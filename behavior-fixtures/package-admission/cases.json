@@ -1,0 +1,36 @@
+{
+  "fixture-version": 1,
+  "valid": [
+    {
+      "rootBasename": "ask-matt",
+      "skillMarkdown": "---\nname: ask-matt\ndescription: Routes architecture questions to a focused design workflow. Use when architecture choices need to be made.\n---\n\n# Ask Matt\n",
+      "expected": {
+        "name": "ask-matt",
+        "description": "Routes architecture questions to a focused design workflow. Use when architecture choices need to be made."
+      }
+    },
+    {
+      "rootBasename": "minimal-skill",
+      "skillMarkdown": "---\nname: minimal-skill\ndescription: A minimal valid Skill used to verify zero-config Package admission.\nmetadata:\n  name: ignored-metadata-name\n---\n",
+      "expected": {
+        "name": "minimal-skill",
+        "description": "A minimal valid Skill used to verify zero-config Package admission."
+      }
+    }
+  ],
+  "invalid": [
+    { "rootBasename": "missing-frontmatter", "skillMarkdown": "# No frontmatter\n", "reason": "missing-frontmatter" },
+    { "rootBasename": "unterminated", "skillMarkdown": "---\nname: unterminated\ndescription: Missing the closing delimiter.\n", "reason": "unterminated-frontmatter" },
+    { "rootBasename": "broken-yaml", "skillMarkdown": "---\nname: [broken-yaml\ndescription: Broken YAML.\n---\n", "reason": "invalid-frontmatter-yaml" },
+    { "rootBasename": "not-a-map", "skillMarkdown": "---\n- name\n- description\n---\n", "reason": "frontmatter-not-map" },
+    { "rootBasename": "missing-name", "skillMarkdown": "---\ndescription: Missing the required name.\n---\n", "reason": "missing-name" },
+    { "rootBasename": "invalid-name", "skillMarkdown": "---\nname: Invalid-Name\ndescription: Invalid name grammar.\n---\n", "reason": "invalid-name" },
+    { "rootBasename": "actual-root", "skillMarkdown": "---\nname: other-root\ndescription: Name does not match the Package Root basename.\n---\n", "reason": "name-root-mismatch" },
+    { "rootBasename": "missing-description", "skillMarkdown": "---\nname: missing-description\n---\n", "reason": "missing-description" },
+    { "rootBasename": "empty-description", "skillMarkdown": "---\nname: empty-description\ndescription: '   '\n---\n", "reason": "invalid-description" },
+    { "rootBasename": "alias-bomb", "skillMarkdown": "---\nname: alias-bomb\ndescription: Excessive YAML aliases must fail as a structured admission error.\nmetadata:\n  a: &a [1, 2, 3]\n  b: &b [*a, *a, *a]\n  c: &c [*b, *b, *b]\n  d: &d [*c, *c, *c]\n  e: &e [*d, *d, *d]\n---\n", "reason": "invalid-frontmatter-yaml" },
+    { "rootBasename": "bad-metadata", "skillMarkdown": "---\nname: bad-metadata\ndescription: Metadata values must be strings.\nmetadata:\n  count: 2\n---\n", "reason": "invalid-metadata" },
+    { "rootBasename": "unknown-frontmatter", "skillMarkdown": "---\nname: unknown-frontmatter\ndescription: Unknown top-level fields must not bypass Agent Skills admission.\nversion: 1.2.3\n---\n", "reason": "unknown-frontmatter-field" },
+    { "rootBasename": "bad-tools", "skillMarkdown": "---\nname: bad-tools\ndescription: allowed-tools must be a string.\nallowed-tools:\n  - Read\n---\n", "reason": "invalid-allowed-tools" }
+  ]
+}

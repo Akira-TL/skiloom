@@ -18,5 +18,8 @@
   "devDependencies": {
     "@types/node": "^22.20.3",
     "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "yaml": "^2.9.1"
   }
 }
