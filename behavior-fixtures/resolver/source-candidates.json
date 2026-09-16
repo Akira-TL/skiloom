@@ -1,0 +1,74 @@
+{
+  "fixture-version": 1,
+  "cases": [
+    {
+      "name": "filters-and-orders-published-semver-candidates",
+      "repository": "Example/Tools",
+      "requirements": [">=1, <2"],
+      "releases": [
+        { "actualTag": "1.4.0", "draft": false, "exactCommit": "c140", "immutable": false, "githubPrerelease": false, "latest": true, "publishedAt": "2026-09-16T20:00:00Z", "apiOrdinal": 0, "snapshot": { "id": "snap-140" } },
+        { "actualTag": "v1.4.0", "draft": true, "exactCommit": "draft-duplicate", "immutable": true, "githubPrerelease": false, "latest": false, "publishedAt": "2026-09-17T20:00:00Z", "apiOrdinal": 1, "snapshot": { "id": "snap-draft-duplicate" } },
+        { "actualTag": "not-semver", "draft": false, "exactCommit": "junk", "immutable": false, "githubPrerelease": false, "latest": false, "publishedAt": "2026-09-18T20:00:00Z", "apiOrdinal": 2, "snapshot": { "id": "snap-junk" } },
+        { "actualTag": "9.0.0", "draft": true, "exactCommit": "draft", "immutable": true, "githubPrerelease": false, "latest": false, "publishedAt": "2026-09-19T20:00:00Z", "apiOrdinal": 3, "snapshot": { "id": "snap-draft" } },
+        { "actualTag": "1.6.0-beta.1", "draft": false, "exactCommit": "pre", "immutable": false, "githubPrerelease": false, "latest": false, "publishedAt": "2026-09-20T20:00:00Z", "apiOrdinal": 4, "snapshot": { "id": "snap-pre" } },
+        { "actualTag": "v1.5.0", "draft": false, "exactCommit": "c150", "immutable": true, "githubPrerelease": true, "latest": false, "publishedAt": "2026-01-01T00:00:00Z", "apiOrdinal": 99, "snapshot": { "id": "snap-150" } },
+        { "actualTag": "2.0.0", "draft": false, "exactCommit": "c200", "immutable": false, "githubPrerelease": false, "latest": false, "publishedAt": "2025-01-01T00:00:00Z", "apiOrdinal": 100, "snapshot": { "id": "snap-200" } }
+      ],
+      "expected": [
+        { "precedence": "1.5.0", "candidates": [{ "version": "1.5.0", "actualTag": "v1.5.0", "exactCommit": "c150", "immutable": true, "snapshotId": "snap-150" }] },
+        { "precedence": "1.4.0", "candidates": [{ "version": "1.4.0", "actualTag": "1.4.0", "exactCommit": "c140", "immutable": false, "snapshotId": "snap-140" }] }
+      ]
+    },
+    {
+      "name": "retains-equal-precedence-build-metadata-group",
+      "repository": "example/tools",
+      "requirements": ["^1"],
+      "releases": [
+        { "actualTag": "1.4.0", "draft": false, "exactCommit": "c140", "immutable": false, "snapshot": { "id": "snap-140" } },
+        { "actualTag": "v1.5.0+windows", "draft": false, "exactCommit": "c15w", "immutable": false, "snapshot": { "id": "snap-15w" } },
+        { "actualTag": "1.5.0+linux", "draft": false, "exactCommit": "c15l", "immutable": true, "snapshot": { "id": "snap-15l" } }
+      ],
+      "expected": [
+        {
+          "precedence": "1.5.0",
+          "candidates": [
+            { "version": "1.5.0+linux", "actualTag": "1.5.0+linux", "exactCommit": "c15l", "immutable": true, "snapshotId": "snap-15l" },
+            { "version": "1.5.0+windows", "actualTag": "v1.5.0+windows", "exactCommit": "c15w", "immutable": false, "snapshotId": "snap-15w" }
+          ]
+        },
+        { "precedence": "1.4.0", "candidates": [{ "version": "1.4.0", "actualTag": "1.4.0", "exactCommit": "c140", "immutable": false, "snapshotId": "snap-140" }] }
+      ]
+    },
+    {
+      "name": "unconstrained-means-stable-release-set",
+      "repository": "example/tools",
+      "requirements": [],
+      "releases": [
+        { "actualTag": "2.0.0-alpha.1", "draft": false, "exactCommit": "pre", "immutable": false, "snapshot": { "id": "snap-pre" } },
+        { "actualTag": "1.9.0", "draft": false, "exactCommit": "stable", "immutable": false, "snapshot": { "id": "snap-stable" } }
+      ],
+      "expected": [
+        { "precedence": "1.9.0", "candidates": [{ "version": "1.9.0", "actualTag": "1.9.0", "exactCommit": "stable", "immutable": false, "snapshotId": "snap-stable" }] }
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "name": "duplicate-normalized-version",
+      "repository": "Example/Tools",
+      "requirements": ["^1"],
+      "releases": [
+        { "actualTag": "v1.4.0", "draft": false, "exactCommit": "b", "immutable": false, "snapshot": { "id": "snap-b" } },
+        { "actualTag": "1.4.0", "draft": false, "exactCommit": "a", "immutable": true, "snapshot": { "id": "snap-a" } }
+      ],
+      "expectedError": {
+        "code": "AmbiguousReleaseVersion",
+        "facts": {
+          "repositoryCoordinate": "example/tools",
+          "normalizedVersion": "1.4.0",
+          "actualTags": ["1.4.0", "v1.4.0"]
+        }
+      }
+    }
+  ]
+}
