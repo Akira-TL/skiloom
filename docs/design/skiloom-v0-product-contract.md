@@ -296,7 +296,7 @@ Skiloom 提供两种单文件导出产物，两者都包含 TOML 精确清单以
 
 ### 内容完整性
 
-所有实际封装内容都必须有摘要验证。导入时逐项验证，损坏、漏文件或摘要不匹配时失败。
+所有实际封装内容都必须有摘要验证。受管 Package 继续使用 `SKILOOM-PACKAGE-V1`，不因进入 export 产生第二套 managed content identity；完整导出中的 Detached Override / 未受管 Skill 使用独立 `SKILOOM-USER-PAYLOAD-V1` portable-tree 摘要域。导入时逐项重算并验证，损坏、漏文件或摘要不匹配时失败。
 
 ### 导入语义
 
@@ -311,7 +311,7 @@ Skiloom 提供两种单文件导出产物，两者都包含 TOML 精确清单以
 
 导出包不得携带或恢复机器本地身份/实现路径，包括原机器绝对 Target path、可复用的旧 `target-id` / generation、Package Store 物理路径、缓存/日志路径或任何凭据。来源 provenance、Package 内容身份和必要 Target 语义可以传播，但新环境必须建立自己的 Target Identity。
 
-外层单文件包的最终扩展名、container framing 与 `skiloom-export.toml` 的具体 schema 由专门公开格式设计固定，不改变上述产品语义。
+v1 单文件扩展名为 `*.skiloom-export`，外层 format identifier 为 `SKILOOM-EXPORT-V1`。Container 使用未压缩、确定性的顺序二进制 framing：`SKILOOM-EXPORT-V1\0` magic、little-endian manifest length、UTF-8 `skiloom-export.toml`，随后为按 payload/path 稳定排序的 regular-file frames。Manifest 严格记录 Direct Install Requirements、exact sources、managed Packages、dependency edges、projection names，以及 full mode 才有的 detached/user-owned records；未知字段、非法组合、frame/payload 不一致或摘要错误 fail closed。Dependency Routing Overlay 与 symlink/junction/copy 等物理 materialization 不进入导出物，而由 exact graph + projection name 或当前平台规则重建。完整公开 schema 与 framing 见 [`exact-export-package-v1.md`](exact-export-package-v1.md)。
 
 ## 15. 已退役的 pre-v0 模型
 

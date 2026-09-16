@@ -211,7 +211,7 @@ request
 - large payload streaming benchmark；
 - 必要时的 export/archive native helper。
 
-`.skiloom-state` v1 已由 #32 固定；本系列剩余的 export container / `skiloom-export.toml` schema 仍必须在实现前由 #17 架构 Gate 收口。
+`.skiloom-state` v1 与 `SKILOOM-EXPORT-V1` / `skiloom-export.toml` 公开格式都已固定；0.7.x 实现必须按对应 Accepted 格式规范开发，不得在代码阶段自行改写 schema/framing。
 
 ## 9. `0.8.x` — Discovery UX、CLI 与第一方 Skills
 

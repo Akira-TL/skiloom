@@ -12,7 +12,7 @@
 
 1. ✅ #27 First-party Skill Suite / bootstrap 已收口；
 2. ✅ `.skiloom-state` v1 公开格式已由 #32 固定；
-3. 单文件 export container + `skiloom-export.toml` v1 公开格式固定；
+3. 单文件 export container + `skiloom-export.toml` v1 公开格式已固定为 `SKILOOM-EXPORT-V1`；
 4. `~/.skiloom/operation.lock` 在 Node.js 官方实现中的跨平台可靠 OS lock 机制固定；
 5. v0 CLI command surface、non-interactive acceptance policy surface 和核心交互边界固定；
 6. Wayfinder #17 完成最终一致性审阅并关闭。

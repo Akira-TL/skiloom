@@ -174,7 +174,7 @@ Skiloom 自己发布的五个标准 Skill Packages：`skiloom` Router、`skiloom
 
 ## Reproducible Export
 
-用户显式生成的可传播 Skill 环境产物，用于跨机器或 CI 恢复一个状态一致的 Target。导出分为“依赖导出”和“完整导出”：两者都包含 TOML 精确清单以及全部 Skiloom 受管 Package 的实际内容；完整导出另外封装 Detached Override 与其他未受管 Skill 的当前内容；改名、依赖路由等可确定性重建的受管变换只记录规则，不额外封装变换后的副本字节。所有封装内容都必须通过摘要校验，因此导入可以离线完成；导入到新环境时重新选择 Target 并取得新的 `target-id`，允许在明确提醒后与已有不冲突 Skill 合并，但同名或同路径冲突必须失败。
+用户显式生成的可传播 Skill 环境产物，用于跨机器或 CI 恢复一个状态一致的 Target。v1 是 `*.skiloom-export` 单文件，外层使用 `SKILOOM-EXPORT-V1` 确定性未压缩 framing，内含严格 TOML `skiloom-export.toml`。导出分为 `dependencies` 与 `full`：两者都包含全部 Skiloom 受管 Package 的 exact source / Package Root / dependency edges / projection names 与实际 `SKILOOM-PACKAGE-V1` 内容；`full` 另外封装 Detached Override 与其他未受管 Skill 的当前字节，并以独立 `SKILOOM-USER-PAYLOAD-V1` digest domain 校验。依赖路由、symlink/junction/copy 等可重建细节不封装。导入可以完全离线，但 recorded source set 仍需重新确认；新环境重新选择 Target 并取得新的 `target-id`，合并导入只允许无同名/同路径冲突项。Export 不携带旧 Target Identity/Generation、本机路径、凭据、cache/log 或 `.skiloom-state` 原文件。
 
 ## Agent Bootstrap
 
