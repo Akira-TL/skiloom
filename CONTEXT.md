@@ -166,7 +166,7 @@ Skiloom Home 中的 machine-local SQLite 状态库，是普通安装日常管理
 
 ## Catalog
 
-用于发现和比较 Skill 的外部目录层。Catalog 可以提供候选、展示元数据与质量/安全信号，但不能成为 Skiloom v0 source/version/content authority；进入安装解析前必须归一成可验证的 source candidate。
+用于发现和比较 Skill 的可选外部目录层。Skiloom v0 默认使用 SkillsMP，并不默认自动聚合多个 Catalog。Catalog 只提供搜索候选和带 provider provenance 的展示信号；只有能明确归一成 GitHub `owner/repo` 与可选 Skill path hint 的条目才能进入安装候选，随后必须重新走 Skiloom 自己的 GitHub source/discovery/digest/resolver 流程。Catalog 自己的 version、hash、snapshot、zip/download 不能成为 source/version/content authority；无 GitHub provenance 的条目可以展示但不能直接安装。Catalog 故障不能影响明确 GitHub coordinate 的 install/update/sync/repair。
 
 ## First-party Skill Suite
 

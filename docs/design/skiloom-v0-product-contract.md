@@ -95,7 +95,7 @@ git
 - Release 只考虑 published (`draft=false`) records；SemVer authority 是 actual tag，不使用 `target_commitish` 代替 tag -> exact commit；
 - GitHub `immutable` 只作为 provenance signal，不是安装准入条件；exact commit 与 Package Content Digest 始终必须存在；
 - repository rename/transfer/redirect 到另一个 canonical coordinate 时返回 `RepositoryCoordinateChanged`，不自动改写来源坐标；
-- Catalog 可以帮助发现 GitHub coordinate，但不能在 v0 中改变 source/version/content authority。
+- Catalog 只负责发现与展示，不能在 v0 中改变 source/version/content authority；v0 默认使用 SkillsMP，只有能明确归一成 GitHub `owner/repo` 的条目才能进入安装候选，且必须重新经过 Skiloom 自己的 GitHub 来源验证。
 
 ## 6. 版本要求与完整依赖解析
 
@@ -307,7 +307,17 @@ Skiloom 提供两种单文件导出产物，两者都包含 TOML 精确清单以
 
 历史 ADR 和旧 design 文档可以保留用于解释设计演进，但凡与本规范冲突，以本规范和后续明确更新的官方产品规范为准。
 
-## 16. 官方实现技术栈
+## 16. Catalog 发现层
+
+Skiloom v0 默认内建 SkillsMP 作为 Catalog discovery provider，但 Catalog 不属于安装来源。Catalog 搜索结果必须先归一成 GitHub `owner/repo` 与可选 Skill path hint，再由 Skiloom 重新执行 GitHub source resolution、Package discovery、snapshot、digest、resolver 与来源确认。
+
+Catalog 的 stars、installs、评分、安全扫描、分类等信号只用于搜索排序和展示，并保留 provider provenance；它们不能影响版本选择、来源接受、Package Content Digest、当前已接受的精确安装状态或精确导出/导入。Catalog 自己的 version、hash、snapshot、zip/download 也不能直接进入 v0 安装流程。
+
+没有可验证 GitHub provenance 的 Catalog 条目可以展示但不能直接安装。Catalog 超时、限流、认证失败或 API 变化不能影响明确 GitHub coordinate 的 install/update/sync/repair。
+
+v0 不默认自动聚合多个 Catalog，也不建立第三方 Catalog Provider SDK；未来新增 provider 必须继续遵守发现层边界。
+
+## 17. 官方实现技术栈
 
 Skiloom 官方实现继续采用：
 
