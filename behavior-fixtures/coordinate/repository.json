@@ -1,0 +1,28 @@
+{
+  "fixture-version": 1,
+  "valid": [
+    {
+      "input": "Akira-TL/Matt-Skills",
+      "canonical": "akira-tl/matt-skills",
+      "owner": "akira-tl",
+      "repo": "matt-skills"
+    },
+    {
+      "input": "owner/repo",
+      "canonical": "owner/repo",
+      "owner": "owner",
+      "repo": "repo"
+    }
+  ],
+  "invalid": [
+    { "input": "owner", "reason": "segment-count" },
+    { "input": "owner/repo/extra", "reason": "segment-count" },
+    { "input": "/repo", "reason": "empty-segment" },
+    { "input": "owner/", "reason": "empty-segment" },
+    { "input": "https://github.com/owner/repo", "reason": "transport-syntax" },
+    { "input": "owner/repo?tab=readme", "reason": "transport-syntax" },
+    { "input": "owner/repo#fragment", "reason": "transport-syntax" },
+    { "input": "owner/repo@main", "reason": "transport-syntax" },
+    { "input": "owner/repo.git", "reason": "git-suffix" }
+  ]
+}

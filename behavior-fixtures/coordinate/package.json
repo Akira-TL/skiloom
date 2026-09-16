@@ -1,0 +1,28 @@
+{
+  "fixture-version": 1,
+  "valid": [
+    {
+      "input": "Akira-TL/Matt-Skills/ask-matt",
+      "canonical": "akira-tl/matt-skills/ask-matt",
+      "packageName": "ask-matt"
+    },
+    {
+      "input": "owner/repo/a1-b2",
+      "canonical": "owner/repo/a1-b2",
+      "packageName": "a1-b2"
+    }
+  ],
+  "invalid": [
+    { "input": "owner/repo", "reason": "segment-count" },
+    { "input": "owner/repo/pkg/extra", "reason": "segment-count" },
+    { "input": "owner//pkg", "reason": "empty-segment" },
+    { "input": "https://github.com/owner/repo/pkg", "reason": "transport-syntax" },
+    { "input": "owner/repo.git/pkg", "reason": "git-suffix" },
+    { "input": "owner/repo/Package", "reason": "invalid-package-name" },
+    { "input": "owner/repo/-package", "reason": "invalid-package-name" },
+    { "input": "owner/repo/package-", "reason": "invalid-package-name" },
+    { "input": "owner/repo/package--name", "reason": "invalid-package-name" },
+    { "input": "owner/repo/package_name", "reason": "invalid-package-name" },
+    { "input": "owner/repo/abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklm", "reason": "invalid-package-name" }
+  ]
+}
