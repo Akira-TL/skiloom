@@ -33,7 +33,10 @@ public package:      skiloom
 public executable:   skiloom
 ```
 
-v0 默认单 npm package。没有真实第二发布物前不启用 monorepo/workspaces；没有真实性能或系统能力证据前不写 native helper。
+v0 默认单 npm package。没有真实第二发布物前不启用 monorepo/workspaces。Native/binary helper 分成两类：
+
+1. **System Capability Helper**：当 Node.js 本身不能可靠提供已经确定的产品所需系统能力时允许成为 mandatory helper，例如 Gate A 正在收口的跨平台 OS file lock。它必须极小、单一职责、预编译分发，并有明确 supported platform matrix；
+2. **Compute Helper**：只有出现真实性能/内存/底层格式处理证据时才引入，默认属于 optional accelerator，不得因为“以后可能更快”预造二进制层。
 
 初始工程采用 TypeScript compiler 直接构建 `dist/`。测试优先使用 Node 自带 test runner 对编译结果运行；如果某个开发工具必须引入第三方 dependency，它只能是 dev-time tooling，不能因此扩大运行时依赖面。
 
@@ -179,7 +182,188 @@ fixture 自己的表示只是 test data format，不是公开 Skiloom format。�
 - source-set delta/origin path；
 - rename/foreign collision/detach/reachability pure target plan。
 
-## 6. 里程碑
+## 6. Native / Binary 实施轨道
+
+Native code 不是独立产品层，而是 Node control plane 后面的窄执行单元。任何 helper 都必须服从：
+
+```text
+官方产品规范
+→ behavior fixtures / system contract tests
+→ Node orchestration
+→ helper deterministic request
+→ helper deterministic response
+```
+
+Helper 不得自行取得网络、凭据、用户授权、Registry 写权限或 Target destructive mutation 权限。
+
+### 6.1 两类 helper
+
+#### A. System Capability Helper
+
+用于 Node 标准能力缺失、但产品语义已经要求的系统调用。v0 当前唯一明确候选是：
+
+```text
+operation.lock
+POSIX: advisory exclusive file lock
+Windows: equivalent kernel-backed exclusive file lock
+```
+
+如果 Gate A 证明 Node 24/22 无法直接可靠完成该能力，则建立一个最小 mandatory platform helper。它只执行：
+
+```text
+acquire lock
+hold lock for parent process lifetime / explicit session
+use a parent-owned pipe/stdin EOF (or equivalent explicit lifetime channel) so parent death forces helper exit
+release on close/helper exit
+return structured status
+```
+
+它不得顺便承担 Store、SQLite、Target 或 resolver 工作。
+
+#### B. Compute Helper
+
+以下是**候选热点**，不是默认必须 native 化：
+
+1. **Resolver search**：大依赖图的 deterministic highest-first backtracking / constraint propagation；
+2. **Repository tree / Git object processing**：pack/object/tree enumeration、exact commit tree extraction 等纯本地处理；
+3. **Snapshot scan + digest**：大规模目录/virtual tree 的 portable-path validation、nested-root cut-out、canonical ordering、`SKILOOM-PACKAGE-V1` stream/hash；
+4. **Export/import payload processing**：大文件树的 deterministic framing、streaming digest、pack/unpack；
+5. 未来经 benchmark 证明的其他纯计算热点。
+
+网络 acquisition、GitHub API、Catalog、用户确认、source authorization、SQLite transaction、Target ownership 和 destructive filesystem change 永远不因性能原因下沉到 compute helper。
+
+### 6.2 Native 化触发 Gate
+
+任何 Compute Helper ticket 创建前必须同时给出：
+
+- 一个已经正确工作的 TypeScript baseline，**或**明确证明 TypeScript 无法合理实现的底层格式/系统能力；
+- 可复现 benchmark fixture；
+- 当前瓶颈是 CPU、内存峰值、吞吐或底层能力中的哪一种；
+- 预期收益阈值；
+- helper 失败时的 fallback / unsupported-platform 行为；
+- 与现有 behavior fixture 的一致性测试方案。
+
+禁止用“Rust/C++ 应该更快”作为 native 化理由。
+
+Compute Helper 默认只有在至少出现以下一种情况时进入实现：
+
+```text
+CPU 时间成为实际用户操作主要瓶颈
+或
+Node 内存峰值对目标规模不可接受
+或
+Node 生态实现会迫使引入更大、更难审计的 runtime dependency
+或
+必须直接处理 Git pack/object、mmap、平台系统调用等底层能力
+```
+
+具体数值阈值由对应 benchmark ticket 固定，不在没有真实 workload 前伪造统一数字。
+
+### 6.3 进程与 IPC
+
+v0 native seam 默认仍是 standalone executable，不使用通用 addon/plugin registry。
+
+每个 helper 独立定义最小 versioned protocol，例如：
+
+```text
+helper-name
+protocol-version
+request-kind
+bounded deterministic input
+→
+result | structured helper error
+```
+
+默认使用 stdin/stdout 或显式临时文件/pipe；Node 使用 `spawn` 直接调用，不经过 shell。IPC 必须：
+
+- 有版本号；
+- 有输入大小/资源边界；
+- stdout 只承载协议结果，诊断走 stderr；
+- 支持 timeout/cancellation；
+- 不接受隐式 HOME/cwd/network discovery；
+- 路径输入必须由 Node 明确提供。
+
+不要建立：
+
+```text
+NativeProvider
+BackendRegistry
+UniversalBinaryRPC
+AlgorithmPlugin
+```
+
+每个 helper 只有出现时才创建一个对应 bridge。
+
+### 6.4 语言与源码布局
+
+Native helper 可以使用 Rust/C/C++，但一个 helper 只选择一种实现语言。默认优先考虑：
+
+- Rust：复杂 parser/search/tree processing，优先内存安全和跨平台；
+- C/C++：只有平台 API、成熟底层库或体积/ABI 需求明显更适合时采用。
+
+这不是对产品公开的语言承诺；选择必须写在具体 helper ticket 中。
+
+真实 helper 出现后才增加：
+
+```text
+native/<helper-name>/
+src/native/<helper-name>.ts   # Node bridge
+```
+
+如果产生 platform-specific npm binary packages，再启用 npm workspaces；此前不为了未来 binary package 提前改仓库结构。
+
+### 6.5 Binary 分发
+
+所有 mandatory/optional helper 都必须由 CI 预编译；最终用户不现场编译。
+
+预期模式：
+
+```text
+skiloom
+  optionalDependencies / required platform dependency as explicitly decided
+    ├── platform binary package (darwin-arm64)
+    ├── platform binary package (darwin-x64)
+    ├── platform binary package (linux-x64-gnu/...)
+    └── platform binary package (win32-x64/...)
+```
+
+Compute accelerator 缺失时，如果 TypeScript baseline 存在，必须自动使用 TS path，行为完全相同。Mandatory System Capability Helper 缺失时必须返回明确的 `UnsupportedPlatformCapability` / 安装完整性错误，不能静默退化成不可靠锁。
+
+### 6.6 Binary 测试
+
+同一个产品算法存在 TS + native 两条路径时：
+
+```text
+同一 behavior fixture
+→ TS implementation
+→ native implementation
+→ canonical result/error 必须相同
+```
+
+此外每个 helper 必须有：
+
+- protocol version/invalid input tests；
+- crash/timeout tests；
+- truncated/corrupt response tests；
+- platform packaging smoke tests；
+- executable provenance / package-integrity 检查；
+- 至少 Linux/macOS/Windows 对应支持矩阵测试。
+
+System Capability Helper 则以系统语义为测试重点，例如双进程争锁、异常退出自动释放、parent/helper crash、路径权限错误。
+
+### 6.7 Native work packages
+
+先预留编号，不代表立即实现：
+
+- **N01 Operation Lock Capability**：Gate A 决定是否需要最小 mandatory native/system helper；
+- **N02 Resolver Benchmark + optional accelerator**：I06 完成且有真实 benchmark 后才可启动；
+- **N03 Git Tree/Object Benchmark + optional helper**：I15 的纯 Node acquisition 路径出现明确瓶颈或底层复杂度后才可启动；
+- **N04 Snapshot/Digest Benchmark + optional helper**：I04 在大型 fixture 上出现明确瓶颈后才可启动；
+- **N05 Export Payload Benchmark + optional helper**：I18 完成 correctness baseline 后才可启动。
+
+N02–N05 任何一项都可以永远不实施；这是正常结果，不影响 v0 correctness。
+
+## 7. 里程碑
 
 ## M0 — Architecture Gate
 
@@ -454,7 +638,7 @@ request
 - npm package 不携带测试秘密、临时数据库或本机绝对路径；
 - release notes 列出支持平台和已知 host projection limitations。
 
-## 7. 暂定依赖图
+## 8. 暂定依赖图
 
 ```text
 Gate A / #17 CLOSED
@@ -470,6 +654,7 @@ Gate A / #17 CLOSED
 
 I02/I04 --------------------> I08
 I02 + Gate lock decision ---> I09/I10
+Gate lock decision ----------> N01 (only if native/system helper is required)
 I06/I07 --------------------> I11
 I08/I09/I10/I11 ------------> I12 --> I13
 I02/I03/I04 ----------------> I14 --> I15
@@ -478,7 +663,14 @@ Gate marker schema + I13 ----> I17
 Gate export schema + I16/I17 -> I18
 I16/I18 + #27/CLI decisions -> I19
 I19 -------------------------> M9 release readiness
+
+I04 -------------------------> N04 benchmark gate
+I06 -------------------------> N02 benchmark gate
+I15 -------------------------> N03 benchmark gate
+I18 -------------------------> N05 benchmark gate
 ```
+
+N02/N03/N04/N05 不在主 correctness critical path；只有 benchmark gate 通过才进入对应里程碑。N01 如果被 Gate A 选为跨平台 lock 的 mandatory 实现，则成为 I10 的实现依赖。
 
 允许的并行：
 
@@ -487,7 +679,7 @@ I19 -------------------------> M9 release readiness
 - I14 GitHub adapter 可与 I11 Target planner 并行；
 - CLI rendering 不应阻塞 domain/runtime 开发，但不得在 Gate A 前固定公开命令语义。
 
-## 8. Ticket 规模规则
+## 9. Ticket 规模规则
 
 真正创建 executable implementation tickets 时，每张票必须：
 
@@ -501,7 +693,7 @@ I19 -------------------------> M9 release readiness
 
 推荐 ticket 大小：一个 deep-module capability 或一个 vertical behavior slice，而不是“一整个 resolver”“实现全部 CLI”这种巨票。
 
-## 9. 代码评审硬边界
+## 10. 代码评审硬边界
 
 每个实现 PR/commit 检查：
 
@@ -515,7 +707,7 @@ I19 -------------------------> M9 release readiness
 - 是否让 native helper/source adapter/CLI 自己拥有产品授权决定；
 - 是否把 secret 写入 Registry/marker/export/log fixture。
 
-## 10. v0 明确不做
+## 11. v0 明确不做
 
 实施阶段不要顺手加入：
 
@@ -532,7 +724,7 @@ I19 -------------------------> M9 release readiness
 - 自动 rename collision suffix；
 - 第三方 conformance/certification 系统。
 
-## 11. 实施启动条件
+## 12. 实施启动条件
 
 当 Gate A 满足后，开发不需要再重新讨论整体架构。第一批 executable tickets 应从：
 
