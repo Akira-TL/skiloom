@@ -335,7 +335,26 @@ Catalog 的 stars、installs、评分、安全扫描、分类等信号只用于�
 
 v0 不默认自动聚合多个 Catalog，也不建立第三方 Catalog Provider SDK；未来新增 provider 必须继续遵守发现层边界。
 
-## 17. 官方实现技术栈
+## 17. 第一方 Skill Suite 与 Bootstrap
+
+Skiloom v0 提供五个第一方标准 Skill Package：`skiloom`、`skiloom-discover`、`skiloom-manage`、`skiloom-doctor`、`skiloom-author`。它们与第三方 Package 使用完全相同的 discovery、source、resolver、Store、Target projection 与 ownership 规则，不形成第一方专用安装权限。
+
+`skiloom` 是 Router Skill，通过普通 Package dependency 显式依赖另外四个 specialist，并根据用户意图进行委托。Router 不是 resolver、dependency routing 或 CLI/runtime 正确性的前提；每个 specialist 也可以独立作为 direct root 安装。
+
+职责边界为：
+
+- `skiloom-discover` 负责 Catalog/GitHub 发现、候选解释与来源提名，不修改 Target；
+- `skiloom-manage` 把 Agent/用户管理意图映射到统一 Skiloom CLI/runtime；
+- `skiloom-doctor` 默认只读诊断，任何修复重新进入普通 sync/repair/recovery/manage 路径；
+- `skiloom-author` 创建/检查标准 Skill 与 Skiloom metadata，不拥有特殊发布或安装能力。
+
+Bootstrap 本质是一次用户显式发起的普通 Router direct install，一次只处理一个用户选择的 Target，并继续使用“显式 Target > 显式 Host preset + scope > 默认 `.agents/skills`”的 Target 选择规则。默认 bootstrap 不使用 repository-wide install，因此官方 repository 后来新增其他 Skill 时，不会仅因 discovery 到新 Package 就自动进入现有 Suite；Suite 扩展必须通过 Router dependency 变化进入普通 update candidate 和 acceptance。
+
+`npm install -g skiloom` / `npx skiloom` 本身不得修改任何 Skill Target，也不得通过 postinstall 或首次运行副作用静默 bootstrap。第一方 Skill 不能直接写 Machine Registry、修改 Store、绕过 `operation.lock`、自动接受来源/Release retarget 或取得普通 Package 之外的隐藏 Target 写权限。
+
+Suite 启用后的 update/remove/sync/repair/detach/rename 等生命周期全部沿用普通 Target 规则。详细契约见 [`first-party-skill-suite-bootstrap.md`](first-party-skill-suite-bootstrap.md)。
+
+## 18. 官方实现技术栈
 
 Skiloom 官方实现继续采用：
 

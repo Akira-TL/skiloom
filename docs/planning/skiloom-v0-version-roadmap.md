@@ -224,10 +224,12 @@ request
 - SkillsMP discovery；
 - explicit GitHub coordinate install；
 - Host preset；
-- first-party `skiloom` / `skiloom-discover` / `skiloom-manage` / `skiloom-doctor` / `skiloom-author` Skills；
-- bootstrap 到用户选定 Target。
+- first-party `skiloom` Router / `skiloom-discover` / `skiloom-manage` / `skiloom-doctor` / `skiloom-author` Skills；
+- Router 通过普通 Package dependency 显式依赖四个 specialist；
+- 一次 bootstrap 只对一个用户选定 Target 执行普通 Router direct install；
+- npm 安装本身不修改 Skill Target。
 
-所有入口最终进入同一 install/update/runtime pipeline。
+所有入口最终进入同一 install/update/runtime pipeline；第一方 Skill 不拥有隐藏安装权限，Router 也不是 CLI/runtime 正确性的前提。
 
 ### `0.8.x` 分支功能
 

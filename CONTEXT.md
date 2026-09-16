@@ -170,7 +170,7 @@ Skiloom Home 中的 machine-local SQLite 状态库，是普通安装日常管理
 
 ## First-party Skill Suite
 
-Skiloom 自己发布的标准 Skill Packages，用于让 Agent 发现、管理、诊断和创作 Skills。它们走与第三方 Package 相同的 source、resolution、Store、Target projection 与 ownership 流程，不拥有系统级特权路径。
+Skiloom 自己发布的五个标准 Skill Packages：`skiloom` Router、`skiloom-discover`、`skiloom-manage`、`skiloom-doctor`、`skiloom-author`。Router 通过普通 Package dependency 显式依赖四个 specialist，只负责 Agent 意图路由；specialist 也都可以独立安装。五者走与第三方 Package 相同的 source、resolution、Store、Target projection 与 ownership 流程，不拥有系统级特权路径，也不是 CLI/runtime 正确性的前提。
 
 ## Reproducible Export
 
@@ -178,4 +178,4 @@ Skiloom 自己发布的标准 Skill Packages，用于让 Agent 发现、管理�
 
 ## Agent Bootstrap
 
-把 First-party Skill Suite 显式安装到用户选择 Target 的首次启用过程。npm 安装本身不修改任何 Skill Target；bootstrap 经一次明确授权后，后续 Agent 可以通过已安装的 Skiloom Skills 无感编排 Skiloom，但 source/graph 变化仍受普通 candidate acceptance 约束。
+把 First-party Skill Suite 显式安装到用户选择 Target 的首次启用过程。v0 一次 bootstrap 只处理一个 Target，本质是普通安装官方 `skiloom` Router direct root，其四个 specialist 通过普通依赖解析进入 Target。默认 bootstrap 不使用 repository-wide install，也不自动扫描并批量修改多个宿主 Target。npm 安装本身不修改任何 Skill Target；后续更新、修复、删除和来源/依赖图变化全部继续走普通 Skiloom 生命周期与 candidate acceptance。
