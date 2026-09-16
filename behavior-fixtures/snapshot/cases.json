@@ -1,0 +1,233 @@
+{
+  "fixture-version": 1,
+  "valid": [
+    {
+      "name": "single regular file golden vector",
+      "packageRoot": "skill",
+      "discoveredPackageRoots": ["skill"],
+      "entries": [
+        { "path": "skill/SKILL.md", "fileType": "regular", "gitMode": "100644", "contentHex": "68656c6c6f0a" }
+      ],
+      "expected": {
+        "entries": [
+          { "path": "SKILL.md", "executable": false, "contentHex": "68656c6c6f0a", "fileDigest": "sha256:5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03" }
+        ],
+        "contentDigest": "sha256:449cfc990a3951bf529fd2c4709a56d2f633f494ebd619fe7ef6613b4741281a"
+      }
+    },
+    {
+      "name": "executable Git mode changes the canonical digest",
+      "packageRoot": "skill",
+      "discoveredPackageRoots": ["skill"],
+      "entries": [
+        { "path": "skill/SKILL.md", "fileType": "regular", "gitMode": "100755", "contentHex": "68656c6c6f0a" }
+      ],
+      "expected": {
+        "entries": [
+          { "path": "SKILL.md", "executable": true, "contentHex": "68656c6c6f0a", "fileDigest": "sha256:5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03" }
+        ],
+        "contentDigest": "sha256:2cd38b0723e3cf0a074b92f166e90ebee954db4df4b3722f0e0db3d9000807bc"
+      }
+    },
+    {
+      "name": "raw UTF-8 path bytes define stable entry ordering",
+      "packageRoot": "skill",
+      "discoveredPackageRoots": ["skill"],
+      "entries": [
+        { "path": "skill/ä.txt", "fileType": "regular", "gitMode": "100644", "contentHex": "756d6c617574" },
+        { "path": "skill/z.txt", "fileType": "regular", "gitMode": "100755", "contentHex": "00ff01" },
+        { "path": "skill/SKILL.md", "fileType": "regular", "gitMode": "100644", "contentHex": "736b696c6c" }
+      ],
+      "expected": {
+        "entries": [
+          { "path": "SKILL.md", "executable": false, "contentHex": "736b696c6c", "fileDigest": "sha256:9c53c074d7ac6a2728b638ac1f376c5fa9eb8f71603017c3ea638c2fd40548df" },
+          { "path": "z.txt", "executable": true, "contentHex": "00ff01", "fileDigest": "sha256:47ffa3ea45a70b8a41c2c0825df323c00a8b7a01c1ea06083cc41dddcc001123" },
+          { "path": "ä.txt", "executable": false, "contentHex": "756d6c617574", "fileDigest": "sha256:46265dd2e7076be5d1b793a7042ca66a0e7cbea186cdf38c335d6425ab6e01b4" }
+        ],
+        "contentDigest": "sha256:46af077044dccbed9310b15624be9c0c4e062c0ba2bdf313c2e5065fc0e756a6"
+      }
+    },
+    {
+      "name": "discovered nested Package Roots are cut before file validation",
+      "packageRoot": "skills/foo",
+      "discoveredPackageRoots": ["skills/foo", "skills/foo/examples/bar"],
+      "entries": [
+        { "path": "skills/foo/examples/bar/link", "fileType": "symlink" },
+        { "path": "skills/foo/examples/bar/helper.py", "fileType": "regular", "gitMode": "100755", "contentHex": "7072696e742831290a" },
+        { "path": "skills/foo/examples/bar/SKILL.md", "fileType": "regular", "gitMode": "100644", "contentHex": "626172" },
+        { "path": "skills/foo/keep.txt", "fileType": "regular", "gitMode": "100644", "contentHex": "6b656570" },
+        { "path": "skills/foo/SKILL.md", "fileType": "regular", "gitMode": "100644", "contentHex": "666f6f" }
+      ],
+      "expected": {
+        "entries": [
+          { "path": "SKILL.md", "executable": false, "contentHex": "666f6f", "fileDigest": "sha256:2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae" },
+          { "path": "keep.txt", "executable": false, "contentHex": "6b656570", "fileDigest": "sha256:6ca7ea2feefc88ecb5ed6356ed963f47dc9137f82526fdd25d618ea626d0803f" }
+        ],
+        "contentDigest": "sha256:6e73b744a03533c3abc732f212772c9bcfd6eb827c357c037e5af934209d8549"
+      }
+    },
+    {
+      "name": "filtered-out nested Skill content remains ordinary ancestor content",
+      "packageRoot": "skills/foo",
+      "discoveredPackageRoots": ["skills/foo"],
+      "entries": [
+        { "path": "skills/foo/examples/bar/helper.py", "fileType": "regular", "gitMode": "100755", "contentHex": "7072696e742831290a" },
+        { "path": "skills/foo/examples/bar/SKILL.md", "fileType": "regular", "gitMode": "100644", "contentHex": "626172" },
+        { "path": "skills/foo/keep.txt", "fileType": "regular", "gitMode": "100644", "contentHex": "6b656570" },
+        { "path": "skills/foo/SKILL.md", "fileType": "regular", "gitMode": "100644", "contentHex": "666f6f" }
+      ],
+      "expected": {
+        "entries": [
+          { "path": "SKILL.md", "executable": false, "contentHex": "666f6f", "fileDigest": "sha256:2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae" },
+          { "path": "examples/bar/SKILL.md", "executable": false, "contentHex": "626172", "fileDigest": "sha256:fcde2b2edba56bf408601fb721fe9b5c338d10ee429ea04fae5511b68fbf8fb9" },
+          { "path": "examples/bar/helper.py", "executable": true, "contentHex": "7072696e742831290a", "fileDigest": "sha256:cc42155088fca5730758db72b2a5bca33112a941dfaa2d43098ec422ce4ea213" },
+          { "path": "keep.txt", "executable": false, "contentHex": "6b656570", "fileDigest": "sha256:6ca7ea2feefc88ecb5ed6356ed963f47dc9137f82526fdd25d618ea626d0803f" }
+        ],
+        "contentDigest": "sha256:d3f2cdcd8e5bb03bee69fab3df5df586e40c43d4d1306205fdf469c892b1931f"
+      }
+    },
+    {
+      "name": "Unicode normalization is not applied to paths",
+      "packageRoot": "skill",
+      "discoveredPackageRoots": ["skill"],
+      "entries": [
+        { "path": "skill/é.txt", "fileType": "regular", "gitMode": "100644", "contentHex": "61" },
+        { "path": "skill/é.txt", "fileType": "regular", "gitMode": "100644", "contentHex": "62" },
+        { "path": "skill/SKILL.md", "fileType": "regular", "gitMode": "100644", "contentHex": "736b696c6c" }
+      ],
+      "expected": {
+        "entries": [
+          { "path": "SKILL.md", "executable": false, "contentHex": "736b696c6c", "fileDigest": "sha256:9c53c074d7ac6a2728b638ac1f376c5fa9eb8f71603017c3ea638c2fd40548df" },
+          { "path": "é.txt", "executable": false, "contentHex": "62", "fileDigest": "sha256:3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d" },
+          { "path": "é.txt", "executable": false, "contentHex": "61", "fileDigest": "sha256:ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb" }
+        ],
+        "contentDigest": "sha256:29618f124fc4e9138e649ced895fd1d158dbb934430f1afbde6cc35c983e1e20"
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "name": "special files fail closed",
+      "packageRoot": "skill",
+      "discoveredPackageRoots": ["skill"],
+      "entries": [
+        { "path": "skill/link", "fileType": "symlink" }
+      ],
+      "error": {
+        "code": "UnsupportedPackageFileType",
+        "facts": { "path": "link", "fileType": "symlink" }
+      }
+    },
+    {
+      "name": "absolute package-relative paths fail closed",
+      "packageRoot": ".",
+      "discoveredPackageRoots": ["."],
+      "entries": [
+        { "path": "/bad", "fileType": "regular", "gitMode": "100644", "contentHex": "00" }
+      ],
+      "error": {
+        "code": "InvalidPackagePath",
+        "facts": { "pathHex": "2f626164", "reason": "absolute-path" }
+      }
+    },
+    {
+      "name": "empty path components fail closed",
+      "packageRoot": "skill",
+      "discoveredPackageRoots": ["skill"],
+      "entries": [
+        { "path": "skill/a//b", "fileType": "regular", "gitMode": "100644", "contentHex": "00" }
+      ],
+      "error": {
+        "code": "InvalidPackagePath",
+        "facts": { "pathHex": "612f2f62", "reason": "empty-segment" }
+      }
+    },
+    {
+      "name": "dot path components fail closed",
+      "packageRoot": "skill",
+      "discoveredPackageRoots": ["skill"],
+      "entries": [
+        { "path": "skill/./x", "fileType": "regular", "gitMode": "100644", "contentHex": "00" }
+      ],
+      "error": {
+        "code": "InvalidPackagePath",
+        "facts": { "pathHex": "2e2f78", "reason": "dot-segment" }
+      }
+    },
+    {
+      "name": "parent path components fail closed",
+      "packageRoot": "skill",
+      "discoveredPackageRoots": ["skill"],
+      "entries": [
+        { "path": "skill/a/../x", "fileType": "regular", "gitMode": "100644", "contentHex": "00" }
+      ],
+      "error": {
+        "code": "InvalidPackagePath",
+        "facts": { "pathHex": "612f2e2e2f78", "reason": "parent-segment" }
+      }
+    },
+    {
+      "name": "NUL in a package path fails closed",
+      "packageRoot": "skill",
+      "discoveredPackageRoots": ["skill"],
+      "entries": [
+        { "pathHex": "736b696c6c2f626164006e616d65", "fileType": "regular", "gitMode": "100644", "contentHex": "00" }
+      ],
+      "error": {
+        "code": "InvalidPackagePath",
+        "facts": { "pathHex": "626164006e616d65", "reason": "nul" }
+      }
+    },
+    {
+      "name": "invalid UTF-8 package paths fail closed",
+      "packageRoot": "skill",
+      "discoveredPackageRoots": ["skill"],
+      "entries": [
+        { "pathHex": "736b696c6c2fff2e747874", "fileType": "regular", "gitMode": "100644", "contentHex": "00" }
+      ],
+      "error": {
+        "code": "InvalidPackagePath",
+        "facts": { "pathHex": "ff2e747874", "reason": "invalid-utf8" }
+      }
+    },
+    {
+      "name": "Unicode default case-fold collisions fail closed",
+      "packageRoot": "skill",
+      "discoveredPackageRoots": ["skill"],
+      "entries": [
+        { "path": "skill/Straße.txt", "fileType": "regular", "gitMode": "100644", "contentHex": "61" },
+        { "path": "skill/STRASSE.txt", "fileType": "regular", "gitMode": "100644", "contentHex": "62" }
+      ],
+      "error": {
+        "code": "PackagePathCollision",
+        "facts": { "caseFoldedPath": "strasse.txt", "paths": ["STRASSE.txt", "Straße.txt"] }
+      }
+    },
+    {
+      "name": "implicit directory case-fold collisions fail closed",
+      "packageRoot": "skill",
+      "discoveredPackageRoots": ["skill"],
+      "entries": [
+        { "path": "skill/assets/b.txt", "fileType": "regular", "gitMode": "100644", "contentHex": "62" },
+        { "path": "skill/Assets/a.txt", "fileType": "regular", "gitMode": "100644", "contentHex": "61" }
+      ],
+      "error": {
+        "code": "PackagePathCollision",
+        "facts": { "caseFoldedPath": "assets", "paths": ["Assets/a.txt", "assets/b.txt"] }
+      }
+    },
+    {
+      "name": "Cherokee default case-fold collisions use the Unicode fold mapping",
+      "packageRoot": "skill",
+      "discoveredPackageRoots": ["skill"],
+      "entries": [
+        { "path": "skill/ꭰ.txt", "fileType": "regular", "gitMode": "100644", "contentHex": "62" },
+        { "path": "skill/Ꭰ.txt", "fileType": "regular", "gitMode": "100644", "contentHex": "61" }
+      ],
+      "error": {
+        "code": "PackagePathCollision",
+        "facts": { "caseFoldedPath": "Ꭰ.txt", "paths": ["Ꭰ.txt", "ꭰ.txt"] }
+      }
+    }
+  ]
+}
