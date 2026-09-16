@@ -1,6 +1,6 @@
 # Skiloom v0 开发实施计划
 
-状态：Planning / blocked by architecture gate
+状态：Planning / ready for ticket decomposition
 
 对应 Issue：#30 `Plan Skiloom v0 implementation decomposition`
 
@@ -8,14 +8,14 @@
 
 ## 1. 开始写运行时代码前的 Gate A
 
-当前仓库仍是纯设计仓。满足以下条件前，不创建 `src/`、`package.json` 或 executable implementation ticket：
+Gate A 已全部满足；当前仓库仍是纯设计仓，下一步先从 canonical Spec #31 执行 `to-tickets`，再由 executable implementation tickets 启动 `src/`、`package.json` 与运行时代码：
 
 1. ✅ #27 First-party Skill Suite / bootstrap 已收口；
 2. ✅ `.skiloom-state` v1 公开格式已由 #32 固定；
 3. ✅ 单文件 export container + `skiloom-export.toml` v1 公开格式已固定为 `SKILOOM-EXPORT-V1`；
 4. ✅ `~/.skiloom/operation.lock` 已固定使用 mandatory Rust helper `skiloom-lock`；
 5. ✅ v0 CLI command surface、non-interactive acceptance policy surface 和核心交互边界已由 #35 固定；
-6. Wayfinder #17 完成最终一致性审阅并关闭。
+6. ✅ Wayfinder #17 已完成最终一致性审阅并关闭。
 
 Gate A 的目的不是继续扩大产品设计，而是防止实现阶段偷偷替公开格式、锁机制或 CLI 行为做不可逆决定。
 
@@ -367,9 +367,9 @@ N02–N05 任何一项都可以永远不实施；这是正常结果，不影响 
 
 ## M0 — Architecture Gate
 
-**产物：** Gate A 全部关闭，#17 CLOSED。
+**状态：Completed。** Gate A 全部关闭，#17 CLOSED。
 
-**禁止：** runtime skeleton、npm publish、真实 CLI implementation。
+**下一步：** 从 #31 执行 `to-tickets`；在 executable implementation ticket 建立前仍不直接启动 runtime skeleton、npm publish 或真实 CLI implementation。
 
 ---
 
