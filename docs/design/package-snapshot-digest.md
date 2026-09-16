@@ -2,6 +2,8 @@
 
 状态：Accepted
 
+当前说明：本文件的 Package Snapshot / `SKILOOM-PACKAGE-V1` / Store identity 细节继续是当前技术规范；pre-shift 的 `skiloom.lock` 持久化表述已被 Machine Registry 当前精确状态取代。
+
 对应 Wayfinder：#13 `Define canonical Package content digest`
 
 ## 1. 目标
@@ -218,7 +220,7 @@ for each file entry in canonical order:
 content-digest = SHA-256(canonical stream)
 ```
 
-Lock 表达：
+标准文本表达：
 
 ```text
 sha256:<64 lowercase hex chars>
@@ -236,7 +238,7 @@ SHA256(temp-directory-tarball)
 
 因为 archive compression、header、timestamp、entry layout 等 transport metadata 可以变化，而解压后的 Package 语义不变。
 
-Release/Git source provenance 负责回答“内容从哪里来”；`content-digest` 负责回答“选中的 Package snapshot 是什么内容”。两者分别进入 Lock。
+Release/Git source provenance 负责回答“内容从哪里来”；`content-digest` 负责回答“选中的 Package snapshot 是什么内容”。两者在 Machine Registry 的当前已接受精确状态中保持分离，并在显式精确导出中一起传播。
 
 ## 10. Store Key
 
@@ -263,7 +265,7 @@ repo B / commit Z / foo
 
 只要最终 canonical Package snapshot 完全相同，就复用同一 Store entry。
 
-GitHub owner/repo、Release version、tag、commit、package-root 等 provenance 不进入 Store key；它们保存在 `skiloom.lock`。
+GitHub owner/repo、Release version、tag、commit、package-root 等 provenance 不进入 Store key；它们保存在 Machine Registry 的当前精确来源/Package records 中。
 
 ## 11. Store 写入与验证
 
@@ -287,27 +289,28 @@ materialize selected Package snapshot
 
 不得把 mutable Git checkout 或 Release extraction directory 直接作为 Store entry。
 
-## 12. Lock 关系
+## 12. 与当前精确安装状态的关系
 
-Lock 将 Package content identity 与 source provenance 重新关联，但不复制第二套 Package name/ref authority：
+Machine Registry 把 Package content identity 与 source provenance 重新关联，但不复制第二套 Package name/ref authority：
 
 ```text
-Repository Record
-  -> canonical repository coordinate
-  -> Release: normalized SemVer + actual tag + exact commit + immutable signal
-  -> Git: exact commit
-
-Requirement Record
+Direct Install Requirement
+  -> Package coordinate 或 repository-wide coordinate
   -> top-level Release requirement 或 requested Git ref
 
-Package Record
+Resolved Source
+  -> canonical repository coordinate
+  -> Release: normalized SemVer + actual tag + exact commit + immutable signal
+  -> Git: requested ref + exact commit
+
+Resolved Package
   -> full Package coordinate（末段即 SKILL.md.name）
   -> repository-relative package-root
   -> content-digest
   -> resolved dependency edges
 ```
 
-Git requested ref 属于 Project Requirement semantics，不重复写入 Repository Record；Package name 已编码在 full Package coordinate 中，也不作为独立 Lock 字段。`content-digest` 不包含 provenance，所以 Store 可以跨 repository/source 去重；Lock 通过 `requirement -> repository -> package` 三层记录将 content 与来源重新关联。
+Git requested ref 属于用户的直接安装要求与精确来源 provenance；Package name 已编码在 full Package coordinate 中，不再复制独立 name authority。`content-digest` 不包含 provenance，所以 Store 可以跨 repository/source 去重；Machine Registry 通过 direct requirement、resolved source、resolved package/edge 关系把内容与来源重新关联。
 
 ## 13. 错误边界
 
@@ -316,7 +319,7 @@ v0 至少需要区分：
 - `UnsupportedPackageFileType`：包含 symlink 或其他特殊文件；
 - `InvalidPackagePath`：路径不是合法 portable relative UTF-8 path；
 - `PackagePathCollision`：Unicode default case folding 后发生冲突；
-- `PackageContentDigestMismatch`：已有/重建 snapshot 与 Lock digest 不一致；
+- `PackageContentDigestMismatch`：已有/重建 snapshot 与当前已接受或导出记录的 expected digest 不一致；
 - `CorruptStoreEntry`：content-addressed Store entry 自校验失败。
 
 ## 14. 最终 v0 契约

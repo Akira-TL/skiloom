@@ -2,6 +2,7 @@
 
 - 状态：Accepted
 - 日期：2026-09-14
+- 当前说明：`SKILOOM-PACKAGE-V1`、snapshot 边界与 digest 规则继续有效；文中 `Lock` / `skiloom.lock` 仅是 pre-shift 持久化表述，现行 source provenance 与 Package identity 由 Machine Registry 的当前精确状态关联，并在显式导出时传播。
 
 ## 背景
 

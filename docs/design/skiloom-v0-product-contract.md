@@ -119,16 +119,23 @@ Release Version Requirement 使用 Cargo-style SemVer profile：
 
 ## 7. 直接安装要求与更新
 
-每个 Target 保存用户当前的全部直接安装要求。
+每个 Target 保存用户当前的全部直接安装要求。直接安装要求有两种目标：
+
+- Package requirement：`<owner>/<repo>/<package>`，把一个明确 Package 作为直接 root；
+- Repository-wide requirement：`<owner>/<repo>`，把所选 exact repository snapshot 经当前 discovery policy 发现的**全部 Package**作为直接 roots。
+
+Package dependency edge 始终精确指向 Package Coordinate，不允许用 repository-wide requirement 表达传递依赖。
 
 Release 直接安装要求可以：
 
 - 显式保存版本要求；后续更新继续遵守该要求；
 - 不指定版本；后续更新允许选择当前最新合法版本。
 
-Git 直接安装要求保存 Package coordinate 与用户请求的 ref；改变来源、约束或 ref 属于显式请求。
+Git 直接安装要求保存目标 coordinate 与用户请求的 ref；改变来源、约束或 ref 属于显式请求。
 
-安装或更新不是局部修改某个依赖闭包。Skiloom 根据该 Target 的全部直接安装要求重新解析完整统一依赖图，使系列 Skill、共享依赖与传递依赖保持同一批次的一致状态。
+Repository-wide requirement 在每次重新解析时都针对本次候选 exact snapshot 重新运行 discovery。因此仓库后来新增或删除合法 Skill 时，直接 root 集合可以随候选版本变化；这些增删必须作为完整候选状态的一部分展示并接受，不能在普通 sync/repair 中静默发生。
+
+安装或更新不是局部修改某个依赖闭包。Skiloom 根据该 Target 的全部直接安装要求重新解析完整统一依赖图，使系列 Skill、共享依赖和传递依赖保持同一批次的一致状态。
 
 旧的当前精确状态只用于比较变化和来源确认，不参与新方案的 candidate ordering。
 
@@ -217,8 +224,11 @@ Target 内使用平铺 `<target>/<activation-name>` 结构。
 - foreign/unknown path 冲突 fail closed；
 - 不自动生成 `foo-2` 一类名字；
 - rename 是 Target + Package 属性，不改变 Package coordinate 或 Store digest；
+- 某个 dependency 使用非默认 projection name 时，Skiloom 只向**声明该依赖的直接反向依赖 Package**生成确定性的 Dependency Routing Overlay；不得全局猜测或改写无关 Package；
+- Skill dependency 是能力依赖，不是跨 Package 路径/name ABI；Package 不得依赖 `../OtherSkill/...` 或某个 projection dirname 作为稳定接口；
 - 受管 transformed copy 仍完全归 Skiloom 管理，用户不能把它当作本地编辑副本；
-- managed 内容被未知修改时，不自动 merge 或 adopt。
+- managed 内容被未知修改时，不自动 merge 或 adopt；
+- 移除一个直接安装要求后，从剩余直接 roots 重新计算 reachability；只移除新变得不可达且仍由 Skiloom 管理的投影，共享依赖只要仍可达就必须保留。
 
 用户可以显式 `detach`：
 
@@ -226,6 +236,8 @@ Target 内使用平铺 `<target>/<activation-name>` 结构。
 - logical Package binding 继续存在；
 - Skiloom 保留 detach 时 baseline provenance 供诊断、路由和恢复提示；
 - 后续相关 update 只警告用户自行适配，不自动覆盖、合并或声称修改后的内容满足新约束。
+
+如果 Detached Override 后来被用户在 Skiloom 外手动移动或改名，Skiloom 不猜测新的绑定；该 logical binding 保持 broken，直到用户显式 rebind。若 Detached Override 已不再被任何 root/dependency 需要且自身也不是直接 root，Skiloom 只移除 logical binding，绝不删除用户目录；如果它仍是直接 root，则绑定继续存在直到用户 remove/forget。
 
 用户显式 `forget` 后释放 Skiloom 关联，字节继续作为 foreign/user-owned 内容保留。
 
@@ -258,7 +270,7 @@ Host preset 不修改宿主配置，也不决定 symlink/junction/copy；通用 
 
 ## 14. 精确导出与导入
 
-Skiloom 提供两种单文件导出产物，两者都包含 TOML 精确清单以及 Skiloom 受管 Package 的实际内容：
+Skiloom 提供两种单文件导出产物，两者都包含 TOML 精确清单以及 Skiloom 受管 Package 的实际内容。只有处于已协调一致状态的 Target 才能导出；stale copy、待修复 projection、marker/DB 身份异常等状态必须先 sync、repair 或 fork，不能把异常现场直接封装成精确导出。
 
 ### 依赖导出
 
@@ -277,7 +289,7 @@ Skiloom 提供两种单文件导出产物，两者都包含 TOML 精确清单以
 - Detached Override 的当前用户字节；
 - Target 中其他可识别、未由 Skiloom 管理的 Skill 当前内容。
 
-完整导出只接受普通文件和目录；用户 Skill 中出现 symlink、设备文件、管道等不可移植特殊内容时明确失败，不跟随、不静默忽略。
+完整导出只接受普通文件和目录；用户 Skill 中出现 symlink、设备文件、管道等不可移植特殊内容时明确失败，不跟随、不静默忽略。对于用户所有/未受管 Skill 自己声明但当前环境并不存在的依赖，导出不联网获取或补齐，只产生可见警告，也不把这类声明自动提升成 Skiloom resolver constraint。
 
 ### 内容完整性
 
@@ -294,7 +306,9 @@ Skiloom 提供两种单文件导出产物，两者都包含 TOML 精确清单以
 - 同名或同路径冲突直接失败，不自动覆盖、不自动改名；
 - 完整导出中的 detach / 未受管 Skill 导入后继续归用户管理。
 
-外层单文件包的最终扩展名可以由后续格式设计固定，不改变上述产品语义。
+导出包不得携带或恢复机器本地身份/实现路径，包括原机器绝对 Target path、可复用的旧 `target-id` / generation、Package Store 物理路径、缓存/日志路径或任何凭据。来源 provenance、Package 内容身份和必要 Target 语义可以传播，但新环境必须建立自己的 Target Identity。
+
+外层单文件包的最终扩展名、container framing 与 `skiloom-export.toml` 的具体 schema 由专门公开格式设计固定，不改变上述产品语义。
 
 ## 15. 已退役的 pre-v0 模型
 

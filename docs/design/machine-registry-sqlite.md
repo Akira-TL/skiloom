@@ -114,18 +114,24 @@ observed_generation  INTEGER
 
 ```text
 target_id            TEXT NOT NULL
-package_coordinate   TEXT NOT NULL
+requirement_kind     TEXT NOT NULL   # package | repository
+target_coordinate    TEXT NOT NULL
 source_kind          TEXT NOT NULL   # github-release | git
 version_requirement  TEXT NULL
 git_requested_ref    TEXT NULL
-PRIMARY KEY (target_id, package_coordinate)
+PRIMARY KEY (target_id, requirement_kind, target_coordinate)
 ```
 
 规则：
 
+- `requirement_kind = package` 时，`target_coordinate` 必须是 `<owner>/<repo>/<package>`；
+- `requirement_kind = repository` 时，`target_coordinate` 必须是 `<owner>/<repo>`，表示该候选 exact repository snapshot discovery 后的全部 Package 都是直接 roots；
+- 一个 Target 可以同时保留同 repository 的整仓 requirement 与独立 Package requirement，因为它们代表不同的用户直接安装意图；移除其中一个时，另一个仍然继续维持对应 root；
+- 同 repository 的多条直接安装要求最终仍共享一个 repository-scoped source assignment；不兼容的 Release/Git 来源要求按既有 resolver/source conflict 规则失败；
 - `github-release` 可以有 canonical version requirement，也可以为 NULL 表示未指定版本；
 - `git` 必须有 `git_requested_ref`；
-- Release 与 Git 的约束字段不得混用。
+- Release 与 Git 的约束字段不得混用；
+- repository-wide requirement 每次 re-resolution 都重新 discovery；其当次展开出的具体 Package 集合属于 `resolved_packages` 当前精确状态，不在本表复制一份展开缓存。
 
 ### 4.4 `resolved_sources`
 
@@ -264,25 +270,26 @@ Machine Registry 不长期保存：
 
 ```text
 1. 读取当前已接受状态
-2. 在事务外完成 source/resolver、Store 获取、Target 安全 preflight
-3. 准备新 projection 的 sibling temp 内容
-4. 用户/策略接受完整新状态
-5. 写入临时进行中操作记录
-6. 执行 Target 文件系统变化
-7. 一个 SQLite transaction 替换该 Target 的完整当前状态并 generation + 1
-8. 删除进行中操作记录
-9. 最后写/更新 Target `.skiloom-state` generation
+2. 在事务外完成 source/resolver、Store 获取与 Target 安全 preflight
+3. 用户/策略接受完整新状态
+4. 如需 sibling staging，记录只用于识别 Skiloom 自己临时路径的进行中操作线索并准备 staging 内容；此时不得替换 live Target 路径
+5. 一个 SQLite transaction 原子替换该 Target 的完整当前状态并 generation + 1
+6. 严格按刚提交的数据库新状态 materialize / reconcile Target
+7. 最后写/更新 Target `.skiloom-state` generation
+8. 清理 staging 与进行中操作线索
 ```
 
-步骤 7 必须是单一 SQLite transaction：同一 Target 的 direct requirements、resolved sources/packages、dependency edges、projection/detach state 与 generation 要么一起成为当前状态，要么完全不改变。
+步骤 5 必须是单一 SQLite transaction：同一 Target 的 direct requirements、resolved sources/packages、dependency edges、projection/detach state 与 generation 要么一起成为当前已接受状态，要么完全不改变。
 
-Store entry 在进入 Target 变更前必须已经完整写好并通过 Package Content Digest 验证；Store immutable，因此不需要与 Target state transaction 做数据库级联合事务。
+**SQLite 必须先于 live Target 成为新权威。** 如果数据库提交后 Target materialization 因进程中断、权限变化或外部文件系统冲突而未完成，数据库中的新状态仍是当前已接受状态；该 Target 处于落后/未完成同步状态，后续 `sync` 严格执行 Machine Registry -> Target，不把残留文件系统状态反向采纳回数据库。
 
-## 8. 最小崩溃恢复日志
+Store entry 在数据库新状态提交前必须已经完整写好并通过 Package Content Digest 验证；Store immutable，因此不需要与 Target state transaction 做数据库级联合事务。
 
-SQLite 与任意 Target filesystem 不能形成真正的跨资源 ACID transaction。v0 不因此建立历史库，只保留一个 **临时、可删除的进行中操作日志**。
+## 8. 最小 staging 清理线索
 
-建议：
+SQLite 与任意 Target filesystem 不能形成真正的跨资源 ACID transaction，但 v0 不为此建立回滚历史。由于第 7 节采用 **DB-first**，live Target 永远只需要向当前数据库状态前进。
+
+如果 materialization 需要在 Target 同文件系统上创建 sibling staging，官方实现可以保留一组 **临时、可删除的 staging 清理线索**：
 
 ```text
 pending_operations
@@ -293,30 +300,28 @@ pending_operations
 
 pending_projection_actions
   operation_id
-  target_path
+  staging_path
   activation_name
-  action_kind
-  action_json
 ```
 
-它只描述当前一个未完成状态型操作需要安全识别的 Target 路径动作，不保存长期历史。
+这些记录只允许描述 Skiloom 自己创建的 staging/temp 路径，不能把未提交前的 live Target mutation 设计成需要根据日志反向回滚的事务。
 
 正常完成后立即删除。
 
-如果进程在 SQLite 最终状态提交前中断：
+如果进程在 SQLite 新状态提交前中断：
 
 - 当前 accepted state 仍是旧 generation；
-- 下次取得 `operation.lock` 后检测到 pending operation；
-- Skiloom 只根据旧 accepted state + pending action 信息清理本次自己创建的临时/新路径，并把 Target 精确恢复到旧 accepted state；
-- 中断的安装/更新不自动视为已经完成，用户重新运行原操作。
+- live Target 尚未被替换；
+- 下次取得 `operation.lock` 后只清理能够由 pending 记录明确证明属于 Skiloom 的 staging/temp 路径，然后删除 pending 记录；
+- 不扫描或猜测其他 Target 内容。
 
-如果 SQLite 最终状态已经提交但 marker 尚未更新：
+如果 SQLite 新状态已经提交、但 Target 或 marker 尚未同步完成：
 
-- pending rows 与最终 transaction 一起删除；
-- DB generation 高于 `.skiloom-state`；
-- 下次按既有规则把 Target/marker sync 到数据库当前 accepted state。
+- 数据库新 generation 已经是权威；
+- 下次操作按既有规则执行 Machine Registry -> Target 的 `sync`；
+- pending 记录只用于清理确定属于该未完成操作的 staging/temp 内容，不承担把数据库或 Target 回滚到旧 generation 的职责。
 
-因此 pending log 是崩溃恢复工具，不是第二份 Lock，也不是安装历史。
+因此 pending 表只是临时清理工具，不是第二份 Lock、安装历史或跨资源 rollback log。
 
 ## 9. Schema migration
 

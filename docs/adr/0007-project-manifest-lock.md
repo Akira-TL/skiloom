@@ -1,7 +1,8 @@
 # ADR 0007：Project Manifest 与 Lock 三层模型
 
-- 状态：Accepted
+- 状态：Superseded by ADR 0018
 - 日期：2026-09-14
+- 当前说明：本 ADR 的 Project Manifest / Project Lock / `.agents/.skiloom` / frozen 模型已经退役。当前直接安装要求、本机精确状态、Target 与 sync/update 语义以 `docs/design/skiloom-v0-product-contract.md` 为准；本文只保留历史设计记录。
 
 ## 背景
 

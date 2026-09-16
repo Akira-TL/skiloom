@@ -10,7 +10,7 @@ GitHub repository 内的局部 Package 名称，例如 `ask-matt`。它以 `SKIL
 
 ## GitHub Package Coordinate
 
-Skiloom v0 的 GitHub Package Coordinate 是 `<owner>/<repo>/<package>`；用户顶层 target 可以省略 `package` 表示 repository-wide requirement，并另外附加 Release requirement 或 explicit Git ref。GitHub `owner/repo` 在 Core semantic comparison、resolver grouping、dependency edge 与 canonical Lock 中统一使用 ASCII lowercase；case-only 差异不产生新 source identity。
+Skiloom v0 的 GitHub Package Coordinate 是 `<owner>/<repo>/<package>`；用户直接安装要求可以省略 `package` 形成 `<owner>/<repo>` repository-wide requirement，表示所选 exact repository snapshot discovery 后的全部 Package 都是直接 roots，并另外附加 Release requirement 或 explicit Git ref。GitHub `owner/repo` 在语义比较、resolver grouping、dependency edge 与本机精确状态中统一使用 ASCII lowercase；case-only 差异不产生新 source identity。
 
 ## GitHub Release Version
 
@@ -18,7 +18,7 @@ Release source 中的 repository 级版本作用域。v0 只接受 SemVer；GitH
 
 ## Release Version Requirement
 
-Class R 对 GitHub Release repository version 的约束语言。v0 使用 Cargo-style default/caret/tilde/wildcard/comparison/comma-intersection semantics；不支持 npm `||` / hyphen range / whitespace-as-AND。多个同 repository requirement 共同约束同一个 exact Release snapshot；explicit Git binding 时同 repository Release range 不参与 commit selection。
+Skiloom 对 GitHub Release repository version 使用的约束语言。v0 使用 Cargo-style default/caret/tilde/wildcard/comparison/comma-intersection semantics；不支持 npm `||` / hyphen range / whitespace-as-AND。多个同 repository requirement 共同约束同一个 exact Release snapshot；explicit Git binding 时同 repository Release range 不参与 commit selection。
 
 ## Git Source
 
@@ -162,7 +162,7 @@ Skiloom 官方实现使用 Node.js + TypeScript + npm 作为主控制面与发�
 
 ## Machine Registry
 
-Skiloom Home 中的 machine-local SQLite 状态库，是普通安装日常管理的完整机器 authority：保存 accepted exact resolution、Target Identity/Generation 与 projection ownership 等机器状态；Package Store 独立负责 immutable content identity，live filesystem 只提供可验证观察，Target Recovery Marker 只提供恢复线索。官方实现 v0 使用 `~/.skiloom/registry.sqlite3`，核心状态关系化保存而不是整个 Target 塞进单一 JSON；旧 generation 的完整安装历史不长期保存。所有会改变或必须一致读取这些状态的操作共用 `~/.skiloom/operation.lock` 的 OS 级独占锁，拿不到时返回 `OperationLocked`；Target Generation 继续用于状态版本与恢复，不承担复杂多进程乐观并发职责。schema 使用 `PRAGMA user_version`，迁移前备份到 `~/.skiloom/backups/`；数据库损坏返回 `RegistryCorrupt` 并 fail closed。SQLite 与 Target filesystem 之间只允许最小临时 pending-operation 记录做崩溃清理，正常完成即删除。同步或修复严格恢复这里已经接受的精确状态而不重新解析；安装、更新和数据库丢失后的恢复才允许形成新的 Installation Candidate。它不登记项目身份、不建立项目 registry，也不引入 `project.id`，且不保存任何凭据。
+Skiloom Home 中的 machine-local SQLite 状态库，是普通安装日常管理的完整机器 authority：保存 accepted exact resolution、Target Identity/Generation 与 projection ownership 等机器状态；Package Store 独立负责 immutable content identity，live filesystem 只提供可验证观察，Target Recovery Marker 只提供恢复线索。官方实现 v0 使用 `~/.skiloom/registry.sqlite3`，核心状态关系化保存而不是整个 Target 塞进单一 JSON；直接安装要求同时支持单 Package 与 repository-wide `owner/repo`；旧 generation 的完整安装历史不长期保存。所有会改变或必须一致读取这些状态的操作共用 `~/.skiloom/operation.lock` 的 OS 级独占锁，拿不到时返回 `OperationLocked`；Target Generation 继续用于状态版本与恢复，不承担复杂多进程乐观并发职责。schema 使用 `PRAGMA user_version`，迁移前备份到 `~/.skiloom/backups/`；数据库损坏返回 `RegistryCorrupt` 并 fail closed。新状态接受后 SQLite transaction **先**成为新权威，再把 Target 单向 materialize/sync 到该状态；临时 pending 记录只用于清理 Skiloom 自己的 staging/temp 路径，不承担 Target rollback。同步或修复严格恢复这里已经接受的精确状态而不重新解析；安装、更新和数据库丢失后的恢复才允许形成新的 Installation Candidate。它不登记项目身份、不建立项目 registry，也不引入 `project.id`，且不保存任何凭据。
 
 ## Catalog
 

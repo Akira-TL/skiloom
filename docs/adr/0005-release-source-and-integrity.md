@@ -2,6 +2,7 @@
 
 - 状态：Accepted
 - 日期：2026-09-14
+- 当前说明：Release SemVer、actual tag -> exact commit、内容完整性与 retarget 规则继续有效；文中 `Lock` / `skiloom.lock` 仅是 pre-shift 持久化表述，现行精确来源事实保存在 Machine Registry 的当前已接受状态中，并在显式导出时传播。
 
 ## 背景
 
