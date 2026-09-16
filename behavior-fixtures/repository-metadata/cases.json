@@ -1,0 +1,83 @@
+{
+  "fixture-version": 1,
+  "valid": [
+    {
+      "source": null,
+      "expected": {
+        "include": ["**"],
+        "exclude": []
+      }
+    },
+    {
+      "source": "schema = 1\n",
+      "expected": {
+        "include": ["**"],
+        "exclude": []
+      }
+    },
+    {
+      "source": "schema = 1\n\n[discovery]\ninclude = [\"skills/**\"]\nexclude = [\"skills/**/examples/**\", \"tests/**\"]\n",
+      "expected": {
+        "include": ["skills/**"],
+        "exclude": ["skills/**/examples/**", "tests/**"]
+      }
+    },
+    {
+      "source": "schema = 1\n\n[discovery]\ninclude = []\nexclude = []\n",
+      "expected": {
+        "include": ["**"],
+        "exclude": []
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "source": "schema = [1\n",
+      "error": { "code": "InvalidRepositoryMetadata", "facts": { "reason": "invalid-toml", "path": "$" } }
+    },
+    {
+      "source": "[discovery]\ninclude = [\"skills/**\"]\n",
+      "error": { "code": "MissingRepositoryMetadataSchema", "facts": {} }
+    },
+    {
+      "source": "schema = 1.0\n",
+      "error": { "code": "InvalidRepositoryMetadataSchema", "facts": { "actualType": "number" } }
+    },
+    {
+      "source": "schema = 2\n",
+      "error": { "code": "UnsupportedRepositoryMetadataSchema", "facts": { "schema": 2 } }
+    },
+    {
+      "source": "schema = 1\nname = \"foo\"\n",
+      "error": { "code": "UnknownRepositoryMetadataField", "facts": { "field": "name" } }
+    },
+    {
+      "source": "schema = 1\ndiscovery = []\n",
+      "error": { "code": "InvalidRepositoryMetadata", "facts": { "reason": "discovery-not-table", "path": "discovery" } }
+    },
+    {
+      "source": "schema = 1\n\n[discovery]\npackages = [\"skills/**\"]\n",
+      "error": { "code": "UnknownRepositoryDiscoveryField", "facts": { "field": "packages" } }
+    },
+    {
+      "source": "schema = 1\n\n[discovery]\ninclude = \"skills/**\"\n",
+      "error": { "code": "InvalidRepositoryMetadata", "facts": { "reason": "include-not-string-array", "path": "discovery.include" } }
+    },
+    {
+      "source": "schema = 1\n\n[discovery]\ninclude = [\"skills/**\", 2]\n",
+      "error": { "code": "InvalidRepositoryMetadata", "facts": { "reason": "include-not-string-array", "path": "discovery.include" } }
+    },
+    {
+      "source": "schema = 1\n\n[discovery]\nexclude = \"tests/**\"\n",
+      "error": { "code": "InvalidRepositoryMetadata", "facts": { "reason": "exclude-not-string-array", "path": "discovery.exclude" } }
+    },
+    {
+      "source": "schema = 1\n\n[dependencies]\n\"owner/repo/skill\" = \"^1\"\n",
+      "error": { "code": "UnknownRepositoryMetadataField", "facts": { "field": "dependencies" } }
+    },
+    {
+      "source": "schema = 1\nversion = \"1.0.0\"\n",
+      "error": { "code": "UnknownRepositoryMetadataField", "facts": { "field": "version" } }
+    }
+  ]
+}

@@ -1,6 +1,10 @@
+import { parse as parseToml, TomlDate } from "smol-toml";
 import { parseDocument } from "yaml";
 
-import { isValidSkillName } from "../coordinate/index.js";
+import {
+  isValidSkillName,
+  parsePackageCoordinate
+} from "../coordinate/index.js";
 import {
   productError,
   type ProductError,
@@ -40,6 +44,40 @@ export type SkillPackageInput = Readonly<{
   rootBasename: string;
   skillMarkdown: string;
 }>;
+
+export type PackageMetadata = Readonly<{
+  dependencies: Readonly<Record<string, string>>;
+  software: Readonly<Record<string, string>>;
+}>;
+
+export type PackageManifestErrorReason =
+  | "invalid-toml"
+  | "dependencies-not-table"
+  | "invalid-dependency-coordinate"
+  | "dependency-requirement-not-string"
+  | "empty-dependency-requirement"
+  | "duplicate-dependency-coordinate"
+  | "software-not-table"
+  | "software-requirement-not-string";
+
+export type PackageMetadataError =
+  | ProductError<"MissingManifestSchema", Readonly<Record<string, never>>>
+  | ProductError<
+      "InvalidManifestSchema",
+      Readonly<{ actualType: string }>
+    >
+  | ProductError<
+      "UnsupportedManifestSchema",
+      Readonly<{ schema: number }>
+    >
+  | ProductError<"UnknownManifestField", Readonly<{ field: string }>>
+  | ProductError<
+      "InvalidPackageManifest",
+      Readonly<{
+        reason: PackageManifestErrorReason;
+        path: string;
+      }>
+    >;
 
 const SKILL_FRONTMATTER_FIELDS = new Set([
   "name",
@@ -154,6 +192,145 @@ export function admitSkillPackage(
   };
 }
 
+export function parsePackageMetadata(
+  source: string | undefined
+): Result<PackageMetadata, PackageMetadataError> {
+  if (source === undefined) {
+    return {
+      ok: true,
+      value: {
+        dependencies: {},
+        software: {}
+      }
+    };
+  }
+
+  let parsedDocument: unknown;
+  try {
+    parsedDocument = parseToml(source, {
+      integersAsBigInt: true,
+      maxDepth: 100
+    });
+  } catch {
+    return invalidPackageManifest("invalid-toml", "$");
+  }
+
+  if (!isTomlTable(parsedDocument)) {
+    return invalidPackageManifest("invalid-toml", "$");
+  }
+  const document = parsedDocument;
+
+  if (!("schema" in document)) {
+    return {
+      ok: false,
+      error: productError("MissingManifestSchema", {})
+    };
+  }
+
+  const schema = document.schema;
+  if (typeof schema !== "bigint" || schema <= 0n) {
+    return {
+      ok: false,
+      error: productError("InvalidManifestSchema", {
+        actualType: typeof schema
+      })
+    };
+  }
+  if (schema !== 1n) {
+    return {
+      ok: false,
+      error: productError("UnsupportedManifestSchema", {
+        schema: Number(schema)
+      })
+    };
+  }
+
+  const unknownField = firstUnknownField(document, [
+    "schema",
+    "dependencies",
+    "software"
+  ]);
+  if (unknownField !== undefined) {
+    return {
+      ok: false,
+      error: productError("UnknownManifestField", {
+        field: unknownField
+      })
+    };
+  }
+
+  const dependencyEntries: Array<readonly [string, string]> = [];
+  const dependencyCoordinates = new Set<string>();
+  if (document.dependencies !== undefined) {
+    if (!isTomlTable(document.dependencies)) {
+      return invalidPackageManifest("dependencies-not-table", "dependencies");
+    }
+
+    for (const [rawCoordinate, requirement] of Object.entries(
+      document.dependencies
+    )) {
+      const coordinateResult = parsePackageCoordinate(rawCoordinate);
+      if (!coordinateResult.ok) {
+        return invalidPackageManifest(
+          "invalid-dependency-coordinate",
+          `dependencies.${rawCoordinate}`
+        );
+      }
+
+      if (typeof requirement !== "string") {
+        return invalidPackageManifest(
+          "dependency-requirement-not-string",
+          `dependencies.${rawCoordinate}`
+        );
+      }
+      if (requirement.trim().length === 0) {
+        return invalidPackageManifest(
+          "empty-dependency-requirement",
+          `dependencies.${rawCoordinate}`
+        );
+      }
+
+      const coordinate = coordinateResult.value.canonical;
+      if (dependencyCoordinates.has(coordinate)) {
+        return invalidPackageManifest(
+          "duplicate-dependency-coordinate",
+          `dependencies.${coordinate}`
+        );
+      }
+      dependencyCoordinates.add(coordinate);
+      dependencyEntries.push([coordinate, requirement]);
+    }
+  }
+
+  const softwareEntries: Array<readonly [string, string]> = [];
+  if (document.software !== undefined) {
+    if (!isTomlTable(document.software)) {
+      return invalidPackageManifest("software-not-table", "software");
+    }
+
+    for (const [name, requirement] of Object.entries(document.software)) {
+      if (typeof requirement !== "string") {
+        return invalidPackageManifest(
+          "software-requirement-not-string",
+          `software.${name}`
+        );
+      }
+      softwareEntries.push([name, requirement]);
+    }
+  }
+
+  dependencyEntries.sort(([left], [right]) => compareStrings(left, right));
+  softwareEntries.sort(([left], [right]) => compareStrings(left, right));
+
+  return {
+    ok: true,
+    value: {
+      dependencies: Object.fromEntries(dependencyEntries),
+      software: Object.fromEntries(softwareEntries)
+    }
+  };
+}
+
 function extractFrontmatter(markdown: string):
   | Readonly<{ ok: true; yaml: string }>
   | Readonly<{
@@ -187,6 +364,43 @@ function invalid(
       reason
     })
   };
+}
+
+function invalidPackageManifest(
+  reason: PackageManifestErrorReason,
+  path: string
+): Result<never, PackageMetadataError> {
+  return {
+    ok: false,
+    error: productError("InvalidPackageManifest", {
+      reason,
+      path
+    })
+  };
+}
+
+function firstUnknownField(
+  value: Readonly<Record<string, unknown>>,
+  allowedFields: ReadonlyArray<string>
+): string | undefined {
+  const allowed = new Set(allowedFields);
+  return Object.keys(value)
+    .filter((field) => !allowed.has(field))
+    .sort(compareStrings)[0];
+}
+
+function isTomlTable(value: unknown): value is Record<string, unknown> {
+  return isPlainRecord(value) && !(value instanceof TomlDate);
+}
+
+function compareStrings(left: string, right: string): number {
+  if (left < right) {
+    return -1;
+  }
+  if (left > right) {
+    return 1;
+  }
+  return 0;
 }
 
 function characterLength(value: string): number {

