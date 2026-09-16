@@ -3,6 +3,8 @@
 - 状态：Accepted
 - 日期：2026-09-15
 
+当前补充：ADR 0025 已把 `operation.lock` 固定为 mandatory Rust System Capability Helper。本文中“optional native helper”的原始表述继续适用于 compute helper；`skiloom-lock` 是已经显式批准的系统能力例外。
+
 ## 背景
 
 Skiloom v0 的主要产品行为已经收敛，但官方实现的语言、包管理、代码组织与高复杂度算法实现方式尚未固定。

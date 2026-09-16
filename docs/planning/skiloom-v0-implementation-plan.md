@@ -12,8 +12,8 @@
 
 1. ✅ #27 First-party Skill Suite / bootstrap 已收口；
 2. ✅ `.skiloom-state` v1 公开格式已由 #32 固定；
-3. 单文件 export container + `skiloom-export.toml` v1 公开格式已固定为 `SKILOOM-EXPORT-V1`；
-4. `~/.skiloom/operation.lock` 在 Node.js 官方实现中的跨平台可靠 OS lock 机制固定；
+3. ✅ 单文件 export container + `skiloom-export.toml` v1 公开格式已固定为 `SKILOOM-EXPORT-V1`；
+4. ✅ `~/.skiloom/operation.lock` 已固定使用 mandatory Rust helper `skiloom-lock`；
 5. v0 CLI command surface、non-interactive acceptance policy surface 和核心交互边界固定；
 6. Wayfinder #17 完成最终一致性审阅并关闭。
 
@@ -35,7 +35,7 @@ public executable:   skiloom
 
 v0 默认单 npm package。没有真实第二发布物前不启用 monorepo/workspaces。Native/binary helper 分成两类：
 
-1. **System Capability Helper**：当 Node.js 本身不能可靠提供已经确定的产品所需系统能力时允许成为 mandatory helper，例如 Gate A 正在收口的跨平台 OS file lock。它必须极小、单一职责、预编译分发，并有明确 supported platform matrix；
+1. **System Capability Helper**：v0 已确定 `skiloom-lock` 是 mandatory Rust standalone helper，用于跨平台 OS file lock。它极小、单一职责、预编译分发；最终 supported platform matrix 在 release readiness 固定；
 2. **Compute Helper**：只有出现真实性能/内存/底层格式处理证据时才引入，默认属于 optional accelerator，不得因为“以后可能更快”预造二进制层。
 
 初始工程采用 TypeScript compiler 直接构建 `dist/`。测试优先使用 Node 自带 test runner 对编译结果运行；如果某个开发工具必须引入第三方 dependency，它只能是 dev-time tooling，不能因此扩大运行时依赖面。
@@ -355,7 +355,7 @@ System Capability Helper 则以系统语义为测试重点，例如双进程争�
 
 先预留编号，不代表立即实现：
 
-- **N01 Operation Lock Capability**：Gate A 决定是否需要最小 mandatory native/system helper；
+- **N01 Operation Lock Capability**：mandatory Rust `skiloom-lock` + Node bridge；实现 `SKILOOM-LOCK-V1` handshake、stdin lifetime、`OperationLocked` / `OperationLockLost` / unsupported capability mapping；
 - **N02 Resolver Benchmark + optional accelerator**：I06 完成且有真实 benchmark 后才可启动；
 - **N03 Git Tree/Object Benchmark + optional helper**：I15 的纯 Node acquisition 路径出现明确瓶颈或底层复杂度后才可启动；
 - **N04 Snapshot/Digest Benchmark + optional helper**：I04 在大型 fixture 上出现明确瓶颈后才可启动；
@@ -473,9 +473,12 @@ N02–N05 任何一项都可以永远不实施；这是正常结果，不影响 
 
 ### I10 Global operation lock
 
-- 使用 Gate A 已决定的跨平台 OS lock mechanism；
+- Node `runtime/lock` bridge direct-spawn `skiloom-lock`；
+- `SKILOOM-LOCK-V1` handshake + stdin lifetime channel；
 - fail-fast `OperationLocked`；
-- crash releases OS lock；
+- acquired 后 helper 意外退出 -> `OperationLockLost`，不静默 reacquire；
+- residual lock file 不代表占锁；
+- unsupported/missing helper 不回退用户态 lock；
 - Linux/macOS/Windows tests。
 
 **M3 DoD：** 一个 fixture candidate 可以写入 Registry、读回语义等价状态；Store 内容可重复验证；migration/lock tests 跨支持平台通过。
@@ -653,8 +656,8 @@ Gate A / #17 CLOSED
                          +--> I06 --> I07
 
 I02/I04 --------------------> I08
-I02 + Gate lock decision ---> I09/I10
-Gate lock decision ----------> N01 (only if native/system helper is required)
+I02 -------------------------> I09
+I02 -------------------------> N01 --> I10
 I06/I07 --------------------> I11
 I08/I09/I10/I11 ------------> I12 --> I13
 I02/I03/I04 ----------------> I14 --> I15
@@ -670,7 +673,7 @@ I15 -------------------------> N03 benchmark gate
 I18 -------------------------> N05 benchmark gate
 ```
 
-N02/N03/N04/N05 不在主 correctness critical path；只有 benchmark gate 通过才进入对应里程碑。N01 如果被 Gate A 选为跨平台 lock 的 mandatory 实现，则成为 I10 的实现依赖。
+N01 已确定属于主 correctness critical path，并是 I10 的实现依赖。N02/N03/N04/N05 不在主 correctness critical path；只有 benchmark gate 通过才进入对应里程碑。
 
 允许的并行：
 

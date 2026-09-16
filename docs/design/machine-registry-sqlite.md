@@ -55,6 +55,16 @@ Skiloom 不是常驻并发服务。v0 不建立复杂的多进程乐观并发协
 
 `generation` 继续是 Target 状态版本和恢复判断依据，但不承担 Skiloom 进程之间的乐观并发控制职责。
 
+### 2.1 官方实现机制
+
+v0 官方实现通过预编译 standalone Rust helper `skiloom-lock` 提供这项 OS lock capability。Node 使用 direct `spawn` 启动 helper；helper 使用 Rust `std::fs::File::try_lock()` 对 Node 显式传入的绝对 `operation.lock` 路径执行 non-blocking exclusive lock，并在成功后通过 `SKILOOM-LOCK-V1 ACQUIRED` handshake 确认。
+
+成功后 helper 保持文件 handle 与 OS lock，并读取父进程 stdin 作为 lifetime channel。Node 正常结束时关闭 stdin；Node 崩溃/退出时 pipe EOF 使 helper 退出，OS 随 handle/file description 关闭释放锁。helper 不 detached、不 daemonize，也不把 lock handle 交给其他长期进程。
+
+初始争用映射为 `OperationLocked`。成功取得锁后 helper 意外死亡则是 `OperationLockLost`；当前操作必须停止继续产生新的受保护 side effect，不能静默重新抢锁后继续。
+
+`~/.skiloom/` 属于 machine-local Skiloom Home。NFS、SMB 等网络/分布式挂载不属于 v0 官方支持范围；Skiloom 不为 Machine Registry 建立 distributed lock/lease。完整实现契约见 [`operation-lock-helper.md`](operation-lock-helper.md)。
+
 ## 3. SQLite 基线
 
 打开 `registry.sqlite3` 时官方实现固定启用：

@@ -152,7 +152,7 @@ Skiloom 官方实现使用本机 SQLite 状态库维护日常权威状态。产�
 
 SQLite 的表结构、路径和迁移策略不是公开产品格式。官方实现 v0 使用 `~/.skiloom/registry.sqlite3`，schema generation 使用 `PRAGMA user_version`；迁移前通过 SQLite backup API 备份到 `~/.skiloom/backups/`。数据库损坏必须返回 `RegistryCorrupt` 并 fail closed，不能通过扫描 Target 猜测原有 Package identity。
 
-Skiloom 不是常驻多写服务。所有 install/update/remove/sync/repair/recovery/import/detach/forget、schema migration、backup restore 以及需要读取一致 Target 状态的 export 共用 `~/.skiloom/operation.lock` 的 OS 级独占文件锁。锁由操作系统持有，不能以 lock file 是否存在判断占用；无法取得锁时返回 `OperationLocked`。Target Generation 继续用于状态版本与恢复，不承担 Skiloom 多进程写入的主要并发控制职责。
+Skiloom 不是常驻多写服务。所有 install/update/remove/sync/repair/recovery/import/detach/forget、schema migration、backup restore 以及需要读取一致 Target 状态的 export 共用 `~/.skiloom/operation.lock` 的 OS 级独占文件锁。锁由操作系统持有，不能以 lock file 是否存在、PID 或 mtime 判断占用；无法取得锁时返回 `OperationLocked`。已经成功取得锁的状态型操作若在完成前失去锁能力，则返回 `OperationLockLost` 并停止继续产生新的受保护 side effect，不能静默重新取得后继续。`~/.skiloom/` 的 v0 官方支持范围是 machine-local filesystem，不建立 NFS/SMB 等网络共享 Home 的 distributed lock 语义。Target Generation 继续用于状态版本与恢复，不承担 Skiloom 多进程写入的主要并发控制职责。
 
 Machine Registry 只长期保存当前已接受状态，不保存旧 generation 的完整安装历史。SQLite 与 Target filesystem 之间允许使用最小临时 pending-operation 记录处理进程中断；正常完成后立即删除，它不是第二份 Lock 或操作历史。
 
@@ -365,8 +365,10 @@ Skiloom 官方实现继续采用：
 - TypeScript strict + ESM；
 - npm package / executable `skiloom`；
 - Node 层拥有 CLI、GitHub access、credentials、状态接受、Store/Target side effects 与用户交互；
-- 真实计算热点可使用可选预编译 Rust/C/C++ standalone helper；
+- `operation.lock` 使用一个预编译 mandatory Rust standalone helper `skiloom-lock` 提供跨平台 OS file lock capability；
+- 真实计算热点仍可按 benchmark 使用可选预编译 Rust/C/C++ standalone helper；
 - native helper 不拥有网络、凭据、用户授权、本机状态库写入或 Target destructive mutation；
-- 不在安装时要求用户现场编译 native code，不预先设计通用 native provider/plugin framework。
+- 不在安装时要求用户现场编译 native code，不预先设计通用 native provider/plugin framework；
+- `~/.skiloom/` 是 machine-local Skiloom Home，v0 不承诺 NFS/SMB 等网络/分布式挂载上的 Machine Registry 锁语义。
 
 官方行为测试数据用于验证上述产品规则与算法，不承担第三方实现认证含义。

@@ -93,10 +93,10 @@ Resolver correctness 先于 native 优化。
 - schema migration / backup；
 - corruption detection / recovery tooling；
 - dependency observation；
-- `operation.lock` 跨平台系统能力；
+- `operation.lock` 跨平台系统能力（mandatory Rust `skiloom-lock` helper）；
 - Store verification 与 interrupted staging cleanup。
 
-如果 Node 无法可靠实现 OS lock，本系列允许引入最小 mandatory System Capability Helper。
+`operation.lock` 已固定使用最小 mandatory Rust System Capability Helper `skiloom-lock`；最终用户不现场编译，CI 预编译并通过 npm platform package 分发。
 
 ## 5. `0.4.x` — Target 管理
 
@@ -274,7 +274,7 @@ request
 
 Native helper 不独立占一个主版本。它服务于所属主要功能：
 
-- `operation.lock` helper -> `0.3.x`；
+- `operation.lock` mandatory `skiloom-lock` helper -> `0.3.x`；
 - resolver accelerator -> `0.2.x`；
 - Git tree/object helper -> `0.5.x`；
 - snapshot/digest helper -> `0.1.x`；
