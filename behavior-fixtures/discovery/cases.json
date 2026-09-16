@@ -1,0 +1,173 @@
+{
+  "fixture-version": 1,
+  "valid": [
+    {
+      "name": "zero-config discovers all legal Skill roots in stable order",
+      "repositoryRootBasename": "repository",
+      "repositoryMetadata": null,
+      "files": [
+        { "path": "skills/zeta/SKILL.md", "content": "---\nname: zeta\ndescription: Zeta Skill.\n---\n" },
+        { "path": "README.md", "content": "not a Skill" },
+        { "path": "skills/alpha/SKILL.md", "content": "---\nname: alpha\ndescription: Alpha Skill.\n---\n" }
+      ],
+      "expected": [
+        { "name": "alpha", "description": "Alpha Skill.", "packageRoot": "skills/alpha" },
+        { "name": "zeta", "description": "Zeta Skill.", "packageRoot": "skills/zeta" }
+      ]
+    },
+    {
+      "name": "filtering happens before Skill validation and exclude wins",
+      "repositoryRootBasename": "repository",
+      "repositoryMetadata": "schema = 1\n\n[discovery]\ninclude = [\"skills/**\", \"fixtures/**\"]\nexclude = [\"**/examples/**\", \"fixtures/**\"]\n",
+      "files": [
+        { "path": "fixtures/bad/SKILL.md", "content": "not valid frontmatter" },
+        { "path": "skills/foo/examples/bad/SKILL.md", "content": "not valid frontmatter" },
+        { "path": "skills/foo/SKILL.md", "content": "---\nname: foo\ndescription: Selected valid Skill.\n---\n" }
+      ],
+      "expected": [
+        { "name": "foo", "description": "Selected valid Skill.", "packageRoot": "skills/foo" }
+      ]
+    },
+    {
+      "name": "nested distinct-name Skill roots remain separate discoveries",
+      "repositoryRootBasename": "repository",
+      "repositoryMetadata": "schema = 1\n\n[discovery]\ninclude = [\"skills/**\"]\n",
+      "files": [
+        { "path": "skills/foo/examples/bar/SKILL.md", "content": "---\nname: bar\ndescription: Nested Bar Skill.\n---\n" },
+        { "path": "skills/foo/SKILL.md", "content": "---\nname: foo\ndescription: Outer Foo Skill.\n---\n" }
+      ],
+      "expected": [
+        { "name": "bar", "description": "Nested Bar Skill.", "packageRoot": "skills/foo/examples/bar" },
+        { "name": "foo", "description": "Outer Foo Skill.", "packageRoot": "skills/foo" }
+      ]
+    },
+    {
+      "name": "literal star double-star and question-mark patterns match Package Roots",
+      "repositoryRootBasename": "repository",
+      "repositoryMetadata": "schema = 1\n\n[discovery]\ninclude = [\"skills/*\", \"tools/a?\", \"deep/**/leaf\"]\nexclude = [\"skills/skip\"]\n",
+      "files": [
+        { "path": "skills/direct/SKILL.md", "content": "---\nname: direct\ndescription: Direct Skill.\n---\n" },
+        { "path": "skills/direct/nested/SKILL.md", "content": "---\nname: nested\ndescription: Nested Skill that should not match one star.\n---\n" },
+        { "path": "skills/skip/SKILL.md", "content": "---\nname: skip\ndescription: Excluded Skill.\n---\n" },
+        { "path": "tools/ab/SKILL.md", "content": "---\nname: ab\ndescription: Question mark Skill.\n---\n" },
+        { "path": "tools/abc/SKILL.md", "content": "---\nname: abc\ndescription: Too long for question mark.\n---\n" },
+        { "path": "deep/leaf/SKILL.md", "content": "---\nname: leaf\ndescription: Double star zero-segment Skill.\n---\n" },
+        { "path": "deep/a/b/deep-leaf/SKILL.md", "content": "---\nname: deep-leaf\ndescription: Double star multi-segment Skill.\n---\n" }
+      ],
+      "expected": [
+        { "name": "ab", "description": "Question mark Skill.", "packageRoot": "tools/ab" },
+        { "name": "direct", "description": "Direct Skill.", "packageRoot": "skills/direct" },
+        { "name": "leaf", "description": "Double star zero-segment Skill.", "packageRoot": "deep/leaf" }
+      ]
+    },
+    {
+      "name": "double-star matches multiple path segments",
+      "repositoryRootBasename": "repository",
+      "repositoryMetadata": "schema = 1\n\n[discovery]\ninclude = [\"deep/**/leaf\"]\n",
+      "files": [
+        { "path": "deep/a/b/leaf/SKILL.md", "content": "---\nname: leaf\ndescription: Included multi-segment leaf.\n---\n" }
+      ],
+      "expected": [
+        { "name": "leaf", "description": "Included multi-segment leaf.", "packageRoot": "deep/a/b/leaf" }
+      ]
+    },
+    {
+      "name": "repository-root Skill is represented by dot",
+      "repositoryRootBasename": "root-skill",
+      "repositoryMetadata": null,
+      "files": [
+        { "path": "SKILL.md", "content": "---\nname: root-skill\ndescription: Root-level Skill.\n---\n" }
+      ],
+      "expected": [
+        { "name": "root-skill", "description": "Root-level Skill.", "packageRoot": "." }
+      ]
+    }
+  ],
+  "invalid": [
+    {
+      "name": "selected invalid Skill fails discovery",
+      "repositoryRootBasename": "repository",
+      "repositoryMetadata": null,
+      "files": [
+        { "path": "skills/bad/SKILL.md", "content": "no frontmatter" }
+      ],
+      "error": {
+        "code": "InvalidSkillPackage",
+        "facts": { "rootBasename": "bad", "reason": "missing-frontmatter" }
+      }
+    },
+    {
+      "name": "duplicate Package Name is ambiguous",
+      "repositoryRootBasename": "repository",
+      "repositoryMetadata": null,
+      "files": [
+        { "path": "b/foo/SKILL.md", "content": "---\nname: foo\ndescription: Second Foo.\n---\n" },
+        { "path": "a/foo/SKILL.md", "content": "---\nname: foo\ndescription: First Foo.\n---\n" }
+      ],
+      "error": {
+        "code": "AmbiguousPackageDiscovery",
+        "facts": { "packageName": "foo", "packageRoots": ["a/foo", "b/foo"] }
+      }
+    },
+    {
+      "name": "absolute discovery pattern is rejected",
+      "repositoryRootBasename": "repository",
+      "repositoryMetadata": "schema = 1\n\n[discovery]\ninclude = [\"/skills/**\"]\n",
+      "files": [],
+      "error": {
+        "code": "InvalidDiscoveryPattern",
+        "facts": { "field": "include", "pattern": "/skills/**", "reason": "absolute-path" }
+      }
+    },
+    {
+      "name": "parent traversal discovery pattern is rejected",
+      "repositoryRootBasename": "repository",
+      "repositoryMetadata": "schema = 1\n\n[discovery]\nexclude = [\"../fixtures/**\"]\n",
+      "files": [],
+      "error": {
+        "code": "InvalidDiscoveryPattern",
+        "facts": { "field": "exclude", "pattern": "../fixtures/**", "reason": "parent-segment" }
+      }
+    },
+    {
+      "name": "unsupported character-class syntax is rejected",
+      "repositoryRootBasename": "repository",
+      "repositoryMetadata": "schema = 1\n\n[discovery]\ninclude = [\"skills/[ab]/**\"]\n",
+      "files": [],
+      "error": {
+        "code": "InvalidDiscoveryPattern",
+        "facts": { "field": "include", "pattern": "skills/[ab]/**", "reason": "unsupported-syntax" }
+      }
+    },
+    {
+      "name": "unsupported brace expansion is rejected",
+      "repositoryRootBasename": "repository",
+      "repositoryMetadata": "schema = 1\n\n[discovery]\ninclude = [\"skills/{alpha,beta}/**\"]\n",
+      "files": [],
+      "error": {
+        "code": "InvalidDiscoveryPattern",
+        "facts": { "field": "include", "pattern": "skills/{alpha,beta}/**", "reason": "unsupported-syntax" }
+      }
+    },
+    {
+      "name": "unsupported extglob syntax is rejected",
+      "repositoryRootBasename": "repository",
+      "repositoryMetadata": "schema = 1\n\n[discovery]\ninclude = [\"skills/@(alpha|beta)/**\"]\n",
+      "files": [],
+      "error": {
+        "code": "InvalidDiscoveryPattern",
+        "facts": { "field": "include", "pattern": "skills/@(alpha|beta)/**", "reason": "unsupported-syntax" }
+      }
+    },
+    {
+      "name": "unsupported pattern negation is rejected",
+      "repositoryRootBasename": "repository",
+      "repositoryMetadata": "schema = 1\n\n[discovery]\nexclude = [\"!skills/private/**\"]\n",
+      "files": [],
+      "error": {
+        "code": "InvalidDiscoveryPattern",
+        "facts": { "field": "exclude", "pattern": "!skills/private/**", "reason": "unsupported-syntax" }
+      }
+    }
+  ]
+}
