@@ -145,7 +145,7 @@ Skiloom 官方实现使用本机 SQLite 状态库维护日常权威状态。产�
 
 SQLite 的表结构、路径和迁移策略不是公开产品格式。
 
-Target 是用户选择的任意 Skill 目标目录。已知 Host 只提供便利 preset；`.agents/skills` 只是可能的 Target，不是固定项目结构。
+Target 是宿主可见的 Skill 目标目录。Skiloom 官方默认工作区 Target 为 `<workspace>/.agents/skills`，默认用户级/全局 Target 为 `~/.agents/skills`；已知 Host preset 与用户显式 `--target` 可以选择其他目录。`.agents/skills` 是 Skiloom 的默认公共安装面，但不是唯一合法 Target，也不是 Package Store。
 
 每个 Skiloom-managed Target 根部具有 `.skiloom-state` 轻量恢复标记。它记录：
 
@@ -238,7 +238,7 @@ Target 内使用平铺 `<target>/<activation-name>` 结构。
 
 ## 13. Package Store
 
-Package Store 是机器级共享的不可变 Package Snapshot 存储，以 Package Content Digest 为 key。相同内容可以被多个 Target 复用，并且每个 Target 独立选择 projection name / rename。
+Package Store 是机器级共享的不可变 Package Snapshot 存储，以 Package Content Digest 为 key。Skiloom 官方实现把它放在用户自己的 `~/.skiloom/` 内部管理空间中，不把 Store 目录直接作为宿主 Skill Target。相同内容可以被多个 Target 复用，并且每个 Target 独立选择 projection name / rename。
 
 v0 不执行 destructive automatic Package Store GC。移除某个直接安装要求或 Target projection 不直接删除共享 Store entry；未来若要 destructive GC，必须另行建立安全的引用/可达性证明。
 
@@ -289,7 +289,7 @@ Skiloom 提供两种单文件导出产物，两者都包含 TOML 精确清单以
 - Project Intent 文件；
 - Project Lock / canonical Lock；
 - `activation.lock`；
-- 固定 `.agents/skills` 项目激活目录；
+- 把 `.agents/skills` 视为唯一且不可替换的项目激活目录；
 - frozen replay 作为公开产品模式；
 - Class P / Class R / Class A；
 - Full Core Manager；

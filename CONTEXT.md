@@ -86,11 +86,11 @@ Package Snapshot 的 canonical 内容身份。v0 使用 `SKILOOM-PACKAGE-V1`：�
 
 ## Package Store
 
-机器级共享的不可变 Skill Package Snapshot 存储，直接以 Package Content Digest 作为 key。不同 repository/source 只要 snapshot 内容完全相同就复用同一 Store entry；source provenance 保存在 Machine Registry 的 Exact Installation Resolution 中，需要传播时进入显式 Reproducible Export，不进入 Store key。宿主环境检查状态不写回 Store。
+机器级共享的不可变 Skill Package Snapshot 存储，直接以 Package Content Digest 作为 key。Skiloom 官方实现把 Store 放在用户自己的 `~/.skiloom/` 内部管理空间中，不把 Store 直接暴露为宿主 Skill 目录。不同 repository/source 只要 snapshot 内容完全相同就复用同一 Store entry；source provenance 保存在 Machine Registry 的 Exact Installation Resolution 中，需要传播时进入显式 Reproducible Export，不进入 Store key。宿主环境检查状态不写回 Store。
 
 ## Target
 
-Skiloom 安装 Skill 时由用户选择的目标目录。Target 可以来自已知 Host preset，也可以是用户指定的任意目录；`.agents/skills` 只是可能的 Target，不是 Skiloom Package Store。Target 内按 `<target>/<activation-name>` 平铺 Skill。
+Skiloom 安装 Skill 时的宿主可见目标目录。官方默认工作区 Target 为 `<workspace>/.agents/skills`，默认用户级/全局 Target 为 `~/.agents/skills`；Host preset 或用户显式 `--target` 可以选择其他目录。`.agents/skills` 是默认安装面而不是 Package Store，Target 内按 `<target>/<activation-name>` 平铺 Skill。
 
 ## Target Installed Graph
 
