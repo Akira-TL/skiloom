@@ -1,20 +1,41 @@
-# Akira sKill Manager
+# Skiloom
 
-Akira sKill Manager（AKM）是一个面向 Agent Skill 的独立包管理器项目。它把 Skill 作为真正的软件包处理，而不是把 Git repository 当作安装单位。
+Skiloom 是面向 Agent Skill 的独立包管理器与安装器。它把标准 Agent Skill 作为真正的软件包处理，负责 GitHub 来源解析、依赖图、不可变内容存储、Target 投影、恢复和可传播环境导出。
 
-当前阶段继续设计和收敛领域模型与协议，不先实现 CLI。`docs/design/` 当前均为 working draft；Skill/Package 的目录结构与基数关系仍在 Wayfinder 中讨论。设计范围包括：
+当前进入 **v0 / `0.1.x` 实施阶段**。v0 架构已经收敛，canonical Spec 为 GitHub #31；开发按 executable implementation tickets 逐步推进，不再使用早期 AKM、Project Lock 或第三方 conformance 模型作为当前产品权威。
 
-- Package Manifest；
-- Release Artifact；
-- Project Manifest 与 Lock；
-- Dependency Resolver 与 Install Plan；
-- 外部软件依赖与 Provider 模型。
+## v0 开发路线
 
-核心目标：一个项目只声明真正需要的顶层 Skill；解析器计算完整依赖闭包；包内容机器级共享；项目通过软链接形成自己的 Skill 视图；所有外部来源和软件安装在执行前形成可审计计划并由用户授权。
+```text
+0.1.x  Domain / Package / Discovery / Snapshot / Requirement
+0.2.x  Deterministic Resolver
+0.3.x  Store / Machine Registry / operation.lock
+0.4.x  Target 管理
+0.5.x  GitHub Source
+0.6.x  install/update/remove 生命周期
+0.7.x  恢复与 exact export/import
+0.8.x  CLI / Catalog / 第一方 Skills
+0.9.x  跨平台与发布硬化
+```
 
-当前设计入口：
+版本规则保持简单：`0.x.0` 表示一个主要功能第一次完整成立，`0.x.y` 用于该主要功能的分支能力、补全、修正和硬化。
 
-- [`CONTEXT.md`](CONTEXT.md)：领域词汇；
-- [`docs/research/package-management-prior-art.md`](docs/research/package-management-prior-art.md)：一手规范调研；
-- `docs/design/`：协议设计；
-- `docs/adr/`：少量难以逆转的架构决定。
+## 当前实现基线
+
+- Node.js >= 22，Node 24 LTS 为主要开发/release 线；
+- TypeScript strict + ESM；
+- npm package / executable 名称均为 `skiloom`；
+- 普通产品控制面由 Node/TypeScript 实现；
+- `operation.lock` 使用预编译 mandatory Rust helper `skiloom-lock`；
+- 其他 native compute helper 只有通过 benchmark gate 后才引入；
+- 最高行为验收 seam 是 versioned offline behavior fixtures。
+
+## 设计与实施入口
+
+- [`CONTEXT.md`](CONTEXT.md)：当前领域词汇；
+- [`docs/design/skiloom-v0-product-contract.md`](docs/design/skiloom-v0-product-contract.md)：v0 官方产品规范；
+- [`docs/planning/skiloom-v0-implementation-plan.md`](docs/planning/skiloom-v0-implementation-plan.md)：实施顺序与工作包；
+- [`docs/planning/skiloom-v0-version-roadmap.md`](docs/planning/skiloom-v0-version-roadmap.md)：`0.1.x`–`0.9.x` 版本路线；
+- GitHub #31：canonical implementation Spec。
+
+当前 `0.1.0` 的目标是在完全离线的 fixture 下建立 Package admission、metadata、repository discovery、`SKILOOM-PACKAGE-V1` snapshot/digest 与 Release Version Requirement 领域基础。

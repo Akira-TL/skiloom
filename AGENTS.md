@@ -1,6 +1,6 @@
 # Skiloom 项目规则
 
-Skiloom 是独立的 Agent Skill 包管理器与安装器项目。当前仍处于协议、产品边界与领域模型设计期；在 Wayfinder 决策图收敛、替代旧模型的正式规范完成、并经用户批准进入实现拆票之前，不提前建立 CLI、运行时或原生辅助程序骨架。
+Skiloom 是独立的 Agent Skill 包管理器与安装器项目。v0 架构 Wayfinder 已收敛并关闭，canonical Spec 为 GitHub #31；当前进入 `0.1.x` 实施期。实现工作必须从已拆分、blocker 已解除的 executable ticket 进入，不在代码阶段重新发明已经接受的产品语义。
 
 ## 工程流程
 
@@ -39,8 +39,8 @@ Matt Engineering 的工作流角色通过 GitHub label 表达，映射见 `docs/
 
 ## 工程约定
 
-- 当前阶段优先完成 Wayfinder 决策、领域模型、替代旧模型的正式规范与一致性测试设计；未经明确进入实现阶段，不因为“以后肯定需要”而先建代码骨架。
-- 官方参考实现已经确定采用 Node.js + TypeScript + npm 作为主控制面与发行方式；真正进入实现时遵守对应架构决定，不把该决定提前等同于“现在就开始写实现”。
+- 当前已经进入实现阶段。实施顺序、版本路线与 blocker 以 canonical Spec #31、`docs/planning/skiloom-v0-implementation-plan.md` 和对应 executable ticket 为准；不要绕过 ticket 边界一次实现未来版本能力。
+- Skiloom 官方实现采用 Node.js + TypeScript + npm 作为主控制面与发行方式；`skiloom-lock` 是已经接受的 mandatory Rust System Capability Helper，其余 native compute helper 只有 benchmark gate 通过后才允许引入。
 - 仓库存在 `.codegraph/` 后，理解或定位代码时优先使用 CodeGraph；索引数据库属于机器本地状态，不进入 Git。
 - 新决定在讨论充分并真正满足 ADR 条件时才写入 ADR；普通已确认领域词汇更新 `CONTEXT.md`，具体操作契约进入规范或对应 Wayfinder 决策记录，不把 `CONTEXT.md` 写成会议纪要。
 - Git 提交遵守系统级 `AGENTS.md` 的原子提交与 `akira-guard` 规则。一个已经完成且可独立理解、验证和回退的修改目的，应先单独提交，再进入下一修改目的。
