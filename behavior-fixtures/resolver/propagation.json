@@ -1,0 +1,249 @@
+{
+  "fixture-version": 1,
+  "cases": [
+    {
+      "name": "package-root-expands-only-requested-package-and-transitive-dependencies",
+      "directRequirements": [
+        { "kind": "package", "coordinate": "org/root/a", "source": "github-release", "version": "^1" }
+      ],
+      "bindings": [
+        {
+          "repository": "org/root",
+          "source": "github-release",
+          "version": "1.5.0",
+          "actualTag": "v1.5.0",
+          "exactCommit": "root150",
+          "immutable": true,
+          "packages": [
+            { "coordinate": "org/root/b", "packageRoot": "skills/b", "contentDigest": "digest-b", "dependencies": [] },
+            { "coordinate": "org/root/a", "packageRoot": "skills/a", "contentDigest": "digest-a", "dependencies": [{ "target": "org/dep/x", "requirement": "^1" }] }
+          ]
+        },
+        {
+          "repository": "org/dep",
+          "source": "github-release",
+          "version": "1.2.0",
+          "actualTag": "1.2.0",
+          "exactCommit": "dep120",
+          "immutable": false,
+          "packages": [
+            { "coordinate": "org/dep/x", "packageRoot": "x", "contentDigest": "digest-x", "dependencies": [] }
+          ]
+        }
+      ],
+      "expected": {
+        "repositoryWideRoots": [],
+        "requiredPackages": ["org/dep/x", "org/root/a"],
+        "releaseConstraintSets": [
+          { "repositoryCoordinate": "org/dep", "constraints": [{ "requirement": "^1", "origin": { "kind": "dependency", "sourcePackageCoordinate": "org/root/a", "targetPackageCoordinate": "org/dep/x" } }] },
+          { "repositoryCoordinate": "org/root", "constraints": [{ "requirement": "^1", "origin": { "kind": "direct", "coordinate": "org/root/a" } }] }
+        ],
+        "sourceBindings": [
+          { "repositoryCoordinate": "org/dep", "sourceKind": "github-release", "version": "1.2.0", "actualTag": "1.2.0", "exactCommit": "dep120", "immutable": false },
+          { "repositoryCoordinate": "org/root", "sourceKind": "github-release", "version": "1.5.0", "actualTag": "v1.5.0", "exactCommit": "root150", "immutable": true }
+        ],
+        "expandedPackages": [
+          { "packageCoordinate": "org/dep/x", "packageRoot": "x", "contentDigest": "digest-x" },
+          { "packageCoordinate": "org/root/a", "packageRoot": "skills/a", "contentDigest": "digest-a" }
+        ],
+        "dependencyEdges": [{ "sourcePackageCoordinate": "org/root/a", "targetPackageCoordinate": "org/dep/x" }],
+        "unresolvedRepositories": []
+      }
+    },
+    {
+      "name": "repository-wide-root-expands-all-discovered-packages",
+      "directRequirements": [
+        { "kind": "repository", "coordinate": "org/root", "source": "github-release" }
+      ],
+      "bindings": [
+        {
+          "repository": "org/root",
+          "source": "github-release",
+          "version": "2.0.0",
+          "actualTag": "2.0.0",
+          "exactCommit": "root200",
+          "immutable": false,
+          "packages": [
+            { "coordinate": "org/root/b", "packageRoot": "b", "contentDigest": "digest-b", "dependencies": [] },
+            { "coordinate": "org/root/a", "packageRoot": "a", "contentDigest": "digest-a", "dependencies": [] }
+          ]
+        }
+      ],
+      "expected": {
+        "repositoryWideRoots": ["org/root"],
+        "requiredPackages": ["org/root/a", "org/root/b"],
+        "releaseConstraintSets": [],
+        "sourceBindings": [
+          { "repositoryCoordinate": "org/root", "sourceKind": "github-release", "version": "2.0.0", "actualTag": "2.0.0", "exactCommit": "root200", "immutable": false }
+        ],
+        "expandedPackages": [
+          { "packageCoordinate": "org/root/a", "packageRoot": "a", "contentDigest": "digest-a" },
+          { "packageCoordinate": "org/root/b", "packageRoot": "b", "contentDigest": "digest-b" }
+        ],
+        "dependencyEdges": [],
+        "unresolvedRepositories": []
+      }
+    },
+    {
+      "name": "multiple-transitive-constraints-accumulate-for-unresolved-repository",
+      "directRequirements": [
+        { "kind": "repository", "coordinate": "org/root", "source": "github-release" }
+      ],
+      "bindings": [
+        {
+          "repository": "org/root",
+          "source": "github-release",
+          "version": "1.0.0",
+          "actualTag": "1.0.0",
+          "exactCommit": "root100",
+          "immutable": false,
+          "packages": [
+            { "coordinate": "org/root/b", "packageRoot": "b", "contentDigest": "digest-b", "dependencies": [{ "target": "org/dep/y", "requirement": ">=1.4, <2" }] },
+            { "coordinate": "org/root/a", "packageRoot": "a", "contentDigest": "digest-a", "dependencies": [{ "target": "org/dep/x", "requirement": "^1.2" }] }
+          ]
+        }
+      ],
+      "expected": {
+        "repositoryWideRoots": ["org/root"],
+        "requiredPackages": ["org/dep/x", "org/dep/y", "org/root/a", "org/root/b"],
+        "releaseConstraintSets": [
+          {
+            "repositoryCoordinate": "org/dep",
+            "constraints": [
+              { "requirement": "<2, >=1.4", "origin": { "kind": "dependency", "sourcePackageCoordinate": "org/root/b", "targetPackageCoordinate": "org/dep/y" } },
+              { "requirement": "^1.2", "origin": { "kind": "dependency", "sourcePackageCoordinate": "org/root/a", "targetPackageCoordinate": "org/dep/x" } }
+            ]
+          }
+        ],
+        "sourceBindings": [
+          { "repositoryCoordinate": "org/root", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "root100", "immutable": false }
+        ],
+        "expandedPackages": [
+          { "packageCoordinate": "org/root/a", "packageRoot": "a", "contentDigest": "digest-a" },
+          { "packageCoordinate": "org/root/b", "packageRoot": "b", "contentDigest": "digest-b" }
+        ],
+        "dependencyEdges": [
+          { "sourcePackageCoordinate": "org/root/a", "targetPackageCoordinate": "org/dep/x" },
+          { "sourcePackageCoordinate": "org/root/b", "targetPackageCoordinate": "org/dep/y" }
+        ],
+        "unresolvedRepositories": ["org/dep"]
+      }
+    },
+    {
+      "name": "explicit-git-binding-suppresses-same-repository-release-constraint",
+      "directRequirements": [
+        { "kind": "package", "coordinate": "org/git/a", "source": "git", "ref": "main" }
+      ],
+      "bindings": [
+        {
+          "repository": "org/git",
+          "source": "git",
+          "ref": "main",
+          "exactCommit": "git-main-commit",
+          "packages": [
+            { "coordinate": "org/git/b", "packageRoot": "b", "contentDigest": "digest-b", "dependencies": [] },
+            { "coordinate": "org/git/a", "packageRoot": "a", "contentDigest": "digest-a", "dependencies": [{ "target": "org/git/b", "requirement": "^999" }] }
+          ]
+        }
+      ],
+      "expected": {
+        "repositoryWideRoots": [],
+        "requiredPackages": ["org/git/a", "org/git/b"],
+        "releaseConstraintSets": [],
+        "sourceBindings": [
+          { "repositoryCoordinate": "org/git", "sourceKind": "git", "requestedRef": "main", "exactCommit": "git-main-commit" }
+        ],
+        "expandedPackages": [
+          { "packageCoordinate": "org/git/a", "packageRoot": "a", "contentDigest": "digest-a" },
+          { "packageCoordinate": "org/git/b", "packageRoot": "b", "contentDigest": "digest-b" }
+        ],
+        "dependencyEdges": [{ "sourcePackageCoordinate": "org/git/a", "targetPackageCoordinate": "org/git/b" }],
+        "unresolvedRepositories": []
+      }
+    }
+  ],
+  "errors": [
+    {
+      "name": "git-binding-does-not-bypass-invalid-dependency-requirement",
+      "directRequirements": [
+        { "kind": "package", "coordinate": "org/git/a", "source": "git", "ref": "main" }
+      ],
+      "bindings": [
+        {
+          "repository": "org/git",
+          "source": "git",
+          "ref": "main",
+          "exactCommit": "git-main-commit",
+          "packages": [
+            { "coordinate": "org/git/a", "packageRoot": "a", "contentDigest": "digest-a", "dependencies": [{ "target": "org/git/b", "requirement": "not valid" }] },
+            { "coordinate": "org/git/b", "packageRoot": "b", "contentDigest": "digest-b", "dependencies": [] }
+          ]
+        }
+      ],
+      "expectedError": {
+        "code": "InvalidReleaseRequirement",
+        "facts": {
+          "requirement": "not valid",
+          "reason": "invalid-version",
+          "originKind": "dependency",
+          "sourcePackageCoordinate": "org/git/a",
+          "targetPackageCoordinate": "org/git/b"
+        }
+      }
+    },
+    {
+      "name": "release-and-git-direct-bindings-conflict",
+      "directRequirements": [
+        { "kind": "package", "coordinate": "org/mix/a", "source": "github-release", "version": "^1" },
+        { "kind": "repository", "coordinate": "org/mix", "source": "git", "ref": "main" }
+      ],
+      "bindings": [],
+      "expectedError": {
+        "code": "RepositorySourceConflict",
+        "facts": {
+          "repositoryCoordinate": "org/mix",
+          "requestedSources": ["git:main", "github-release"]
+        }
+      }
+    },
+    {
+      "name": "different-git-refs-for-one-repository-conflict",
+      "directRequirements": [
+        { "kind": "package", "coordinate": "org/mix/a", "source": "git", "ref": "main" },
+        { "kind": "package", "coordinate": "org/mix/b", "source": "git", "ref": "dev" }
+      ],
+      "bindings": [],
+      "expectedError": {
+        "code": "RepositorySourceConflict",
+        "facts": {
+          "repositoryCoordinate": "org/mix",
+          "requestedSources": ["git:dev", "git:main"]
+        }
+      }
+    },
+    {
+      "name": "bound-snapshot-missing-required-package",
+      "directRequirements": [
+        { "kind": "package", "coordinate": "org/root/missing", "source": "github-release", "version": "^1" }
+      ],
+      "bindings": [
+        {
+          "repository": "org/root",
+          "source": "github-release",
+          "version": "1.0.0",
+          "actualTag": "1.0.0",
+          "exactCommit": "root100",
+          "immutable": false,
+          "packages": []
+        }
+      ],
+      "expectedError": {
+        "code": "PackageNotFound",
+        "facts": {
+          "repositoryCoordinate": "org/root",
+          "packageCoordinate": "org/root/missing"
+        }
+      }
+    }
+  ]
+}
