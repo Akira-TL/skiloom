@@ -28,7 +28,7 @@ Skiloom v0 不把 prompts、agents、commands、hooks、MCP、plugin 等其他 A
 - `skiloom-package.toml`；
 - `skiloom-repo.toml`；
 - `DEPENDENCIES.md`；
-- 目标目录根部的 `.skiloom-state`；
+- 目标目录根部的 `.skiloom-state` v1（`SKILOOM-STATE-V1`）；
 - 精确导出包及其中的 `skiloom-export.toml`；
 - Package Snapshot 格式 `SKILOOM-PACKAGE-V1`；
 - GitHub Repository / Package Coordinate；
@@ -158,14 +158,17 @@ Machine Registry 只长期保存当前已接受状态，不保存旧 generation 
 
 Target 是宿主可见的 Skill 目标目录。Skiloom 官方默认工作区 Target 为 `<workspace>/.agents/skills`，默认用户级/全局 Target 为 `~/.agents/skills`；已知 Host preset 与用户显式 `--target` 可以选择其他目录。`.agents/skills` 是 Skiloom 的默认公共安装面，但不是唯一合法 Target，也不是 Package Store。
 
-每个 Skiloom-managed Target 根部具有 `.skiloom-state` 轻量恢复标记。它记录：
+每个 Skiloom-managed Target 根部具有公开 TOML 恢复标记 `.skiloom-state`。v1 格式标识固定为 `SKILOOM-STATE-V1`，完整 schema 见 [`target-recovery-marker-v1.md`](target-recovery-marker-v1.md)。它只保存：
 
-- opaque random `target-id`；
-- 单调递增 Target Generation；
-- 直接安装要求；
-- 恢复目标侧语义所需的稀疏 rename、managed transform、Detached Override 等信息。
+- canonical lowercase UUID v4 `target-id`（产品语义仍是 opaque random identity）；
+- 非负 Target Generation；
+- Package 或 repository-wide Direct Install Requirements；
+- 非默认 projection activation name；
+- Detached Override 的 logical Package 与 detach 时 baseline provenance/digest。
 
-`.skiloom-state` 不展开完整传递依赖图，也不复制本机数据库中的完整精确状态，更不保存 detach 后的用户修改字节。
+v1 不展开完整传递依赖图、不保存 exact transitive source/version、物理 materialization、Dependency Routing Overlay 展开内容、Target/Store/cache 绝对路径、Host preset、来源授权历史、Catalog metadata、凭据或 detach 后的用户修改字节。Routing overlay 必须由恢复后的 dependency edges + projection names 确定性重建；symlink/junction/copy 由当前平台重新选择。
+
+`.skiloom-state` 使用严格 schema：未知字段、重复条目或非法字段组合返回 `InvalidTargetState`；未知 `format` 返回 `UnsupportedTargetStateVersion`，旧程序不得猜测解析或自动降级重写。官方 writer 输出稳定 canonical TOML，Marker 仍是 machine-managed state file，不承诺保留手写注释或原始顺序。
 
 ## 9. 状态权威与同步 / 修复 / 恢复
 

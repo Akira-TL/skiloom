@@ -194,7 +194,7 @@ request
 - `.skiloom-state` v1；
 - Target Identity / Generation；
 - direct requirements；
-- sparse rename/transform/detach metadata；
+- sparse projection rename + Detached Override baseline metadata；
 - dependency export；
 - full export；
 - `skiloom-export.toml`；
@@ -211,7 +211,7 @@ request
 - large payload streaming benchmark；
 - 必要时的 export/archive native helper。
 
-公开格式 schema 在实现前必须由 #17 架构 Gate 固定。
+`.skiloom-state` v1 已由 #32 固定；本系列剩余的 export container / `skiloom-export.toml` schema 仍必须在实现前由 #17 架构 Gate 收口。
 
 ## 9. `0.8.x` — Discovery UX、CLI 与第一方 Skills
 

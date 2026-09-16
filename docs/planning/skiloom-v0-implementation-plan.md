@@ -10,8 +10,8 @@
 
 当前仓库仍是纯设计仓。满足以下条件前，不创建 `src/`、`package.json` 或 executable implementation ticket：
 
-1. #27 First-party Skill Suite / bootstrap 已收口；
-2. `.skiloom-state` v1 公开格式固定；
+1. ✅ #27 First-party Skill Suite / bootstrap 已收口；
+2. ✅ `.skiloom-state` v1 公开格式已由 #32 固定；
 3. 单文件 export container + `skiloom-export.toml` v1 公开格式固定；
 4. `~/.skiloom/operation.lock` 在 Node.js 官方实现中的跨平台可靠 OS lock 机制固定；
 5. v0 CLI command surface、non-interactive acceptance policy surface 和核心交互边界固定；

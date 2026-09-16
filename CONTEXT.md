@@ -130,7 +130,7 @@ Skiloom 为 rename 或 dependency routing 等确定性变换生成并继续全�
 
 ## Target Recovery Marker
 
-每个 Skiloom-managed Target 根目录中的 `.skiloom-state` 轻量恢复锚点。它记录 `target-id`、Target Generation、用户直接安装的 top-level roots，以及恢复目标侧语义所需的 rename、managed transform 与 Detached Override 等稀疏标记；不展开 transitive dependency graph，也不保存用户修改后的 bytes。Machine Registry 丢失时，Skiloom 可从这些 roots 重新解析依赖并形成新的 recovery candidate，同时不得覆盖 marker 声明的 user-owned override。
+每个 Skiloom-managed Target 根目录中的公开 TOML 文件 `.skiloom-state`。v1 使用 `SKILOOM-STATE-V1`，保存 canonical lowercase UUID v4 `target-id`、Target Generation、Package/repository-wide Direct Install Requirements、非默认 projection activation name，以及 Detached Override 的 logical Package + detach baseline provenance/digest。它不保存完整 transitive graph、exact transitive source/version、symlink/junction/copy 选择、Dependency Routing Overlay 展开内容或用户修改后的 bytes；routing overlay 由恢复后的依赖边与 projection name 确定性重建。v1 严格拒绝未知字段和非法组合，未知格式版本 fail closed。Machine Registry 丢失时，Skiloom 只能以这些信息重新解析 recovery candidate 并重新确认完整来源，不能把 Marker 当作精确 Lock。
 
 ## Package Store GC Boundary
 
