@@ -143,7 +143,11 @@ Skiloom 官方实现使用本机 SQLite 状态库维护日常权威状态。产�
 - exact Package records 与 dependency edges；
 - projection name、rename、managed transform、detach 等 ownership facts。
 
-SQLite 的表结构、路径和迁移策略不是公开产品格式。
+SQLite 的表结构、路径和迁移策略不是公开产品格式。官方实现 v0 使用 `~/.skiloom/registry.sqlite3`，schema generation 使用 `PRAGMA user_version`；迁移前通过 SQLite backup API 备份到 `~/.skiloom/backups/`。数据库损坏必须返回 `RegistryCorrupt` 并 fail closed，不能通过扫描 Target 猜测原有 Package identity。
+
+Skiloom 不是常驻多写服务。所有 install/update/remove/sync/repair/recovery/import/detach/forget、schema migration、backup restore 以及需要读取一致 Target 状态的 export 共用 `~/.skiloom/operation.lock` 的 OS 级独占文件锁。锁由操作系统持有，不能以 lock file 是否存在判断占用；无法取得锁时返回 `OperationLocked`。Target Generation 继续用于状态版本与恢复，不承担 Skiloom 多进程写入的主要并发控制职责。
+
+Machine Registry 只长期保存当前已接受状态，不保存旧 generation 的完整安装历史。SQLite 与 Target filesystem 之间允许使用最小临时 pending-operation 记录处理进程中断；正常完成后立即删除，它不是第二份 Lock 或操作历史。
 
 Target 是宿主可见的 Skill 目标目录。Skiloom 官方默认工作区 Target 为 `<workspace>/.agents/skills`，默认用户级/全局 Target 为 `~/.agents/skills`；已知 Host preset 与用户显式 `--target` 可以选择其他目录。`.agents/skills` 是 Skiloom 的默认公共安装面，但不是唯一合法 Target，也不是 Package Store。
 

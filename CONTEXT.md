@@ -162,7 +162,7 @@ Skiloom 官方实现使用 Node.js + TypeScript + npm 作为主控制面与发�
 
 ## Machine Registry
 
-Skiloom Home 中的 machine-local SQLite 状态库，是普通安装日常管理的完整机器 authority：保存 accepted exact resolution、Target Identity/Generation 与 projection ownership 等机器状态；Package Store 独立负责 immutable content identity，live filesystem 只提供可验证观察，Target Recovery Marker 只提供恢复线索。同步或修复严格恢复这里已经接受的精确状态而不重新解析；安装、更新和数据库丢失后的恢复才允许形成新的 Installation Candidate。它不登记项目身份、不建立项目 registry，也不引入 `project.id`。
+Skiloom Home 中的 machine-local SQLite 状态库，是普通安装日常管理的完整机器 authority：保存 accepted exact resolution、Target Identity/Generation 与 projection ownership 等机器状态；Package Store 独立负责 immutable content identity，live filesystem 只提供可验证观察，Target Recovery Marker 只提供恢复线索。官方实现 v0 使用 `~/.skiloom/registry.sqlite3`，核心状态关系化保存而不是整个 Target 塞进单一 JSON；旧 generation 的完整安装历史不长期保存。所有会改变或必须一致读取这些状态的操作共用 `~/.skiloom/operation.lock` 的 OS 级独占锁，拿不到时返回 `OperationLocked`；Target Generation 继续用于状态版本与恢复，不承担复杂多进程乐观并发职责。schema 使用 `PRAGMA user_version`，迁移前备份到 `~/.skiloom/backups/`；数据库损坏返回 `RegistryCorrupt` 并 fail closed。SQLite 与 Target filesystem 之间只允许最小临时 pending-operation 记录做崩溃清理，正常完成即删除。同步或修复严格恢复这里已经接受的精确状态而不重新解析；安装、更新和数据库丢失后的恢复才允许形成新的 Installation Candidate。它不登记项目身份、不建立项目 registry，也不引入 `project.id`，且不保存任何凭据。
 
 ## Catalog
 
