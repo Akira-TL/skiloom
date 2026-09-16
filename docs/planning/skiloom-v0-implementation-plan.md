@@ -200,15 +200,15 @@ Helper 不得自行取得网络、凭据、用户授权、Registry 写权限或 
 
 #### A. System Capability Helper
 
-用于 Node 标准能力缺失、但产品语义已经要求的系统调用。v0 当前唯一明确候选是：
+用于 Node 标准能力缺失、但产品语义已经要求的系统调用。v0 已固定唯一 mandatory System Capability Helper：
 
 ```text
-operation.lock
-POSIX: advisory exclusive file lock
-Windows: equivalent kernel-backed exclusive file lock
+skiloom-lock
+→ operation.lock
+→ Unix OS file lock / Windows equivalent kernel-backed exclusive file lock
 ```
 
-如果 Gate A 证明 Node 24/22 无法直接可靠完成该能力，则建立一个最小 mandatory platform helper。它只执行：
+`skiloom-lock` 是预编译 Rust standalone helper，并使用 `SKILOOM-LOCK-V1` + parent stdin lifetime channel。它只执行：
 
 ```text
 acquire lock
@@ -664,9 +664,9 @@ I06/I07 --------------------> I11
 I08/I09/I10/I11 ------------> I12 --> I13
 I02/I03/I04 ----------------> I14 --> I15
 I07/I08/I09/I12/I14/I15 ----> I16
-Gate marker schema + I13 ----> I17
-Gate export schema + I16/I17 -> I18
-I16/I18 + #27/CLI decisions -> I19
+I13 --------------------------> I17
+I16/I17 ----------------------> I18
+I16/I18 ----------------------> I19
 I19 -------------------------> M9 release readiness
 
 I04 -------------------------> N04 benchmark gate
@@ -682,7 +682,7 @@ N01 已确定属于主 correctness critical path，并是 I10 的实现依赖。
 - I03 / I05 在 I01+I02 后并行；
 - I08 / I09 在核心 state types 稳定后并行；
 - I14 GitHub adapter 可与 I11 Target planner 并行；
-- CLI rendering 不应阻塞 domain/runtime 开发，但不得在 Gate A 前固定公开命令语义。
+- CLI rendering 不应阻塞 domain/runtime 开发，但必须实现 #35 已固定的公开命令/接受/JSON 语义，不得在实现 ticket 中重新设计。
 
 ## 9. Ticket 规模规则
 

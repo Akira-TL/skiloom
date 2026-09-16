@@ -42,7 +42,7 @@ Skiloom v0 不把 prompts、agents、commands、hooks、MCP、plugin 等其他 A
 - Package Store 的物理目录布局；
 - 临时目录和原子切换的内部路径；
 - Node.js 内部模块边界与调用链；
-- CLI 的具体交互文案、TUI/GUI、进度显示与网络重试策略。
+- CLI 的具体自然语言文案、颜色/表格布局、spinner、进度显示与网络重试策略。
 
 ## 3. Repository discovery 与 Package Snapshot
 
