@@ -1,0 +1,179 @@
+{
+  "fixtureVersion": 1,
+  "cases": [
+    {
+      "id": "initial-resolution-adds-complete-repository-set-with-canonical-origins",
+      "directRequirements": [
+        { "kind": "package", "coordinate": "root/repo/main", "source": "github-release" }
+      ],
+      "candidate": {
+        "sourceBindings": [
+          { "repositoryCoordinate": "new/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "v1.0.0", "exactCommit": "new-1", "immutable": false },
+          { "repositoryCoordinate": "dep/b", "sourceKind": "git", "requestedRef": "main", "exactCommit": "dep-b-1" },
+          { "repositoryCoordinate": "root/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "root-1", "immutable": true },
+          { "repositoryCoordinate": "dep/a", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "dep-a-1", "immutable": false }
+        ],
+        "packages": [
+          { "packageCoordinate": "new/repo/tool", "packageRoot": "tool", "contentDigest": "sha256:new" },
+          { "packageCoordinate": "dep/b/mid", "packageRoot": "mid", "contentDigest": "sha256:b" },
+          { "packageCoordinate": "root/repo/main", "packageRoot": "main", "contentDigest": "sha256:root" },
+          { "packageCoordinate": "dep/a/mid", "packageRoot": "mid", "contentDigest": "sha256:a" }
+        ],
+        "dependencyEdges": [
+          { "sourcePackageCoordinate": "dep/b/mid", "targetPackageCoordinate": "new/repo/tool" },
+          { "sourcePackageCoordinate": "root/repo/main", "targetPackageCoordinate": "dep/b/mid" },
+          { "sourcePackageCoordinate": "dep/a/mid", "targetPackageCoordinate": "new/repo/tool" },
+          { "sourcePackageCoordinate": "root/repo/main", "targetPackageCoordinate": "dep/a/mid" }
+        ]
+      },
+      "expected": {
+        "previousRepositories": [],
+        "candidateRepositories": [
+          { "repositoryCoordinate": "dep/a", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "dep-a-1", "immutable": false },
+          { "repositoryCoordinate": "dep/b", "sourceKind": "git", "requestedRef": "main", "exactCommit": "dep-b-1" },
+          { "repositoryCoordinate": "new/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "v1.0.0", "exactCommit": "new-1", "immutable": false },
+          { "repositoryCoordinate": "root/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "root-1", "immutable": true }
+        ],
+        "sourceDeltas": [
+          { "kind": "repository-added", "repositoryCoordinate": "dep/a", "candidate": { "repositoryCoordinate": "dep/a", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "dep-a-1", "immutable": false } },
+          { "kind": "repository-added", "repositoryCoordinate": "dep/b", "candidate": { "repositoryCoordinate": "dep/b", "sourceKind": "git", "requestedRef": "main", "exactCommit": "dep-b-1" } },
+          { "kind": "repository-added", "repositoryCoordinate": "new/repo", "candidate": { "repositoryCoordinate": "new/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "v1.0.0", "exactCommit": "new-1", "immutable": false } },
+          { "kind": "repository-added", "repositoryCoordinate": "root/repo", "candidate": { "repositoryCoordinate": "root/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "root-1", "immutable": true } }
+        ],
+        "repositoryOrigins": [
+          { "repositoryCoordinate": "dep/a", "kind": "transitive", "directRequirementCoordinate": "root/repo/main", "packagePath": ["root/repo/main", "dep/a/mid"] },
+          { "repositoryCoordinate": "dep/b", "kind": "transitive", "directRequirementCoordinate": "root/repo/main", "packagePath": ["root/repo/main", "dep/b/mid"] },
+          { "repositoryCoordinate": "new/repo", "kind": "transitive", "directRequirementCoordinate": "root/repo/main", "packagePath": ["root/repo/main", "dep/a/mid", "new/repo/tool"] },
+          { "repositoryCoordinate": "root/repo", "kind": "direct", "directRequirementCoordinate": "root/repo/main" }
+        ],
+        "packageDeltas": [
+          { "kind": "package-added", "packageCoordinate": "dep/a/mid", "candidate": { "packageRoot": "mid", "contentDigest": "sha256:a" } },
+          { "kind": "package-added", "packageCoordinate": "dep/b/mid", "candidate": { "packageRoot": "mid", "contentDigest": "sha256:b" } },
+          { "kind": "package-added", "packageCoordinate": "new/repo/tool", "candidate": { "packageRoot": "tool", "contentDigest": "sha256:new" } },
+          { "kind": "package-added", "packageCoordinate": "root/repo/main", "candidate": { "packageRoot": "main", "contentDigest": "sha256:root" } }
+        ],
+        "dependencyEdgeDeltas": [
+          { "kind": "dependency-edge-added", "sourcePackageCoordinate": "dep/a/mid", "targetPackageCoordinate": "new/repo/tool" },
+          { "kind": "dependency-edge-added", "sourcePackageCoordinate": "dep/b/mid", "targetPackageCoordinate": "new/repo/tool" },
+          { "kind": "dependency-edge-added", "sourcePackageCoordinate": "root/repo/main", "targetPackageCoordinate": "dep/a/mid" },
+          { "kind": "dependency-edge-added", "sourcePackageCoordinate": "root/repo/main", "targetPackageCoordinate": "dep/b/mid" }
+        ]
+      }
+    },
+    {
+      "id": "re-resolution-compares-complete-source-content-and-edge-sets",
+      "directRequirements": [
+        { "kind": "package", "coordinate": "root/repo/main", "source": "github-release" }
+      ],
+      "previous": {
+        "sourceBindings": [
+          { "repositoryCoordinate": "Case/Repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "v1.0.0", "exactCommit": "case-1", "immutable": false },
+          { "repositoryCoordinate": "git/repo", "sourceKind": "git", "requestedRef": "main", "exactCommit": "git-1" },
+          { "repositoryCoordinate": "imm/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "imm-1", "immutable": false },
+          { "repositoryCoordinate": "kind/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "kind-1", "immutable": false },
+          { "repositoryCoordinate": "old/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "old-1", "immutable": false },
+          { "repositoryCoordinate": "rel/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "v1.0.0", "exactCommit": "rel-1", "immutable": false },
+          { "repositoryCoordinate": "retarget/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "v1.0.0", "exactCommit": "retarget-old", "immutable": false },
+          { "repositoryCoordinate": "root/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "root-1", "immutable": false }
+        ],
+        "packages": [
+          { "packageCoordinate": "Case/Repo/pkg", "packageRoot": "old-root", "contentDigest": "sha256:case" },
+          { "packageCoordinate": "git/repo/pkg", "packageRoot": "pkg", "contentDigest": "sha256:git" },
+          { "packageCoordinate": "imm/repo/pkg", "packageRoot": "pkg", "contentDigest": "sha256:imm" },
+          { "packageCoordinate": "kind/repo/pkg", "packageRoot": "pkg", "contentDigest": "sha256:kind" },
+          { "packageCoordinate": "old/repo/pkg", "packageRoot": "pkg", "contentDigest": "sha256:old" },
+          { "packageCoordinate": "rel/repo/pkg", "packageRoot": "pkg", "contentDigest": "sha256:rel-old" },
+          { "packageCoordinate": "retarget/repo/pkg", "packageRoot": "pkg", "contentDigest": "sha256:retarget" },
+          { "packageCoordinate": "root/repo/main", "packageRoot": "main", "contentDigest": "sha256:root-old" }
+        ],
+        "dependencyEdges": [
+          { "sourcePackageCoordinate": "root/repo/main", "targetPackageCoordinate": "Case/Repo/pkg" },
+          { "sourcePackageCoordinate": "root/repo/main", "targetPackageCoordinate": "git/repo/pkg" },
+          { "sourcePackageCoordinate": "root/repo/main", "targetPackageCoordinate": "imm/repo/pkg" },
+          { "sourcePackageCoordinate": "root/repo/main", "targetPackageCoordinate": "kind/repo/pkg" },
+          { "sourcePackageCoordinate": "root/repo/main", "targetPackageCoordinate": "old/repo/pkg" },
+          { "sourcePackageCoordinate": "root/repo/main", "targetPackageCoordinate": "rel/repo/pkg" },
+          { "sourcePackageCoordinate": "root/repo/main", "targetPackageCoordinate": "retarget/repo/pkg" }
+        ]
+      },
+      "candidate": {
+        "sourceBindings": [
+          { "repositoryCoordinate": "case/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "v1.0.0", "exactCommit": "case-1", "immutable": false },
+          { "repositoryCoordinate": "git/repo", "sourceKind": "git", "requestedRef": "main", "exactCommit": "git-2" },
+          { "repositoryCoordinate": "imm/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "imm-1", "immutable": true },
+          { "repositoryCoordinate": "kind/repo", "sourceKind": "git", "requestedRef": "main", "exactCommit": "kind-1" },
+          { "repositoryCoordinate": "new/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "new-1", "immutable": false },
+          { "repositoryCoordinate": "rel/repo", "sourceKind": "github-release", "version": "2.0.0", "actualTag": "v2.0.0", "exactCommit": "rel-2", "immutable": false },
+          { "repositoryCoordinate": "retarget/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "v1.0.0", "exactCommit": "retarget-new", "immutable": false },
+          { "repositoryCoordinate": "root/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "root-1", "immutable": false }
+        ],
+        "packages": [
+          { "packageCoordinate": "case/repo/pkg", "packageRoot": "new-root", "contentDigest": "sha256:case" },
+          { "packageCoordinate": "git/repo/pkg", "packageRoot": "pkg", "contentDigest": "sha256:git" },
+          { "packageCoordinate": "imm/repo/pkg", "packageRoot": "pkg", "contentDigest": "sha256:imm" },
+          { "packageCoordinate": "kind/repo/pkg", "packageRoot": "pkg", "contentDigest": "sha256:kind" },
+          { "packageCoordinate": "new/repo/pkg", "packageRoot": "pkg", "contentDigest": "sha256:new" },
+          { "packageCoordinate": "rel/repo/pkg", "packageRoot": "pkg", "contentDigest": "sha256:rel-new" },
+          { "packageCoordinate": "retarget/repo/pkg", "packageRoot": "pkg", "contentDigest": "sha256:retarget" },
+          { "packageCoordinate": "root/repo/main", "packageRoot": "main", "contentDigest": "sha256:root-new" }
+        ],
+        "dependencyEdges": [
+          { "sourcePackageCoordinate": "root/repo/main", "targetPackageCoordinate": "case/repo/pkg" },
+          { "sourcePackageCoordinate": "root/repo/main", "targetPackageCoordinate": "git/repo/pkg" },
+          { "sourcePackageCoordinate": "root/repo/main", "targetPackageCoordinate": "imm/repo/pkg" },
+          { "sourcePackageCoordinate": "root/repo/main", "targetPackageCoordinate": "kind/repo/pkg" },
+          { "sourcePackageCoordinate": "root/repo/main", "targetPackageCoordinate": "new/repo/pkg" },
+          { "sourcePackageCoordinate": "root/repo/main", "targetPackageCoordinate": "rel/repo/pkg" },
+          { "sourcePackageCoordinate": "root/repo/main", "targetPackageCoordinate": "retarget/repo/pkg" }
+        ]
+      },
+      "expected": {
+        "previousRepositories": [
+          { "repositoryCoordinate": "case/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "v1.0.0", "exactCommit": "case-1", "immutable": false },
+          { "repositoryCoordinate": "git/repo", "sourceKind": "git", "requestedRef": "main", "exactCommit": "git-1" },
+          { "repositoryCoordinate": "imm/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "imm-1", "immutable": false },
+          { "repositoryCoordinate": "kind/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "kind-1", "immutable": false },
+          { "repositoryCoordinate": "old/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "old-1", "immutable": false },
+          { "repositoryCoordinate": "rel/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "v1.0.0", "exactCommit": "rel-1", "immutable": false },
+          { "repositoryCoordinate": "retarget/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "v1.0.0", "exactCommit": "retarget-old", "immutable": false },
+          { "repositoryCoordinate": "root/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "root-1", "immutable": false }
+        ],
+        "candidateRepositories": [
+          { "repositoryCoordinate": "case/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "v1.0.0", "exactCommit": "case-1", "immutable": false },
+          { "repositoryCoordinate": "git/repo", "sourceKind": "git", "requestedRef": "main", "exactCommit": "git-2" },
+          { "repositoryCoordinate": "imm/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "imm-1", "immutable": true },
+          { "repositoryCoordinate": "kind/repo", "sourceKind": "git", "requestedRef": "main", "exactCommit": "kind-1" },
+          { "repositoryCoordinate": "new/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "new-1", "immutable": false },
+          { "repositoryCoordinate": "rel/repo", "sourceKind": "github-release", "version": "2.0.0", "actualTag": "v2.0.0", "exactCommit": "rel-2", "immutable": false },
+          { "repositoryCoordinate": "retarget/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "v1.0.0", "exactCommit": "retarget-new", "immutable": false },
+          { "repositoryCoordinate": "root/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "root-1", "immutable": false }
+        ],
+        "sourceDeltas": [
+          { "kind": "git-commit-changed", "repositoryCoordinate": "git/repo", "previousCommit": "git-1", "candidateCommit": "git-2" },
+          { "kind": "immutable-signal-changed", "repositoryCoordinate": "imm/repo", "previousImmutable": false, "candidateImmutable": true, "advisory": true },
+          { "kind": "source-kind-changed", "repositoryCoordinate": "kind/repo", "previousSourceKind": "github-release", "candidateSourceKind": "git" },
+          { "kind": "repository-added", "repositoryCoordinate": "new/repo", "candidate": { "repositoryCoordinate": "new/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "new-1", "immutable": false } },
+          { "kind": "repository-removed", "repositoryCoordinate": "old/repo", "previous": { "repositoryCoordinate": "old/repo", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "old-1", "immutable": false } },
+          { "kind": "release-commit-changed", "repositoryCoordinate": "rel/repo", "previousCommit": "rel-1", "candidateCommit": "rel-2" },
+          { "kind": "release-tag-changed", "repositoryCoordinate": "rel/repo", "previousTag": "v1.0.0", "candidateTag": "v2.0.0" },
+          { "kind": "release-version-changed", "repositoryCoordinate": "rel/repo", "previousVersion": "1.0.0", "candidateVersion": "2.0.0" },
+          { "kind": "release-retarget", "repositoryCoordinate": "retarget/repo", "actualTag": "v1.0.0", "previousCommit": "retarget-old", "candidateCommit": "retarget-new", "risk": "high" }
+        ],
+        "repositoryOrigins": [
+          { "repositoryCoordinate": "new/repo", "kind": "transitive", "directRequirementCoordinate": "root/repo/main", "packagePath": ["root/repo/main", "new/repo/pkg"] }
+        ],
+        "packageDeltas": [
+          { "kind": "package-root-changed", "packageCoordinate": "case/repo/pkg", "previousRoot": "old-root", "candidateRoot": "new-root" },
+          { "kind": "package-added", "packageCoordinate": "new/repo/pkg", "candidate": { "packageRoot": "pkg", "contentDigest": "sha256:new" } },
+          { "kind": "package-removed", "packageCoordinate": "old/repo/pkg", "previous": { "packageRoot": "pkg", "contentDigest": "sha256:old" } },
+          { "kind": "package-content-changed", "packageCoordinate": "rel/repo/pkg", "previousDigest": "sha256:rel-old", "candidateDigest": "sha256:rel-new" },
+          { "kind": "package-content-changed", "packageCoordinate": "root/repo/main", "previousDigest": "sha256:root-old", "candidateDigest": "sha256:root-new" }
+        ],
+        "dependencyEdgeDeltas": [
+          { "kind": "dependency-edge-added", "sourcePackageCoordinate": "root/repo/main", "targetPackageCoordinate": "new/repo/pkg" },
+          { "kind": "dependency-edge-removed", "sourcePackageCoordinate": "root/repo/main", "targetPackageCoordinate": "old/repo/pkg" }
+        ]
+      }
+    }
+  ]
+}
