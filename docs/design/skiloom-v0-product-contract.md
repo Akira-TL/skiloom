@@ -32,7 +32,8 @@ Skiloom v0 不把 prompts、agents、commands、hooks、MCP、plugin 等其他 A
 - 精确导出包及其中的 `skiloom-export.toml`；
 - Package Snapshot 格式 `SKILOOM-PACKAGE-V1`；
 - GitHub Repository / Package Coordinate；
-- Release Version Requirement 语法与语义。
+- Release Version Requirement 语法与语义；
+- CLI machine-output envelope `SKILOOM-CLI-V1`。
 
 以下内容属于 Skiloom 官方实现细节，不作为公开持久化格式承诺：
 
@@ -372,3 +373,15 @@ Skiloom 官方实现继续采用：
 - `~/.skiloom/` 是 machine-local Skiloom Home，v0 不承诺 NFS/SMB 等网络/分布式挂载上的 Machine Registry 锁语义。
 
 官方行为测试数据用于验证上述产品规则与算法，不承担第三方实现认证含义。
+
+## 19. CLI、候选接受与机器输出
+
+Skiloom v0 使用一组 canonical CLI commands：`search`、`status`、`doctor`、`validate`、`install`、`update`、`remove`、`rename`、`sync`、`repair`、`detach`、`rebind`、`forget`、`recover`、`fork`、`export`、`import`、`bootstrap`。v0 不维护 `add/rm/fix/upgrade` 等同义 alias，也不提供 `--force` 绕过完整性或 ownership 检查。
+
+`install/update/remove/recover/fork/import/bootstrap` 都属于完整 Candidate 操作，并统一支持 `--plan`：只计算、验证和展示完整 candidate，不接受、不写 Machine Registry、不修改 live Target。non-interactive 执行若 candidate 需要提交，必须显式 `--yes`；`--json` 自动禁止 prompt，但不隐含 `--yes`。Release tag retarget 还需要显式 `--allow-release-retarget`，merge import 还需要显式 `--merge`；v0 不把这些授权持久化成长期 source whitelist 或 policy profile。
+
+`sync/repair` 只恢复当前已接受 exact state，不重新解析，因此不再次要求接受当前状态。`rename/detach/rebind/forget` 是用户显式局部状态操作，命令本身提供该局部授权，但仍必须经过 `operation.lock`、ownership preflight、Machine Registry transaction 与 DB-first Target materialization。
+
+Target CLI 选择固定为互斥的显式 `--target <path>` 或 `--host codex|claude|gemini|opencode` + `--scope workspace|user`；未指定时以当前工作目录为 workspace context，默认 `<cwd>/.agents/skills`，v0 不自动搜索 Git repository root。
+
+Agent/CI 使用 `--json` 得到一个 `SKILOOM-CLI-V1` JSON document，固定 envelope 为 `schema`、`ok`、`command`、`result|error`、`warnings`；具体产品错误通过 `error.code` 表达。Shell exit code 只保留少量类别：`0` success/no-op、`1` product/runtime failure、`2` invalid argv、`3` approval absent/declined/`InteractionRequired`、`130` SIGINT。完整命令、参数与交互规则见 [`cli-surface-v0.md`](cli-surface-v0.md)。

@@ -14,7 +14,7 @@
 2. ✅ `.skiloom-state` v1 公开格式已由 #32 固定；
 3. ✅ 单文件 export container + `skiloom-export.toml` v1 公开格式已固定为 `SKILOOM-EXPORT-V1`；
 4. ✅ `~/.skiloom/operation.lock` 已固定使用 mandatory Rust helper `skiloom-lock`；
-5. v0 CLI command surface、non-interactive acceptance policy surface 和核心交互边界固定；
+5. ✅ v0 CLI command surface、non-interactive acceptance policy surface 和核心交互边界已由 #35 固定；
 6. Wayfinder #17 完成最终一致性审阅并关闭。
 
 Gate A 的目的不是继续扩大产品设计，而是防止实现阶段偷偷替公开格式、锁机制或 CLI 行为做不可逆决定。
@@ -618,13 +618,15 @@ request
 该阶段在真正拆 executable tickets 时应再细分，但依赖关系是：
 
 1. SkillsMP search adapter只输出 discovery candidates；
-2. CLI command parser/render/prompt/exit 使用 Gate A 已固定 surface；
-3. non-interactive acceptance policy 只消费完整 candidate/delta，不绕过 product rules；
-4. first-party `skiloom` / discover / manage / doctor / author Skills 走普通 Package/Target 安装；
-5. bootstrap 不创建 privileged Store/Target path；
-6. npm install 本身不静默修改用户 Skill Target。
+2. CLI 实现 #35 固定的 canonical commands、互斥 Target selector、`--plan`、`--yes`、`--allow-release-retarget` 与 `--merge`；
+3. `--json` 输出 `SKILOOM-CLI-V1` 单文档 envelope，并自动 non-interactive，但绝不自动批准 candidate；
+4. non-interactive acceptance policy 只消费完整 candidate/delta，不绕过 product rules；
+5. sync/repair 不重新解析；rename/detach/rebind/forget 复用统一 lock + DB-first 局部状态路径；
+6. first-party `skiloom` / discover / manage / doctor / author Skills 走普通 Package/Target 安装并优先使用 JSON 机器接口；
+7. bootstrap 不创建 privileged Store/Target path，也不隐式 update；
+8. npm install 本身不静默修改用户 Skill Target。
 
-**M8 DoD：** 用户可以从搜索或明确 GitHub coordinate 进入同一安装 pipeline；第一方 Skills 不具有普通第三方 Package 之外的隐藏安装特权。
+**M8 DoD：** 用户可以从搜索或明确 GitHub coordinate 进入同一安装 pipeline；Agent/CI 可以只通过 `SKILOOM-CLI-V1` 与 structured product errors 稳定调用；第一方 Skills 不具有普通第三方 Package 之外的隐藏安装特权。
 
 ---
 

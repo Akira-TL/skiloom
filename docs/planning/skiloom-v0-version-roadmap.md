@@ -219,8 +219,9 @@ request
 
 形成面向用户和 Agent 的完整产品入口：
 
-- CLI command surface；
-- prompt / render / exit behavior；
+- #35 固定的 canonical CLI command surface；
+- `--plan` / `--yes` / 高风险显式授权与 prompt / render / exit behavior；
+- `SKILOOM-CLI-V1` JSON machine-output envelope；
 - SkillsMP discovery；
 - explicit GitHub coordinate install；
 - Host preset；
@@ -229,7 +230,7 @@ request
 - 一次 bootstrap 只对一个用户选定 Target 执行普通 Router direct install；
 - npm 安装本身不修改 Skill Target。
 
-所有入口最终进入同一 install/update/runtime pipeline；第一方 Skill 不拥有隐藏安装权限，Router 也不是 CLI/runtime 正确性的前提。
+所有入口最终进入同一 install/update/runtime pipeline；`--json` 自动 non-interactive 但不自动批准候选，v0 不提供 `--force` 或永久 policy DSL。第一方 Skill 不拥有隐藏安装权限，Router 也不是 CLI/runtime 正确性的前提。
 
 ### `0.8.x` 分支功能
 
