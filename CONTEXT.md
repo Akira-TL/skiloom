@@ -86,11 +86,15 @@ Package Snapshot 的 canonical 内容身份。v0 使用 `SKILOOM-PACKAGE-V1`：�
 
 ## Package Store
 
-机器级共享的不可变 Skill Package Snapshot 存储，直接以 Package Content Digest 作为 key。Skiloom 官方实现把 Store 放在用户自己的 `~/.skiloom/` 内部管理空间中，不把 Store 直接暴露为宿主 Skill 目录。不同 repository/source 只要 snapshot 内容完全相同就复用同一 Store entry；source provenance 保存在 Machine Registry 的 Exact Installation Resolution 中，需要传播时进入显式 Reproducible Export，不进入 Store key。宿主环境检查状态不写回 Store。
+机器级共享的不可变 Skill Package Snapshot 存储，直接以 Package Content Digest 作为 key。Skiloom 官方实现把机器级内部数据放在 `~/.skiloom/`，Package Store 默认位于 `~/.skiloom/store/`；所有 Host、scope 与 Target 共用这一套 Store，不创建宿主专用 Store，也不把 Store 直接暴露为宿主 Skill 目录。不同 repository/source 只要 snapshot 内容完全相同就复用同一 Store entry；source provenance 保存在 Machine Registry 的 Exact Installation Resolution 中，需要传播时进入显式 Reproducible Export，不进入 Store key。宿主环境检查状态不写回 Store。
 
 ## Target
 
 Skiloom 安装 Skill 时的宿主可见目标目录。官方默认工作区 Target 为 `<workspace>/.agents/skills`，默认用户级/全局 Target 为 `~/.agents/skills`；Host preset 或用户显式 `--target` 可以选择其他目录。`.agents/skills` 是默认安装面而不是 Package Store，Target 内按 `<target>/<activation-name>` 平铺 Skill。
+
+## Host Target Preset
+
+用户明确选择某个宿主时，用于把 `host + scope + workspace context` 映射为普通 Target 的轻量快捷规则。v0 中 Codex、Gemini CLI、OpenCode 仍映射到 `.agents/skills`，Claude 映射到 `.claude/skills`。优先级为显式 Target > 显式 Host preset + scope > 默认 `.agents/skills`。Preset 不修改宿主配置、不拥有 Store、依赖图或来源确认，也不决定 symlink/junction/copy；最多提供已知能力或风险提示。
 
 ## Target Installed Graph
 

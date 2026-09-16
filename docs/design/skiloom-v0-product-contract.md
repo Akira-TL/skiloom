@@ -238,9 +238,19 @@ Target 内使用平铺 `<target>/<activation-name>` 结构。
 
 ## 13. Package Store
 
-Package Store 是机器级共享的不可变 Package Snapshot 存储，以 Package Content Digest 为 key。Skiloom 官方实现把它放在用户自己的 `~/.skiloom/` 内部管理空间中，不把 Store 目录直接作为宿主 Skill Target。相同内容可以被多个 Target 复用，并且每个 Target 独立选择 projection name / rename。
+Package Store 是机器级共享的不可变 Package Snapshot 存储，以 Package Content Digest 为 key。Skiloom 官方实现把机器级内部数据放在 `~/.skiloom/`，Package Store 默认位于 `~/.skiloom/store/`；Store 目录不直接作为宿主 Skill Target。相同内容可以被多个 Target 复用，并且每个 Target 独立选择 projection name / rename。
+
+所有 Host、scope 与 Target 共用这一套 Store，不创建宿主专用 Store。
 
 v0 不执行 destructive automatic Package Store GC。移除某个直接安装要求或 Target projection 不直接删除共享 Store entry；未来若要 destructive GC，必须另行建立安全的引用/可达性证明。
+
+### 13.1 默认 Target 与 Host preset
+
+没有显式 Target 或 Host preset 时，workspace scope 默认使用 `<workspace>/.agents/skills/`，user scope 默认使用 `~/.agents/skills/`。
+
+Host preset 只是用户明确选择时的 Target 快捷映射，不是另一套安装器。v0 中 Codex、Gemini CLI、OpenCode preset 使用 `.agents/skills`；Claude preset 使用 `.claude/skills`。Target 选择优先级固定为：显式 Target > 显式 Host preset + scope > 默认 `.agents/skills`。
+
+Host preset 不修改宿主配置，也不决定 symlink/junction/copy；通用 Target materialization 规则继续负责投影方式。详细契约见 [`host-target-presets.md`](host-target-presets.md)。
 
 ## 14. 精确导出与导入
 
