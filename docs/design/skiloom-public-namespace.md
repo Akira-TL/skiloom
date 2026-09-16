@@ -1,8 +1,10 @@
 # Skiloom Public Namespace v0
 
-状态：Accepted
+状态：Partially Superseded
 
-对应 Issue：#14 `Choose a collision-free product and CLI name`
+当前说明：`Skiloom / skiloom` 产品名、CLI/package token、`skiloom-package.toml`、`skiloom-repo.toml` 与 `SKILOOM-PACKAGE-V1` 继续有效；旧项目级 `.agents/.skiloom` 状态文件与 `Skiloom Core` 命名不再是当前产品权威。当前规则见 [`skiloom-v0-product-contract.md`](skiloom-v0-product-contract.md)。
+
+对应历史 Issue：#14 `Choose a collision-free product and CLI name`
 
 外部命名核查：[`../research/skiloom-name-collision-2026-09.md`](../research/skiloom-name-collision-2026-09.md)
 
@@ -21,7 +23,7 @@ GitHub repository target:  Akira-TL/skiloom
 
 公开文档不再建立新的 `AKM`、`ASKM` 或其他 acronym。需要简称时直接使用 `Skiloom` / `skiloom`。
 
-`Skiloom Core` 是协议核心名称；reference implementation 可以直接称 `Skiloom`，不另造第二个产品名。
+当前产品直接称 `Skiloom`，不再建立独立的 `Skiloom Core` 产品/兼容层名称。
 
 ## 2. Project namespace
 

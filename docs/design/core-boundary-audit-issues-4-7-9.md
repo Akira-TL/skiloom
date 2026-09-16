@@ -1,8 +1,8 @@
 # Skiloom Core 边界审查：Package Manifest、Resolver、Source / Trust
 
-状态：Review Complete
+状态：Historical Review
 
-前提：[`skiloom-core-conformance.md`](skiloom-core-conformance.md) 与 [ADR 0012](../adr/0012-skiloom-core-conformance-boundary.md) 已接受。本文件记录 #4、#7、#9 在 Core boundary 下的审查过程；后续 normative 结论已分别落到 `package-manifest-schema.md`、`resolver-conformance.md`、`source-trust-conformance.md` 及 ADR 0013–0015。
+当前说明：本文记录已退役的 Core/conformance 分类审查过程，只保留为历史设计材料。当前产品权威见 [`skiloom-v0-product-contract.md`](skiloom-v0-product-contract.md) 与 ADR 0018。
 
 ## 1. 审查规则
 

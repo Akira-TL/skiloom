@@ -1,8 +1,10 @@
 # Project Skill Activation v0
 
-状态：Accepted
+状态：Superseded
 
-对应 ADR：[`0008-flat-agent-skill-activation.md`](../adr/0008-flat-agent-skill-activation.md)
+当前说明：固定项目 `.agents/skills`、项目私有状态目录和 `activation.lock` 模型已退役。当前权威见 [`skiloom-v0-product-contract.md`](skiloom-v0-product-contract.md) 与 ADR 0018。
+
+对应历史 ADR：[`0008-flat-agent-skill-activation.md`](../adr/0008-flat-agent-skill-activation.md)
 
 ## 1. 项目目录
 

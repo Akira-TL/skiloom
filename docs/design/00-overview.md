@@ -1,8 +1,12 @@
 # Skiloom v0 协议工作草案
 
+状态：Superseded
+
+当前说明：本文记录 pre-target-centric 的早期工作草案，已被 [`skiloom-v0-product-contract.md`](skiloom-v0-product-contract.md) 与 ADR 0018 取代，不再作为当前产品权威。
+
 ## 当前阶段
 
-当前仍处于协议收敛阶段，不进入 CLI/runtime 实现。以下文档是当前 working draft；已经明确拒绝的旧方案不再作为实现候选。
+以下内容保留为历史设计背景。
 
 设计文件：
 

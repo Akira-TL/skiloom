@@ -1,8 +1,8 @@
 # Dependency Resolver 与 Install Plan v0 工作草案
 
-状态：Working Draft（reference manager orchestration）
+状态：Superseded Working Draft
 
-Class R 的 normative resolution contract 已固定在 [`resolver-conformance.md`](resolver-conformance.md)、[`source-trust-conformance.md`](source-trust-conformance.md)、[ADR 0014](../adr/0014-deterministic-release-resolver.md) 与 [ADR 0015](../adr/0015-github-source-trust-boundary.md)。本文件继续描述 reference manager 如何把 Core resolution 与 source acquisition、Package snapshot、activation、Host Observation 串成 Install Plan；其中 cache/materialization/CLI 细节不构成 Class R conformance requirement。
+当前说明：本文记录旧 Project/Lock/Core 编排草案，已被 [`skiloom-v0-product-contract.md`](skiloom-v0-product-contract.md) 取代。仍有效的 resolver/source 具体规则已经吸收到当前官方产品规范。
 
 ## 1. Resolver 的对象
 

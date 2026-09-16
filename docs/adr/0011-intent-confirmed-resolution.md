@@ -1,7 +1,8 @@
 # ADR 0011：Project Intent 与 Confirmed Resolution 分离
 
-- 状态：Accepted
+- 状态：Superseded by ADR 0018
 - 日期：2026-09-14
+- 当前说明：Project Intent、Project Lock 与 frozen replay 已退役；直接安装要求、本机精确状态、整图更新与 sync/repair 语义见 `docs/design/skiloom-v0-product-contract.md`。
 
 ## 背景
 

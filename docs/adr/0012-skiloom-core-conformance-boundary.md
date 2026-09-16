@@ -1,7 +1,8 @@
 # ADR 0012：Skiloom Core 只标准化跨实现可观察语义
 
-- 状态：Accepted
+- 状态：Superseded by ADR 0018
 - 日期：2026-09-14
+- 当前说明：跨第三方实现的 Core / conformance / P-R-A 分类不再是 Skiloom 产品目标；当前权威是 `docs/design/skiloom-v0-product-contract.md`。
 
 ## 背景
 

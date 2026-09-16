@@ -1,7 +1,8 @@
 # ADR 0014：Class R 使用 Cargo-style requirement 与 deterministic highest-first backtracking
 
-- 状态：Accepted
+- 状态：Partially Superseded by ADR 0018
 - 日期：2026-09-14
+- 当前说明：Cargo-style 版本要求、SemVer 候选顺序、确定性回溯、cycle 合法与旧状态不影响候选优先级等解析规则继续有效；Class R、Project Intent、Lock 与 conformance fixture 语义已退役。现行规则见 `docs/design/skiloom-v0-product-contract.md`。
 
 ## 背景
 

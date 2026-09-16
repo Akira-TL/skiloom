@@ -1,8 +1,8 @@
 # GitHub Release Source 与完整性 v0
 
-状态：Accepted
+状态：Partially Superseded
 
-Class R 的 Release candidate / source trust 边界同时受 [`resolver-conformance.md`](resolver-conformance.md)、[`source-trust-conformance.md`](source-trust-conformance.md)、ADR 0014 与 ADR 0015 约束。
+当前说明：GitHub Release -> actual tag -> exact commit、SemVer 与完整性边界继续有效；Class R / Lock / conformance 相关引用已退役。当前产品权威见 [`skiloom-v0-product-contract.md`](skiloom-v0-product-contract.md)。
 
 ## 1. 目标
 

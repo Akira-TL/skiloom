@@ -1,6 +1,8 @@
 # Skill 包与 GitHub 分发布局
 
-状态：Working Draft
+状态：Superseded Working Draft
+
+当前说明：本文保留为早期布局探索记录；其中固定项目 `.agents/skills`、项目级安装视图等内容不再是当前产品权威。现行 Package/Source/Target 规则见 [`skiloom-v0-product-contract.md`](skiloom-v0-product-contract.md)。
 
 ## 1. GitHub 是 v0 分发坐标系
 

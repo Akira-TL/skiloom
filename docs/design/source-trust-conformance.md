@@ -1,14 +1,12 @@
 # Skiloom Core GitHub Source / Trust Conformance v0
 
-状态：Accepted
+状态：Partially Superseded
 
-对应 Issue：#9 `Define package sources, indexes and trust policy`
+当前说明：GitHub coordinate、Release/Git source kind、exact commit、published Release、redirect/retarget 与完整来源确认等具体产品规则继续有效；Project Intent / Lock / Confirmed Resolution / Class R / Full Core conformance 相关内容已退役。当前产品权威见 [`skiloom-v0-product-contract.md`](skiloom-v0-product-contract.md)。
 
-对应 Core class：Class R — Resolver / Lock Consumer-Producer
+对应历史 Issue：#9 `Define package sources, indexes and trust policy`
 
 外部事实核查：[`../research/github-source-identity-trust-2026-09.md`](../research/github-source-identity-trust-2026-09.md)
-
-本文件定义 Skiloom Core v0 的 mandatory GitHub source profile。它只标准化会改变 source identity、candidate repository set、exact provenance、Confirmed Resolution 或 integrity verdict 的可观察语义；credential UX、network retry、cache layout、marketplace reputation、signing PKI 与 malware scanning 不属于 Full Core conformance。
 
 本文中的 **MUST / MUST NOT / SHOULD / MAY** 按 RFC 2119 / RFC 8174 的规范性含义理解。
 

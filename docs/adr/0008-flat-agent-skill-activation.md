@@ -1,7 +1,8 @@
 # ADR 0008：项目 Skill 直接扁平激活到 `.agents/skills`
 
-- 状态：Accepted
+- 状态：Superseded by ADR 0018
 - 日期：2026-09-14
+- 当前说明：固定项目 `.agents/skills`、项目私有状态目录和 `activation.lock` 模型已退役；平铺 Target、冲突保护与 rename 的现行规则见 `docs/design/skiloom-v0-product-contract.md`。
 
 ## 背景
 

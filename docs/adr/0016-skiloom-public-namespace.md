@@ -1,7 +1,8 @@
 # ADR 0016：采用 Skiloom 公开产品与协议 Namespace
 
-- 状态：Accepted
+- 状态：Partially Superseded by ADR 0018
 - 日期：2026-09-14
+- 当前说明：`Skiloom / skiloom` 品牌、CLI/package token、`skiloom-package.toml`、`skiloom-repo.toml` 与 `SKILOOM-PACKAGE-V1` 继续有效；旧 `.agents/.skiloom/skiloom.toml`、`skiloom.lock`、`activation.lock` 等项目状态 namespace 已退役。现行规则见 `docs/design/skiloom-v0-product-contract.md`。
 
 ## 背景
 

@@ -1,7 +1,8 @@
 # ADR 0010：依赖运行时状态只保存本机观察结果
 
-- 状态：Accepted
+- 状态：Partially Superseded by ADR 0018
 - 日期：2026-09-14
+- 当前说明：环境 requirement 与观察状态的职责分离继续有效；旧 `.agents/.skiloom/dependencies.lock` 项目路径和“四类项目状态”模型不再是当前产品权威。现行边界见 `docs/design/skiloom-v0-product-contract.md`。
 
 ## 背景
 

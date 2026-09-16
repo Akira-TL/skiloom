@@ -1,7 +1,8 @@
 # ADR 0015：GitHub Source Identity 与 Trust Boundary
 
-- 状态：Accepted
+- 状态：Partially Superseded by ADR 0018
 - 日期：2026-09-14
+- 当前说明：GitHub coordinate、Release/Git source kind、exact commit、published Release、redirect/retarget 与完整来源确认等产品规则继续有效；Project Intent、Lock、Confirmed Resolution 与 Core conformance 措辞不再是当前权威。现行规则见 `docs/design/skiloom-v0-product-contract.md`。
 
 ## 背景
 

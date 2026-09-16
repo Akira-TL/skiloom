@@ -1,7 +1,8 @@
 # ADR 0009：Activation Runtime Ownership 与 Store GC 边界
 
-- 状态：Accepted
+- 状态：Superseded by ADR 0018
 - 日期：2026-09-14
+- 当前说明：`activation.lock` 与项目激活状态模型已退役；现行 ownership、detach、修复与 Store GC 边界见 `docs/design/skiloom-v0-product-contract.md`。
 
 ## 背景
 

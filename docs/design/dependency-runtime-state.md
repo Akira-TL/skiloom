@@ -1,10 +1,12 @@
 # Dependency Runtime State v0
 
-状态：Accepted
+状态：Partially Superseded
+
+当前说明：环境 requirement 与观察状态的职责分离继续有效；固定 `.agents/.skiloom/dependencies.lock` 项目路径已经退役，观察结果的物理存储属于官方实现细节。当前产品权威见 [`skiloom-v0-product-contract.md`](skiloom-v0-product-contract.md)。
 
 对应 Wayfinder：#8 `Define the external software dependency model`
 
-本文件收敛 `.agents/.skiloom/dependencies.lock` 的本机状态职责。Package admission、Skill dependency resolution、immutable `DEPENDENCIES.md` 与 `skiloom-package.toml [software]` 的来源边界保持不变。对应 ADR：[`0010-dependency-runtime-state.md`](../adr/0010-dependency-runtime-state.md)。
+对应历史 ADR：[`0010-dependency-runtime-state.md`](../adr/0010-dependency-runtime-state.md)。
 
 ## 1. `dependencies.lock` 只保存观察结果
 

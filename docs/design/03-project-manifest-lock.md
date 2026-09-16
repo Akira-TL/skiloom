@@ -1,8 +1,10 @@
 # Project Manifest 与 Lock v0
 
-状态：Accepted
+状态：Superseded
 
-对应 Wayfinder：#6 `Define Project Manifest and Lock semantics`
+当前说明：Project Manifest / Project Lock / `activation.lock` 项目状态模型已经退役。当前状态模型见 [`skiloom-v0-product-contract.md`](skiloom-v0-product-contract.md) 与 ADR 0018。
+
+对应历史 Wayfinder：#6 `Define Project Manifest and Lock semantics`
 
 ## 1. Project state 布局
 

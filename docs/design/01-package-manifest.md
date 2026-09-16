@@ -1,8 +1,8 @@
 # Package Manifest v0 设计背景
 
-状态：Superseded as normative source
+状态：Superseded
 
-Schema 1 已由 [`package-manifest-schema.md`](package-manifest-schema.md) 与 ADR 0013 接受并取代本文件作为 normative source。本文件只保留早期设计背景；若与 accepted schema、Core conformance 或 Host Observation boundary 冲突，以后者为准。
+当前说明：本文只保留早期 Package Manifest 设计背景。当前产品权威见 [`skiloom-v0-product-contract.md`](skiloom-v0-product-contract.md)；仍有效的 Schema 1 细节保留在 [`package-manifest-schema.md`](package-manifest-schema.md)，但其中旧 Core/conformance 措辞不再具有当前权威。
 
 ## 1. 定位
 

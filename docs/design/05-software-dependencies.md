@@ -1,10 +1,12 @@
 # 软件依赖说明与本地状态模型 v0
 
-状态：Accepted
+状态：Partially Superseded
 
-对应 Wayfinder：#8 `Define the external software dependency model`
+当前说明：Package 侧软件/特殊环境 requirement 的产品语义继续有效；旧项目级 `dependencies.lock` 路径和 canonical runtime-state schema 已退役。当前产品权威见 [`skiloom-v0-product-contract.md`](skiloom-v0-product-contract.md)。
 
-运行时状态的 canonical schema 见 [`dependency-runtime-state.md`](dependency-runtime-state.md)，决策记录见 [`0010-dependency-runtime-state.md`](../adr/0010-dependency-runtime-state.md)。
+对应历史 Wayfinder：#8 `Define the external software dependency model`
+
+历史运行时状态设计见 [`dependency-runtime-state.md`](dependency-runtime-state.md) 与 [`0010-dependency-runtime-state.md`](../adr/0010-dependency-runtime-state.md)。
 
 ## 1. Package 最低条件仍只有 `SKILL.md`
 

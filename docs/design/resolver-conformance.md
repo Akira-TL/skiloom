@@ -1,14 +1,12 @@
 # Skiloom Core Resolver / Lock Conformance v0
 
-状态：Accepted
+状态：Partially Superseded
 
-对应 Issue：#7 `Define version constraints and the dependency solver`
+当前说明：Cargo-style requirement、SemVer 候选顺序、确定性回溯、cycle 与结构化解析失败等具体算法规则继续有效；Project Intent / Lock / Confirmed Resolution / Class R / conformance 相关内容已退役。当前产品权威见 [`skiloom-v0-product-contract.md`](skiloom-v0-product-contract.md)。
 
-对应 Core class：Class R — Resolver / Lock Consumer-Producer
+对应历史 Issue：#7 `Define version constraints and the dependency solver`
 
 外部语义调研：[`../research/semver-requirement-grammar-2026-09.md`](../research/semver-requirement-grammar-2026-09.md)
-
-本文件只固定**resolution-changing operation** 的确定性求解语义。已有匹配 Confirmed Resolution 的 replay/sync 仍按 ADR 0011 完全 lock-preserving，不运行本求解器。
 
 ## 1. Resolver 输入与输出边界
 

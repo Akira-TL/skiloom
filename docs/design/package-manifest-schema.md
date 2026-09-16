@@ -1,12 +1,12 @@
 # Package Manifest v0 Schema
 
-状态：Accepted
+状态：Partially Superseded
+
+当前说明：`skiloom-package.toml` 的 Schema 1、Skill dependency、`[software]` 环境观察与禁止任意宿主写脚本等规则继续有效；Core / conformance / Confirmed Resolution 相关表述已退役。当前产品权威见 [`skiloom-v0-product-contract.md`](skiloom-v0-product-contract.md)。
 
 对应 Wayfinder：#4 `Define the Package Manifest schema and ownership boundaries`
 
-对应 Core 边界：[`skiloom-core-conformance.md`](skiloom-core-conformance.md)、[ADR 0012](../adr/0012-skiloom-core-conformance-boundary.md)
-
-> 公开文件名已由 ADR 0016 固定为 `skiloom-package.toml`。本文件定义其 Schema 1 结构与 Core / Host Observation ownership；未来 filename 或 namespace 变化必须通过显式 protocol migration。
+> 公开文件名仍为 `skiloom-package.toml`。
 
 ## 1. 定位
 

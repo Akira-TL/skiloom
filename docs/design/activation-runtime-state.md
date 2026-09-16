@@ -1,8 +1,10 @@
 # Activation Runtime State v0
 
-状态：Accepted
+状态：Superseded
 
-对应 ADR：[`0009-activation-runtime-ownership.md`](../adr/0009-activation-runtime-ownership.md)
+当前说明：`activation.lock` 与固定项目 `.agents/skills` 激活模型已经退役。当前 Target ownership / detach / repair / Store GC 规则见 [`skiloom-v0-product-contract.md`](skiloom-v0-product-contract.md) 与 ADR 0018。
+
+对应历史 ADR：[`0009-activation-runtime-ownership.md`](../adr/0009-activation-runtime-ownership.md)
 
 对应 Wayfinder：#10 `Define Package Store and project activation ownership`
 

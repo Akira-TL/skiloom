@@ -1,6 +1,8 @@
 # v0 Module 边界工作草案
 
-本文件只描述当前协议对应的候选代码 seam；协议未稳定前不进入实现。
+状态：Superseded Working Draft
+
+当前说明：本文基于旧 Project/Lock/Core 模型，已不再作为官方实现结构依据。现行实现边界见 [`official-implementation-architecture.md`](official-implementation-architecture.md) 和 [`skiloom-v0-product-contract.md`](skiloom-v0-product-contract.md)。
 
 ## 总体数据流
 

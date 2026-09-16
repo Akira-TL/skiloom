@@ -1,7 +1,8 @@
 # ADR 0013：Package Manifest 分离 Core dependency 与 Host Observation extension ownership
 
-- 状态：Accepted
+- 状态：Partially Superseded by ADR 0018
 - 日期：2026-09-14
+- 当前说明：`skiloom-package.toml` 中 Skill dependency、`[software]` 环境观察和禁止任意宿主写脚本的产品规则继续有效；Core / P-R-A / conformance 分类不再是当前权威。现行规则见 `docs/design/skiloom-v0-product-contract.md`。
 
 ## 背景
 

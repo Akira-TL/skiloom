@@ -42,15 +42,15 @@ GitHub SemVer Release 解析得到的 actual tag + exact commit 对应 repositor
 
 ## Package Manifest
 
-Package Root 中可选的 `skiloom-package.toml`。Schema 1 的 `[dependencies]` 属于 Skiloom Core Skill dependency graph；`[software]` 是同一物理 Manifest 中已登记的 Host Observation Extension attachment。Manifest 不复制 `SKILL.md.name` 或 GitHub Release version；不支持 Host Observation Extension 不会使 otherwise-valid Package 失去 Core conformance。
+Package Root 中可选的 `skiloom-package.toml`。Schema 1 的 `[dependencies]` 进入 Skiloom 的 Skill dependency graph；`[software]` 是同一物理 Manifest 中已登记的宿主环境观察信息。Manifest 不复制 `SKILL.md.name` 或 GitHub Release version；不支持某项环境观察能力不会使 otherwise-valid Package 失去安装资格。
 
 ## Dependency Check File
 
 Package Root 中可选、不可变的 `DEPENDENCIES.md`。它是 Package author 提供给 Agent 的特殊软件/环境依赖检查说明，只描述 requirement、检查方法与处理边界；不保存当前宿主状态。
 
-## Dependency State Lock
+## Dependency Observation State
 
-项目本地 `.agents/.skiloom/dependencies.lock`。它只保存当前机器的 dependency observations；Package `content-digest` 是唯一 freshness anchor，不复制 requirement、`DEPENDENCIES.md` digest、检查时间或授权信息。Skiloom Core 维护 common software observations，Agent 维护 special observations；属于可删除重建的本机状态，默认不提交版本控制。
+Skiloom 保存的可删除重建的本机环境观察状态。它只记录当前机器的 dependency observations；Package `content-digest` 是唯一 freshness anchor，不复制 requirement、`DEPENDENCIES.md` digest、检查时间或授权信息。Skiloom 维护 common software observations，Agent 维护 special observations；其 SQLite/table/file 物理存储属于官方实现细节，不是公开产品格式。
 
 ## Skill Dependency
 
@@ -148,9 +148,13 @@ Skiloom v0 不执行 destructive automatic Package Store GC。移除某个 proje
 
 Skiloom v0 的公开 token 是 `skiloom`：CLI 为 `skiloom`，Package/Repository optional metadata 为 `skiloom-package.toml` / `skiloom-repo.toml`，公开 Package Snapshot format identifier 为 `SKILOOM-PACKAGE-V1`。普通安装不要求项目级 `skiloom.toml` / `skiloom.lock`；目标目录用 `.skiloom-state` 保留轻量恢复锚点，完整机器安装状态由 Skiloom Home 的 Machine Registry 管理。`.agents/skills` 等宿主目录只是 Target。旧 `AKM / akm` 只属于 pre-standard working draft，不形成 v0 compatibility alias。
 
-## Reference Implementation Architecture
+## Official Product Contract
 
-Skiloom 官方 reference implementation 使用 Node.js + TypeScript + npm 作为主控制面与发行方式：Node.js >=22，开发/release 主线为 Node 24 LTS，公开 npm package / executable 均为 `skiloom`。复杂计算或底层热点允许使用预编译 Rust/C/C++ 等 standalone native helper，但它们只能位于窄的内部 seam 后，不能独立拥有网络、凭据、用户授权、Machine Registry 写入或 Target destructive mutation；协议 authority 始终是 Source Spec + versioned conformance fixtures。
+Skiloom 当前最高产品权威，定义官方产品必须遵守的安装、解析、状态、Target、恢复、来源确认与导入导出行为，以及稳定公开的数据格式。它不建立第三方实现的兼容等级或 conformance class；第三方若要兼容，应适配 Skiloom 已公开的行为与格式。
+
+## Official Implementation Architecture
+
+Skiloom 官方实现使用 Node.js + TypeScript + npm 作为主控制面与发行方式：Node.js >=22，开发/release 主线为 Node 24 LTS，公开 npm package / executable 均为 `skiloom`。复杂计算或底层热点允许使用预编译 Rust/C/C++ 等 standalone native helper，但它们只能位于窄的内部 seam 后，不能独立拥有网络、凭据、用户授权、Machine Registry 写入或 Target destructive mutation；产品行为权威是 Skiloom 官方产品规范与官方行为测试数据。
 
 ## Machine Registry
 
@@ -158,7 +162,7 @@ Skiloom Home 中的 machine-local SQLite 状态库，是普通安装日常管理
 
 ## Catalog
 
-用于发现和比较 Skill 的外部目录层。Catalog 可以提供候选、展示元数据与质量/安全信号，但不能成为 Skiloom v0 source/version/content authority；进入 Core 前必须归一成可验证的 source candidate。
+用于发现和比较 Skill 的外部目录层。Catalog 可以提供候选、展示元数据与质量/安全信号，但不能成为 Skiloom v0 source/version/content authority；进入安装解析前必须归一成可验证的 source candidate。
 
 ## First-party Skill Suite
 

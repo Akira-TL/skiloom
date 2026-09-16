@@ -1,8 +1,10 @@
 # Skiloom Core 标准化与 Conformance 边界
 
-状态：Accepted
+状态：Superseded
 
-对应 Issue：#15 `Define Skiloom Core standardization and conformance boundary`
+当前说明：跨第三方实现的 Core / P-R-A / Full Core Manager / conformance 体系已由 ADR 0018 明确退役。当前产品权威见 [`skiloom-v0-product-contract.md`](skiloom-v0-product-contract.md)。本文仅保留为历史设计记录。
+
+对应历史 Issue：#15 `Define Skiloom Core standardization and conformance boundary`
 
 ## 1. 目的
 

@@ -1,8 +1,10 @@
 # Repository Discovery Control
 
-状态：Accepted
+状态：Partially Superseded
 
-对应 Wayfinder：#12 `Define repository-level Skill discovery control`
+当前说明：`skiloom-repo.toml` 的 discovery 过滤规则继续有效；文中 Project Lock / Confirmed Resolution 的保存与 replay 语义已退役。当前产品权威见 [`skiloom-v0-product-contract.md`](skiloom-v0-product-contract.md)。
+
+对应历史 Wayfinder：#12 `Define repository-level Skill discovery control`
 
 ## 1. 决定
 

@@ -1,16 +1,16 @@
-# Skiloom Reference Implementation Architecture v0
+# Skiloom 官方实现架构 v0
 
 状态：Accepted
 
-对应：Skiloom Core v0 Source Spec #16
+对应：[`skiloom-v0-product-contract.md`](skiloom-v0-product-contract.md)
 
-对应 ADR：[`0017-node-reference-implementation-with-native-helpers.md`](../adr/0017-node-reference-implementation-with-native-helpers.md)
+对应 ADR：[`0017-node-official-implementation-with-native-helpers.md`](../adr/0017-node-official-implementation-with-native-helpers.md)
 
-本文件固定 **Skiloom reference implementation** 的技术栈、代码组织和 native helper 边界。它不改变 Skiloom Core 协议；独立实现可以使用其他语言，只要通过同一版本的 P/R/A conformance fixtures。
+本文件固定 **Skiloom 官方实现** 的技术栈、代码组织和 native helper 边界。它服从 Skiloom 官方产品规范，不承担第三方实现兼容等级或认证职责。
 
 ## 1. 首要目标
 
-Reference implementation 优先优化：
+官方实现优先优化：
 
 1. 用户通过 npm 低摩擦安装和试用；
 2. `npm install -g skiloom` / `npx skiloom` 可以直接进入产品；
@@ -29,7 +29,7 @@ optional prebuilt native compute helpers
 
 ## 2. Node.js / TypeScript 基线
 
-Reference implementation 固定：
+官方实现固定：
 
 ```text
 runtime:            Node.js >= 22
@@ -60,14 +60,14 @@ skiloom
 内部 Module 不因为代码边界而自动变成多个 npm package。特别是 v0 不提前发布：
 
 ```text
-@skiloom/core
+@skiloom/domain
 @skiloom/runtime
 @skiloom/source-github
 ```
 
 避免过早承担多 package versioning、export map、发布顺序与 public library compatibility。
 
-当确实出现第二个独立发布物（例如 platform-specific native binary package 或 independent conformance consumer）时，repository MAY 启用 npm workspaces。Workspace 是 repository/release tooling，不是 Skiloom Core 协议。
+当确实出现第二个独立发布物（例如 platform-specific native binary package）时，repository MAY 启用 npm workspaces。Workspace 只是 repository/release tooling，不改变 Skiloom 产品行为。
 
 ## 4. 代码结构
 
@@ -79,33 +79,31 @@ skiloom/
 ├── package-lock.json
 ├── tsconfig.json
 ├── src/
-│   ├── core/
+│   ├── domain/
 │   │   ├── package/
 │   │   ├── snapshot/
 │   │   ├── requirement/
 │   │   ├── resolver/
-│   │   ├── project/
-│   │   ├── lock/
-│   │   ├── activation-plan/
+│   │   ├── target/
+│   │   ├── export/
 │   │   └── errors/
 │   ├── source/
 │   │   └── github/
 │   ├── runtime/
-│   │   ├── project/
+│   │   ├── registry/
 │   │   ├── source-cache/
 │   │   ├── store/
-│   │   ├── activation/
+│   │   ├── projection/
 │   │   └── filesystem/
 │   ├── native/
 │   │   └── ... explicit helper bridges only when needed
 │   └── cli/
 │       └── ... thin command surface
-├── conformance/
-│   ├── fixtures/
-│   │   ├── p/
-│   │   ├── r/
-│   │   └── a/
-│   └── runner/
+├── behavior-fixtures/
+│   ├── package/
+│   ├── resolver/
+│   ├── target/
+│   └── export-import/
 ├── test/
 ├── native/
 │   └── ... native source trees only when a real helper exists
@@ -116,7 +114,7 @@ skiloom/
 
 ## 5. 依赖方向
 
-Reference implementation 的逻辑依赖方向固定为：
+官方实现的逻辑依赖方向固定为：
 
 ```text
 CLI
@@ -124,12 +122,12 @@ CLI
 runtime orchestration
  ├──────────────→ GitHub source adapter
  ↓
-Core interface
+domain interface
  ↓
-protocol-semantic implementation
+product-rule implementation
 ```
 
-`src/core/` 是主要协议语义面。它不能直接拥有：
+`src/domain/` 是主要产品规则实现面。它不能直接拥有：
 
 ```text
 process.argv / process.exit
@@ -142,7 +140,7 @@ foreign project file deletion
 host package installation
 ```
 
-Source/runtime/CLI 把明确输入交给 Core，并消费 Core result/error。
+Source/runtime/CLI 把明确输入交给 domain，并消费 domain result/error。
 
 ## 6. Node 标准库优先
 
@@ -160,7 +158,7 @@ basic CLI arg parsing -> built-in capability when sufficient
 
 第三方依赖只用于标准库明显不应该自行实现的协议，例如 TOML/YAML parser，或经过评估确实能明显降低复杂度的能力。
 
-Skiloom Release Requirement 不能直接把 npm `semver` grammar 当协议 oracle，因为 Core 已定义自己的 Cargo-style requirement profile。
+Skiloom Release Requirement 不能直接把 npm `semver` grammar 当产品规则 oracle，因为官方产品规范已经固定自己的 Cargo-style requirement profile。
 
 ## 7. Native helper 的角色
 
@@ -196,8 +194,8 @@ Native helper MUST NOT 独立拥有：
 - GitHub/network access；
 - credentials/secrets discovery；
 - user prompts/authorization；
-- Project Intent/Lock write policy；
-- `.agents/skills/` destructive mutation；
+- 本机状态库 write policy；
+- Target destructive mutation；
 - Package Store ownership policy；
 - CLI rendering/exit policy。
 
@@ -205,23 +203,23 @@ Node runtime 负责取得/验证外部事实，并向 helper 提供明确 determ
 
 Helper MAY 读取 Node 明确提供的 immutable input/file/stream，并 MAY 写到 Node 明确分配的 temporary/output target；它不得自行遍历任意 project/home/network 状态来补充隐式输入。
 
-### 7.3 Protocol authority
+### 7.3 产品行为权威
 
-Native code 可以实现 Core 算法，但它不是协议 authority。
+Native code 可以实现解析、摘要等产品算法，但它不是产品规则 authority。
 
 Authority 顺序是：
 
 ```text
-Source Spec / Accepted protocol
+Skiloom 官方产品规范
         ↓
-versioned conformance fixtures
+官方行为测试数据
         ↓
 TypeScript or native implementation
 ```
 
-如果 TypeScript path 与 native path 对同一 fixture 给出不同结果，这是 implementation bug，不是“两个 backend 都合法”。
+如果 TypeScript path 与 native path 对同一固定输入给出不同结果，这是 implementation bug，不是“两个 backend 都合法”。
 
-一个 Core algorithm 若只有 native implementation，也必须独立通过对应 conformance fixture；不要求为了形式上的 fallback 再维护一份完整 TypeScript duplicate implementation。
+一个算法若只有 native implementation，也必须通过对应官方行为测试；不要求为了形式上的 fallback 再维护一份完整 TypeScript duplicate implementation。
 
 ## 8. Native process seam
 
@@ -253,17 +251,17 @@ Native helper 不应在用户执行 `npm install` 时现场编译。
 4. Node runtime 检测已安装的匹配 helper，并在有对应 implementation 时使用；
 5. `npm install -g skiloom` / `npx skiloom` 仍是用户唯一需要理解的入口。
 
-具体 platform package 名称是 release engineering 名称，不属于 Core protocol。在正式创建 npm scope/package 前必须重新验证 registry availability。
+具体 platform package 名称是 release engineering 名称，不属于公开产品格式。在正式创建 npm scope/package 前必须重新验证 registry availability。
 
-因为 npm 允许用户用 `--omit=optional` 跳过 optional dependencies，所以 **optional native accelerator 的缺失不能让一个原本有 TypeScript implementation 的 Core capability变得错误**。
+因为 npm 允许用户用 `--omit=optional` 跳过 optional dependencies，所以 **optional native accelerator 的缺失不能让一个原本有 TypeScript implementation 的产品能力变得错误**。
 
-若未来某项 mandatory capability 只提供 native implementation，则必须在采用前显式修改 reference implementation support policy：声明 supported platform matrix、安装行为与清晰的 `UnsupportedPlatformCapability` 类产品错误；不能借 optional dependency 的偶然存在偷偷变成 mandatory。
+若未来某项 mandatory capability 只提供 native implementation，则必须在采用前显式修改官方实现 support policy：声明 supported platform matrix、安装行为与清晰的 `UnsupportedPlatformCapability` 类产品错误；不能借 optional dependency 的偶然存在偷偷变成 mandatory。
 
 ## 10. GitHub source implementation
 
 v0 GitHub source adapter优先使用 Node built-in HTTP capabilities和 GitHub API/source transport，不要求用户机器安装 system `git` executable。
 
-Core source semantics仍是：
+GitHub source 的产品语义仍是：
 
 ```text
 GitHub metadata/ref/tag
@@ -271,31 +269,31 @@ GitHub metadata/ref/tag
   -> exact repository snapshot facts
 ```
 
-是否未来用 native Git object helper优化 acquisition 属于 implementation；不能改变 Source Spec 的 coordinate/redirect/tag/commit/discovery/digest语义。
+是否未来用 native Git object helper 优化 acquisition 属于实现细节；不能改变官方产品规范已经固定的 coordinate/redirect/tag/commit/discovery/digest 语义。
 
 ## 11. Testing architecture
 
-最高测试 seam继续是 Source Spec 已接受的：
+最高测试 seam 是官方产品规范已经固定的：
 
 ```text
-versioned fixture
+versioned behavior fixture
   -> implementation under test
-  -> canonical observable result/error
+  -> expected product result/error
 ```
 
-Reference implementation tests分三层：
+官方实现 tests 分三层：
 
-1. **Conformance fixtures**：验证 P/R/A协议结果，不依赖 live GitHub；
-2. **Module tests**：验证 source/runtime/native adapter自己的实现细节和错误映射；
-3. **Thin end-to-end CLI tests**：验证 npm executable能够把输入交给 runtime并正确渲染/退出，不重复测试 resolver内部算法。
+1. **官方行为测试数据**：验证 Package、Resolver、Target、恢复与导入导出的产品结果，不依赖 live GitHub；
+2. **Module tests**：验证 source/runtime/native adapter 自己的实现细节和错误映射；
+3. **Thin end-to-end CLI tests**：验证 npm executable 能够把输入交给 runtime 并正确渲染/退出，不重复测试 resolver 内部算法。
 
-如果某个算法同时有 TypeScript 与 native implementation，同一 conformance fixture suite MUST 对两条 implementation path运行。
+如果某个算法同时有 TypeScript 与 native implementation，同一行为测试数据 MUST 对两条 implementation path 运行。
 
-Native helper自身 MAY 使用其语言生态的 unit/property tests，但这些不能代替 repository-level conformance fixtures。
+Native helper 自身 MAY 使用其语言生态的 unit/property tests，但这些不能代替 repository-level 官方行为测试。
 
 ## 12. 发布与平台原则
 
-Reference implementation的主要传播渠道是 npm，而不是 GitHub binary download。
+官方实现的主要传播渠道是 npm，而不是 GitHub binary download。
 
 目标用户体验：
 
@@ -307,28 +305,28 @@ npx skiloom ...
 
 预编译 native helper只是 npm dependency graph内部的实现细节。用户不应该为了使用 Skiloom而安装 Rust、C/C++ compiler、CMake 或 platform SDK。
 
-Node.js v0 support floor为 22；开发/release主线使用 Node 24 LTS。未来提高 Node support floor属于 reference implementation release policy，不需要修改 Core protocol version，除非它改变 portable artifact/conformance语义。
+Node.js v0 support floor 为 22；开发/release 主线使用 Node 24 LTS。未来提高 Node support floor 属于官方实现 release policy；只有当它同时改变公开产品格式或产品行为时，才需要修改相应产品规范。
 
 ## 13. Non-Goals
 
 本 architecture v0 不定义：
 
-- Skiloom Core 对其他实现语言的限制；
-- public `@skiloom/core` library API；
+- 第三方实现语言或兼容等级；
+- public `@skiloom/domain` library API；
 - 通用 native plugin/provider framework；
 - 用户现场编译 native helper；
 - runtime 自动下载任意未通过 npm/release provenance管理的 executable；
 - 将 native helper作为 Package/Skill可执行 extension机制；
-- 通过 native helper绕过 Core host-side-effect boundary；
+- 通过 native helper 绕过 Skiloom 的宿主副作用授权边界；
 - 为没有性能证据的算法同时维护 TS/native duplicate implementation。
 
 ## 14. 一句话架构
 
 ```text
-Skiloom reference implementation
+Skiloom 官方实现
 = npm-distributed Node.js/TypeScript control plane
-+ small deep Core interfaces
++ small deep domain interfaces
 + GitHub/runtime side-effect adapters
-+ language-neutral conformance fixtures
++ 官方行为测试数据
 + optional prebuilt native compute helpers behind narrow versioned seams.
 ```
