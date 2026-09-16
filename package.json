@@ -1,0 +1,22 @@
+{
+  "name": "skiloom",
+  "version": "0.1.0",
+  "description": "Agent Skill package manager and installer",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:compile": "tsc -p tsconfig.test.json",
+    "test:unit": "npm run test:compile --silent && node scripts/run-tests.mjs unit",
+    "test:behavior": "npm run test:compile --silent && node scripts/run-tests.mjs behavior",
+    "test": "npm run test:compile --silent && node scripts/run-tests.mjs all",
+    "check": "npm run typecheck && npm run build && npm test"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.3",
+    "typescript": "^7.0.2"
+  }
+}
