@@ -1,0 +1,379 @@
+{
+  "fixtureVersion": 1,
+  "success": [
+    {
+      "id": "highest-satisfiable-candidate-wins",
+      "directRequirements": [
+        { "kind": "package", "coordinate": "org/app/main", "source": "github-release", "version": "^1" }
+      ],
+      "releaseSources": [
+        {
+          "repository": "org/app",
+          "releases": [
+            {
+              "tag": "1.4.0",
+              "commit": "app-140",
+              "immutable": false,
+              "snapshot": { "packages": [
+                { "coordinate": "org/app/main", "packageRoot": "skills/main", "contentDigest": "sha256:app140", "dependencies": [] }
+              ] }
+            },
+            {
+              "tag": "1.5.0",
+              "commit": "app-150",
+              "immutable": true,
+              "snapshot": { "packages": [
+                { "coordinate": "org/app/main", "packageRoot": "skills/main", "contentDigest": "sha256:app150", "dependencies": [] }
+              ] }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "sourceBindings": [
+          { "repositoryCoordinate": "org/app", "sourceKind": "github-release", "version": "1.5.0", "actualTag": "1.5.0", "exactCommit": "app-150", "immutable": true }
+        ],
+        "packages": [
+          { "packageCoordinate": "org/app/main", "packageRoot": "skills/main", "contentDigest": "sha256:app150" }
+        ],
+        "dependencyEdges": []
+      }
+    },
+    {
+      "id": "missing-package-backtracks-to-lower-candidate",
+      "directRequirements": [
+        { "kind": "package", "coordinate": "org/app/main", "source": "github-release" }
+      ],
+      "releaseSources": [
+        {
+          "repository": "org/app",
+          "releases": [
+            { "tag": "2.0.0", "commit": "app-200", "immutable": false, "snapshot": { "packages": [] } },
+            {
+              "tag": "1.0.0",
+              "commit": "app-100",
+              "immutable": false,
+              "snapshot": { "packages": [
+                { "coordinate": "org/app/main", "packageRoot": "main", "contentDigest": "sha256:app100", "dependencies": [] }
+              ] }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "sourceBindings": [
+          { "repositoryCoordinate": "org/app", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "app-100", "immutable": false }
+        ],
+        "packages": [
+          { "packageCoordinate": "org/app/main", "packageRoot": "main", "contentDigest": "sha256:app100" }
+        ],
+        "dependencyEdges": []
+      }
+    },
+    {
+      "id": "canonical-repository-order-and-new-constraint-backtracking",
+      "directRequirements": [
+        { "kind": "package", "coordinate": "z/dep/tool", "source": "github-release" },
+        { "kind": "package", "coordinate": "a/app/main", "source": "github-release" }
+      ],
+      "releaseSources": [
+        {
+          "repository": "z/dep",
+          "releases": [
+            {
+              "tag": "1.0.0",
+              "commit": "z-100",
+              "immutable": false,
+              "snapshot": { "packages": [
+                { "coordinate": "z/dep/tool", "packageRoot": "tool", "contentDigest": "sha256:z100", "dependencies": [
+                  { "target": "a/app/main", "requirement": "^2" }
+                ] }
+              ] }
+            },
+            {
+              "tag": "2.0.0",
+              "commit": "z-200",
+              "immutable": false,
+              "snapshot": { "packages": [
+                { "coordinate": "z/dep/tool", "packageRoot": "tool", "contentDigest": "sha256:z200", "dependencies": [
+                  { "target": "a/app/main", "requirement": "^1" }
+                ] }
+              ] }
+            }
+          ]
+        },
+        {
+          "repository": "a/app",
+          "releases": [
+            {
+              "tag": "1.0.0",
+              "commit": "a-100",
+              "immutable": false,
+              "snapshot": { "packages": [
+                { "coordinate": "a/app/main", "packageRoot": "main", "contentDigest": "sha256:a100", "dependencies": [] }
+              ] }
+            },
+            {
+              "tag": "2.0.0",
+              "commit": "a-200",
+              "immutable": false,
+              "snapshot": { "packages": [
+                { "coordinate": "a/app/main", "packageRoot": "main", "contentDigest": "sha256:a200", "dependencies": [] }
+              ] }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "sourceBindings": [
+          { "repositoryCoordinate": "a/app", "sourceKind": "github-release", "version": "2.0.0", "actualTag": "2.0.0", "exactCommit": "a-200", "immutable": false },
+          { "repositoryCoordinate": "z/dep", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "z-100", "immutable": false }
+        ],
+        "packages": [
+          { "packageCoordinate": "a/app/main", "packageRoot": "main", "contentDigest": "sha256:a200" },
+          { "packageCoordinate": "z/dep/tool", "packageRoot": "tool", "contentDigest": "sha256:z100" }
+        ],
+        "dependencyEdges": [
+          { "sourcePackageCoordinate": "z/dep/tool", "targetPackageCoordinate": "a/app/main" }
+        ]
+      }
+    },
+    {
+      "id": "dependency-cycle-is-legal-and-preserved",
+      "directRequirements": [
+        { "kind": "package", "coordinate": "a/app/a", "source": "github-release", "version": "^1" }
+      ],
+      "releaseSources": [
+        {
+          "repository": "b/dep",
+          "releases": [
+            {
+              "tag": "1.0.0",
+              "commit": "b-100",
+              "immutable": true,
+              "snapshot": { "packages": [
+                { "coordinate": "b/dep/b", "packageRoot": "b", "contentDigest": "sha256:b100", "dependencies": [
+                  { "target": "a/app/a", "requirement": "^1" }
+                ] }
+              ] }
+            }
+          ]
+        },
+        {
+          "repository": "a/app",
+          "releases": [
+            {
+              "tag": "1.0.0",
+              "commit": "a-100",
+              "immutable": true,
+              "snapshot": { "packages": [
+                { "coordinate": "a/app/a", "packageRoot": "a", "contentDigest": "sha256:a100", "dependencies": [
+                  { "target": "b/dep/b", "requirement": "^1" }
+                ] }
+              ] }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "sourceBindings": [
+          { "repositoryCoordinate": "a/app", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "a-100", "immutable": true },
+          { "repositoryCoordinate": "b/dep", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "b-100", "immutable": true }
+        ],
+        "packages": [
+          { "packageCoordinate": "a/app/a", "packageRoot": "a", "contentDigest": "sha256:a100" },
+          { "packageCoordinate": "b/dep/b", "packageRoot": "b", "contentDigest": "sha256:b100" }
+        ],
+        "dependencyEdges": [
+          { "sourcePackageCoordinate": "a/app/a", "targetPackageCoordinate": "b/dep/b" },
+          { "sourcePackageCoordinate": "b/dep/b", "targetPackageCoordinate": "a/app/a" }
+        ]
+      }
+    },
+    {
+      "id": "lower-equal-precedence-ambiguity-is-not-reached",
+      "directRequirements": [
+        { "kind": "package", "coordinate": "org/app/main", "source": "github-release" }
+      ],
+      "releaseSources": [
+        {
+          "repository": "org/app",
+          "releases": [
+            { "tag": "2.0.0+windows", "commit": "app-2w", "immutable": false, "snapshot": { "packages": [ { "coordinate": "org/app/main", "packageRoot": "main", "contentDigest": "sha256:2w", "dependencies": [] } ] } },
+            { "tag": "3.0.0", "commit": "app-300", "immutable": false, "snapshot": { "packages": [ { "coordinate": "org/app/main", "packageRoot": "main", "contentDigest": "sha256:300", "dependencies": [] } ] } },
+            { "tag": "2.0.0+linux", "commit": "app-2l", "immutable": false, "snapshot": { "packages": [ { "coordinate": "org/app/main", "packageRoot": "main", "contentDigest": "sha256:2l", "dependencies": [] } ] } }
+          ]
+        }
+      ],
+      "expected": {
+        "sourceBindings": [
+          { "repositoryCoordinate": "org/app", "sourceKind": "github-release", "version": "3.0.0", "actualTag": "3.0.0", "exactCommit": "app-300", "immutable": false }
+        ],
+        "packages": [
+          { "packageCoordinate": "org/app/main", "packageRoot": "main", "contentDigest": "sha256:300" }
+        ],
+        "dependencyEdges": []
+      }
+    },
+    {
+      "id": "invalid-manifest-requirement-backtracks",
+      "directRequirements": [
+        { "kind": "package", "coordinate": "org/app/main", "source": "github-release" }
+      ],
+      "releaseSources": [
+        {
+          "repository": "org/app",
+          "releases": [
+            {
+              "tag": "2.0.0",
+              "commit": "app-200",
+              "immutable": false,
+              "snapshot": { "packages": [
+                { "coordinate": "org/app/main", "packageRoot": "main", "contentDigest": "sha256:200", "dependencies": [
+                  { "target": "other/dep/x", "requirement": "^1 || ^2" }
+                ] }
+              ] }
+            },
+            {
+              "tag": "1.0.0",
+              "commit": "app-100",
+              "immutable": false,
+              "snapshot": { "packages": [
+                { "coordinate": "org/app/main", "packageRoot": "main", "contentDigest": "sha256:100", "dependencies": [] }
+              ] }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "sourceBindings": [
+          { "repositoryCoordinate": "org/app", "sourceKind": "github-release", "version": "1.0.0", "actualTag": "1.0.0", "exactCommit": "app-100", "immutable": false }
+        ],
+        "packages": [
+          { "packageCoordinate": "org/app/main", "packageRoot": "main", "contentDigest": "sha256:100" }
+        ],
+        "dependencyEdges": []
+      }
+    },
+    {
+      "id": "exact-git-binding-is-carried-into-complete-graph",
+      "directRequirements": [
+        { "kind": "package", "coordinate": "git/repo/tool", "source": "git", "ref": "main" }
+      ],
+      "gitBindings": [
+        {
+          "repository": "git/repo",
+          "requestedRef": "main",
+          "exactCommit": "git-commit-1",
+          "snapshot": { "packages": [
+            { "coordinate": "git/repo/tool", "packageRoot": "tool", "contentDigest": "sha256:gittool", "dependencies": [] }
+          ] }
+        }
+      ],
+      "releaseSources": [],
+      "expected": {
+        "sourceBindings": [
+          { "repositoryCoordinate": "git/repo", "sourceKind": "git", "requestedRef": "main", "exactCommit": "git-commit-1" }
+        ],
+        "packages": [
+          { "packageCoordinate": "git/repo/tool", "packageRoot": "tool", "contentDigest": "sha256:gittool" }
+        ],
+        "dependencyEdges": []
+      }
+    }
+  ],
+  "errors": [
+    {
+      "id": "reached-equal-precedence-group-is-ambiguous",
+      "directRequirements": [
+        { "kind": "package", "coordinate": "org/app/main", "source": "github-release" }
+      ],
+      "releaseSources": [
+        {
+          "repository": "org/app",
+          "releases": [
+            { "tag": "2.0.0+windows", "commit": "app-2w", "immutable": false, "snapshot": { "packages": [ { "coordinate": "org/app/main", "packageRoot": "main", "contentDigest": "sha256:2w", "dependencies": [] } ] } },
+            { "tag": "2.0.0+linux", "commit": "app-2l", "immutable": false, "snapshot": { "packages": [ { "coordinate": "org/app/main", "packageRoot": "main", "contentDigest": "sha256:2l", "dependencies": [] } ] } }
+          ]
+        }
+      ],
+      "expectedError": {
+        "code": "AmbiguousReleasePrecedence",
+        "facts": {
+          "repositoryCoordinate": "org/app",
+          "precedence": "2.0.0",
+          "candidates": [
+            { "version": "2.0.0+linux", "actualTag": "2.0.0+linux" },
+            { "version": "2.0.0+windows", "actualTag": "2.0.0+windows" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "unsatisfiable-repository-constraints",
+      "directRequirements": [
+        { "kind": "package", "coordinate": "org/app/main", "source": "github-release", "version": "^3" }
+      ],
+      "releaseSources": [
+        {
+          "repository": "org/app",
+          "releases": [
+            { "tag": "1.0.0", "commit": "app-100", "immutable": false, "snapshot": { "packages": [] } },
+            { "tag": "2.0.0", "commit": "app-200", "immutable": false, "snapshot": { "packages": [] } }
+          ]
+        }
+      ],
+      "expectedError": {
+        "code": "UnsatisfiableReleaseRequirements",
+        "facts": {
+          "repositoryCoordinate": "org/app",
+          "requirements": [
+            { "requirement": "^3", "origin": { "kind": "direct", "coordinate": "org/app/main" } }
+          ]
+        }
+      }
+    },
+    {
+      "id": "all-candidates-exhausted",
+      "directRequirements": [
+        { "kind": "package", "coordinate": "org/app/main", "source": "github-release" }
+      ],
+      "releaseSources": [
+        {
+          "repository": "org/app",
+          "releases": [
+            { "tag": "1.0.0", "commit": "app-100", "immutable": false, "snapshot": { "packages": [] } },
+            { "tag": "2.0.0", "commit": "app-200", "immutable": false, "snapshot": { "packages": [] } }
+          ]
+        }
+      ],
+      "expectedError": {
+        "code": "UnresolvableDependencyGraph",
+        "facts": {
+          "repositoryCoordinate": "org/app",
+          "candidateVersions": ["2.0.0", "1.0.0"],
+          "attempts": [
+            { "version": "2.0.0", "rootFailureCode": "PackageNotFound", "subjectCoordinate": "org/app/main" },
+            { "version": "1.0.0", "rootFailureCode": "PackageNotFound", "subjectCoordinate": "org/app/main" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "invalid-direct-requirement-remains-structured",
+      "directRequirements": [
+        { "kind": "package", "coordinate": "org/app/main", "source": "github-release", "version": "^1 || ^2" }
+      ],
+      "releaseSources": [],
+      "expectedError": {
+        "code": "InvalidReleaseRequirement",
+        "facts": {
+          "requirement": "^1 || ^2",
+          "reason": "unsupported-union",
+          "originKind": "direct",
+          "originCoordinate": "org/app/main"
+        }
+      }
+    }
+  ]
+}
