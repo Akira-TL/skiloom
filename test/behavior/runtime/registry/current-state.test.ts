@@ -6,11 +6,9 @@ import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 
 import { resolveSkiloomHomePaths, type SkiloomHomePaths } from "../../../../src/runtime/home.js";
-import {
-  CURRENT_REGISTRY_SCHEMA_VERSION,
-  openMachineRegistry,
-  type RegistryTargetStateInput
-} from "../../../../src/runtime/registry/index.js";
+import { openMachineRegistry } from "../../../../src/runtime/registry/database.js";
+import type { RegistryTargetStateInput } from "../../../../src/runtime/registry/model.js";
+import { CURRENT_REGISTRY_SCHEMA_VERSION } from "../../../../src/runtime/registry/schema.js";
 
 type Fixture = Readonly<{
   fixtureVersion: 1;

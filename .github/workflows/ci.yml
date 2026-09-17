@@ -56,3 +56,7 @@ jobs:
         run: npm run test:lock-bridge
         env:
           SKILOOM_LOCK_TEST_BINARY: ${{ github.workspace }}/native/skiloom-lock/target/debug/skiloom-lock
+      - name: Test locked Machine State integration
+        run: npm run test:machine-state
+        env:
+          SKILOOM_LOCK_TEST_BINARY: ${{ github.workspace }}/native/skiloom-lock/target/debug/skiloom-lock

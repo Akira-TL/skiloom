@@ -52,7 +52,8 @@ export type OperationLockLost = ProductError<
       | "helper-error"
       | "lifetime-channel-error"
       | "protocol-closed"
-      | "protocol-output";
+      | "protocol-output"
+      | "session-not-held";
   }>
 >;
 
@@ -74,6 +75,7 @@ export interface OperationLockSession {
   readonly held: boolean;
   /** Diagnostic only. Never use the PID as lock authority. */
   readonly helperPid: number | undefined;
+  checkHeld(): Result<void, OperationLockLost>;
   waitForLoss(): Promise<OperationLockLost>;
   release(): Promise<Result<void, OperationLockReleaseError>>;
 }
@@ -133,6 +135,22 @@ class HeldOperationLockSession implements OperationLockSession {
 
   get helperPid(): number | undefined {
     return this.#child.pid;
+  }
+
+  checkHeld(): Result<void, OperationLockLost> {
+    if (this.#state === "held") {
+      return { ok: true, value: undefined };
+    }
+    if (this.#lostError !== undefined) {
+      return { ok: false, error: this.#lostError };
+    }
+    return {
+      ok: false,
+      error: productError("OperationLockLost", {
+        lockPath: this.#lockPath,
+        reason: "session-not-held"
+      })
+    };
   }
 
   waitForLoss(): Promise<OperationLockLost> {
