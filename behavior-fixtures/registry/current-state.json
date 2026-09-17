@@ -1,0 +1,128 @@
+{
+  "fixtureVersion": 1,
+  "state": {
+    "targetId": "11111111-1111-4111-8111-111111111111",
+    "locations": [
+      { "path": "/tmp/z-target", "observedGeneration": null },
+      { "path": "/tmp/a-target", "observedGeneration": 0 }
+    ],
+    "directRequirements": [
+      {
+        "kind": "repository",
+        "coordinate": "acme/tools",
+        "sourceKind": "github-release",
+        "versionRequirement": "^1.2"
+      },
+      {
+        "kind": "package",
+        "coordinate": "vendor/gitpkg/leaf",
+        "sourceKind": "git",
+        "requestedRef": "main"
+      },
+      {
+        "kind": "package",
+        "coordinate": "acme/tools/alpha",
+        "sourceKind": "github-release",
+        "versionRequirement": "^1.2"
+      }
+    ],
+    "resolvedSources": [
+      {
+        "repositoryCoordinate": "vendor/gitpkg",
+        "sourceKind": "git",
+        "requestedRef": "main",
+        "exactCommit": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      {
+        "repositoryCoordinate": "acme/tools",
+        "sourceKind": "github-release",
+        "version": "1.2.3",
+        "actualTag": "v1.2.3",
+        "exactCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "immutable": true
+      }
+    ],
+    "resolvedPackages": [
+      {
+        "packageCoordinate": "vendor/gitpkg/leaf",
+        "repositoryCoordinate": "vendor/gitpkg",
+        "packageRoot": ".",
+        "contentDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      {
+        "packageCoordinate": "acme/tools/beta",
+        "repositoryCoordinate": "acme/tools",
+        "packageRoot": "skills/beta",
+        "contentDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      {
+        "packageCoordinate": "acme/tools/alpha",
+        "repositoryCoordinate": "acme/tools",
+        "packageRoot": "skills/alpha",
+        "contentDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "dependencyEdges": [
+      { "fromPackage": "acme/tools/beta", "toPackage": "acme/tools/alpha" },
+      { "fromPackage": "acme/tools/alpha", "toPackage": "vendor/gitpkg/leaf" },
+      { "fromPackage": "acme/tools/alpha", "toPackage": "acme/tools/beta" }
+    ],
+    "projections": [
+      {
+        "packageCoordinate": "vendor/gitpkg/leaf",
+        "activationName": "leaf",
+        "ownership": "managed",
+        "materialization": "junction",
+        "transformJson": null
+      },
+      {
+        "packageCoordinate": "acme/tools/beta",
+        "activationName": "beta-local",
+        "ownership": "detached",
+        "materialization": "copy",
+        "transformJson": null
+      },
+      {
+        "packageCoordinate": "acme/tools/alpha",
+        "activationName": "alpha",
+        "ownership": "managed",
+        "materialization": "symlink",
+        "transformJson": "{\"routing\":{\"leaf\":\"leaf\"}}"
+      }
+    ],
+    "detachedBaselines": [
+      {
+        "packageCoordinate": "acme/tools/beta",
+        "repositoryCoordinate": "acme/tools",
+        "sourceKind": "github-release",
+        "version": "1.2.3",
+        "actualTag": "v1.2.3",
+        "exactCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "packageRoot": "skills/beta",
+        "contentDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      }
+    ],
+    "dependencyObservations": [
+      {
+        "packageCoordinate": "acme/tools/alpha",
+        "packageContentDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "kind": "software",
+        "name": "node",
+        "status": "present",
+        "detectedVersion": "24.16.0",
+        "location": "/usr/bin/node",
+        "note": null
+      },
+      {
+        "packageCoordinate": "vendor/gitpkg/leaf",
+        "packageContentDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "kind": "special",
+        "name": "gpu",
+        "status": "unknown",
+        "detectedVersion": null,
+        "location": null,
+        "note": "manual observation required"
+      }
+    ]
+  }
+}
