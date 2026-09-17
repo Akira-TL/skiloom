@@ -37,3 +37,22 @@ jobs:
         run: rustup toolchain install 1.89.0 --profile minimal
       - name: Test skiloom-lock
         run: cargo +1.89.0 test --manifest-path native/skiloom-lock/Cargo.toml --locked
+
+  lock-bridge:
+    name: Lock bridge (Node 22 / Rust 1.89)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Rust 1.89.0
+        run: rustup toolchain install 1.89.0 --profile minimal
+      - name: Build skiloom-lock
+        run: cargo +1.89.0 build --manifest-path native/skiloom-lock/Cargo.toml --locked
+      - name: Test Node lock bridge with real helper
+        run: npm run test:lock-bridge
+        env:
+          SKILOOM_LOCK_TEST_BINARY: ${{ github.workspace }}/native/skiloom-lock/target/debug/skiloom-lock
