@@ -1,0 +1,185 @@
+{
+  "fixtureVersion": 1,
+  "success": [
+    {
+      "id": "rename-and-routing-transform-only-direct-reverse-dependents",
+      "packages": [
+        { "packageCoordinate": "org/app/main", "packageRoot": "skills/main", "contentDigest": "sha256:main" },
+        { "packageCoordinate": "org/lib/core", "packageRoot": "skills/core", "contentDigest": "sha256:core" },
+        { "packageCoordinate": "org/lib/helper", "packageRoot": "skills/helper", "contentDigest": "sha256:helper" },
+        { "packageCoordinate": "other/tools/observer", "packageRoot": "observer", "contentDigest": "sha256:observer" }
+      ],
+      "dependencyEdges": [
+        { "sourcePackageCoordinate": "org/app/main", "targetPackageCoordinate": "org/lib/core" },
+        { "sourcePackageCoordinate": "org/app/main", "targetPackageCoordinate": "org/lib/helper" }
+      ],
+      "directRoots": ["org/app/main", "other/tools/observer"],
+      "renames": [
+        { "packageCoordinate": "org/lib/core", "activationName": "core-local" }
+      ],
+      "expected": {
+        "projections": [
+          {
+            "packageCoordinate": "org/app/main",
+            "packageRoot": "skills/main",
+            "contentDigest": "sha256:main",
+            "activationName": "main",
+            "projectionKind": "transformed-copy",
+            "transform": {
+              "rename": null,
+              "dependencyRoutes": [
+                {
+                  "dependencyPackageCoordinate": "org/lib/core",
+                  "fromActivationName": "core",
+                  "toActivationName": "core-local"
+                }
+              ]
+            }
+          },
+          {
+            "packageCoordinate": "org/lib/core",
+            "packageRoot": "skills/core",
+            "contentDigest": "sha256:core",
+            "activationName": "core-local",
+            "projectionKind": "transformed-copy",
+            "transform": {
+              "rename": {
+                "fromActivationName": "core",
+                "toActivationName": "core-local"
+              },
+              "dependencyRoutes": []
+            }
+          },
+          {
+            "packageCoordinate": "org/lib/helper",
+            "packageRoot": "skills/helper",
+            "contentDigest": "sha256:helper",
+            "activationName": "helper",
+            "projectionKind": "direct",
+            "transform": null
+          },
+          {
+            "packageCoordinate": "other/tools/observer",
+            "packageRoot": "observer",
+            "contentDigest": "sha256:observer",
+            "activationName": "observer",
+            "projectionKind": "direct",
+            "transform": null
+          }
+        ],
+        "reachablePackages": [
+          "org/app/main",
+          "org/lib/core",
+          "org/lib/helper",
+          "other/tools/observer"
+        ],
+        "unreachableManagedPackages": []
+      }
+    },
+    {
+      "id": "remaining-roots-preserve-shared-dependency-and-drop-unreachable-cycle",
+      "packages": [
+        { "packageCoordinate": "org/app/root-a", "packageRoot": "root-a", "contentDigest": "sha256:a" },
+        { "packageCoordinate": "org/app/root-b", "packageRoot": "root-b", "contentDigest": "sha256:b" },
+        { "packageCoordinate": "org/lib/shared", "packageRoot": "shared", "contentDigest": "sha256:s" },
+        { "packageCoordinate": "org/cycle/one", "packageRoot": "one", "contentDigest": "sha256:1" },
+        { "packageCoordinate": "org/cycle/two", "packageRoot": "two", "contentDigest": "sha256:2" },
+        { "packageCoordinate": "org/old/orphan", "packageRoot": "orphan", "contentDigest": "sha256:o" }
+      ],
+      "dependencyEdges": [
+        { "sourcePackageCoordinate": "org/app/root-a", "targetPackageCoordinate": "org/lib/shared" },
+        { "sourcePackageCoordinate": "org/app/root-b", "targetPackageCoordinate": "org/lib/shared" },
+        { "sourcePackageCoordinate": "org/app/root-a", "targetPackageCoordinate": "org/cycle/one" },
+        { "sourcePackageCoordinate": "org/cycle/one", "targetPackageCoordinate": "org/cycle/two" },
+        { "sourcePackageCoordinate": "org/cycle/two", "targetPackageCoordinate": "org/cycle/one" }
+      ],
+      "directRoots": ["org/app/root-b"],
+      "renames": [],
+      "expected": {
+        "projections": [
+          {
+            "packageCoordinate": "org/app/root-b",
+            "packageRoot": "root-b",
+            "contentDigest": "sha256:b",
+            "activationName": "root-b",
+            "projectionKind": "direct",
+            "transform": null
+          },
+          {
+            "packageCoordinate": "org/lib/shared",
+            "packageRoot": "shared",
+            "contentDigest": "sha256:s",
+            "activationName": "shared",
+            "projectionKind": "direct",
+            "transform": null
+          }
+        ],
+        "reachablePackages": ["org/app/root-b", "org/lib/shared"],
+        "unreachableManagedPackages": [
+          "org/app/root-a",
+          "org/cycle/one",
+          "org/cycle/two",
+          "org/old/orphan"
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "id": "invalid-activation-name-is-rejected",
+      "packages": [
+        { "packageCoordinate": "org/app/main", "packageRoot": ".", "contentDigest": "sha256:main" }
+      ],
+      "dependencyEdges": [],
+      "directRoots": ["org/app/main"],
+      "renames": [
+        { "packageCoordinate": "org/app/main", "activationName": "Bad_Name" }
+      ],
+      "expectedError": {
+        "code": "InvalidActivationName",
+        "facts": {
+          "packageCoordinate": "org/app/main",
+          "activationName": "Bad_Name",
+          "reason": "invalid-skill-name"
+        }
+      }
+    },
+    {
+      "id": "duplicate-activation-name-fails-without-auto-suffix",
+      "packages": [
+        { "packageCoordinate": "a/repo/alpha", "packageRoot": "alpha", "contentDigest": "sha256:a" },
+        { "packageCoordinate": "b/repo/beta", "packageRoot": "beta", "contentDigest": "sha256:b" }
+      ],
+      "dependencyEdges": [],
+      "directRoots": ["a/repo/alpha", "b/repo/beta"],
+      "renames": [
+        { "packageCoordinate": "b/repo/beta", "activationName": "alpha" }
+      ],
+      "expectedError": {
+        "code": "ActivationNameConflict",
+        "facts": {
+          "activationName": "alpha",
+          "packageCoordinates": ["a/repo/alpha", "b/repo/beta"]
+        }
+      }
+    },
+    {
+      "id": "unknown-rename-package-fails-closed",
+      "packages": [
+        { "packageCoordinate": "org/app/main", "packageRoot": ".", "contentDigest": "sha256:main" }
+      ],
+      "dependencyEdges": [],
+      "directRoots": ["org/app/main"],
+      "renames": [
+        { "packageCoordinate": "org/missing/ghost", "activationName": "ghost-local" }
+      ],
+      "expectedError": {
+        "code": "InvalidTargetPlanInput",
+        "facts": {
+          "reason": "unknown-rename-package",
+          "packageCoordinate": "org/missing/ghost"
+        }
+      }
+    }
+  ]
+}
