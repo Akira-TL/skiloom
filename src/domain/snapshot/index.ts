@@ -42,6 +42,12 @@ export type PackageSnapshot = Readonly<{
   contentDigest: string;
 }>;
 
+export type PackageSnapshotContentEntry = Readonly<{
+  path: string;
+  executable: boolean;
+  content: Uint8Array;
+}>;
+
 export type PackageSnapshotInput = Readonly<{
   packageRoot: string;
   discoveredPackageRoots: ReadonlyArray<string>;
@@ -97,6 +103,51 @@ type PreparedEntry = Readonly<{
 const UTF8_DECODER = new TextDecoder("utf-8", { fatal: true });
 const UTF8_ENCODER = new TextEncoder();
 const FORMAT_HEADER = Buffer.from("SKILOOM-PACKAGE-V1\0", "ascii");
+
+export function createPackageSnapshot(
+  entries: ReadonlyArray<PackageSnapshotContentEntry>
+): Result<PackageSnapshot, PackageSnapshotError> {
+  const prepared: PreparedEntry[] = [];
+  for (const entry of entries) {
+    const pathBytes = UTF8_ENCODER.encode(entry.path);
+    const pathResult = validatePackagePath(pathBytes);
+    if (!pathResult.ok) {
+      return pathResult;
+    }
+    const content = Uint8Array.from(entry.content);
+    const fileDigestBytes = sha256(content);
+    prepared.push({
+      path: pathResult.value,
+      pathBytes,
+      executable: entry.executable,
+      content,
+      fileDigest: `sha256:${hex(fileDigestBytes)}`,
+      fileDigestBytes
+    });
+  }
+
+  prepared.sort((left, right) => compareBytes(left.pathBytes, right.pathBytes));
+  const collision = firstPathCollision(prepared);
+  if (collision !== undefined) {
+    return {
+      ok: false,
+      error: productError("PackagePathCollision", collision)
+    };
+  }
+
+  return {
+    ok: true,
+    value: {
+      entries: prepared.map((entry) => ({
+        path: entry.path,
+        executable: entry.executable,
+        content: entry.content,
+        fileDigest: entry.fileDigest
+      })),
+      contentDigest: digestSnapshot(prepared)
+    }
+  };
+}
 
 export function buildPackageSnapshot(
   input: PackageSnapshotInput

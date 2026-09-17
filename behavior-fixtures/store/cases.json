@@ -1,0 +1,17 @@
+{
+  "fixtureVersion": 1,
+  "snapshot": {
+    "entries": [
+      {
+        "path": "scripts/run.sh",
+        "executable": true,
+        "contentUtf8": "#!/bin/sh\necho skiloom\n"
+      },
+      {
+        "path": "SKILL.md",
+        "executable": false,
+        "contentUtf8": "---\nname: store-demo\ndescription: Package Store fixture\n---\n"
+      }
+    ]
+  }
+}
