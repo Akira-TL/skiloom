@@ -215,8 +215,8 @@ export function isValidPackageRoot(value: string): boolean {
   if (
     value.length === 0 ||
     value.startsWith("/") ||
+    /^[A-Za-z]:\//u.test(value) ||
     value.endsWith("/") ||
-    value.includes("\\") ||
     value.includes("\0")
   ) {
     return false;

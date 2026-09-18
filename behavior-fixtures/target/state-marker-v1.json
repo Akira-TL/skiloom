@@ -180,6 +180,13 @@
       "code": "InvalidTargetState",
       "reason": "invalid-field",
       "path": "detached[0].baseline-content-digest"
+    },
+    {
+      "id": "drive-absolute-detached-package-root",
+      "source": "format = \"SKILOOM-STATE-V1\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 1\n[[detached]]\npackage = \"akira-tl/skills/a\"\nbaseline-source = \"git\"\nbaseline-ref = \"main\"\nbaseline-commit = \"0123456789abcdef0123456789abcdef01234567\"\nbaseline-package-root = \"C:/skills/a\"\nbaseline-content-digest = \"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"\n",
+      "code": "InvalidTargetState",
+      "reason": "invalid-field",
+      "path": "detached[0].baseline-package-root"
     }
   ]
 }
