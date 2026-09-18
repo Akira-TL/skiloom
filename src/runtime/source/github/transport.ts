@@ -12,9 +12,24 @@ export type GitHubFetchTransportOptions = Readonly<{
   userAgent?: string;
 }>;
 
-export function createGitHubRepositoryFetchTransport(
+export type GitHubJsonTransportRequest = Readonly<{
+  path: string;
+  query?: Readonly<Record<string, string>>;
+  credential?: string;
+}>;
+
+export type GitHubJsonTransportResponse = Readonly<{
+  status: number;
+  body: unknown;
+}>;
+
+export type GitHubJsonTransport = (
+  request: GitHubJsonTransportRequest
+) => Promise<GitHubJsonTransportResponse>;
+
+export function createGitHubJsonFetchTransport(
   options: GitHubFetchTransportOptions = {}
-): GitHubRepositoryTransport {
+): GitHubJsonTransport {
   const fetchImpl = options.fetchImpl ?? fetch;
   const apiBaseUrl = stripTrailingSlash(
     options.apiBaseUrl ?? DEFAULT_GITHUB_API_BASE_URL
@@ -22,12 +37,11 @@ export function createGitHubRepositoryFetchTransport(
   const userAgent = options.userAgent ?? "skiloom";
 
   return async (request) => {
-    const url =
-      apiBaseUrl +
-      "/repos/" +
-      encodeURIComponent(request.repository.owner) +
-      "/" +
-      encodeURIComponent(request.repository.repo);
+    const url = new URL(apiBaseUrl + request.path);
+    for (const [key, value] of Object.entries(request.query ?? {})) {
+      url.searchParams.set(key, value);
+    }
+
     const headers: Record<string, string> = {
       Accept: GITHUB_ACCEPT,
       "X-GitHub-Api-Version": GITHUB_API_VERSION,
@@ -48,6 +62,24 @@ export function createGitHubRepositoryFetchTransport(
       body: await readJsonBody(response)
     };
   };
+}
+
+export function createGitHubRepositoryFetchTransport(
+  options: GitHubFetchTransportOptions = {}
+): GitHubRepositoryTransport {
+  const transport = createGitHubJsonFetchTransport(options);
+
+  return async (request) =>
+    transport({
+      path:
+        "/repos/" +
+        encodeURIComponent(request.repository.owner) +
+        "/" +
+        encodeURIComponent(request.repository.repo),
+      ...(request.credential === undefined
+        ? {}
+        : { credential: request.credential })
+    });
 }
 
 async function readJsonBody(response: Response): Promise<unknown> {
