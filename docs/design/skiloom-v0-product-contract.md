@@ -221,7 +221,7 @@ Skiloom 不维护永久来源白名单。来源确认属于每一次完整新状
 
 Target 内使用平铺 `<target>/<activation-name>` 结构。
 
-普通受管 Package 默认通过 link/junction 指向不可变 Store；rename、dependency routing 等 Skiloom 可确定性重建的变换可以使用 managed transformed copy。
+普通受管 Package 默认通过 link/junction 指向不可变 Store；rename、dependency routing 等 Skiloom 可确定性重建的变换可以使用 managed transformed copy。v1 managed transformed copy 的精确字节契约见 [`managed-transformed-copy-v1.md`](managed-transformed-copy-v1.md)：输出 path set 与原 Package Snapshot 相同，transform 只确定性修改顶层 `SKILL.md`；rename 只替换 frontmatter `name` value 的 source range，routing 只向直接反向依赖的 `SKILL.md` 追加 canonical generated instruction block；存在任一 transform 时必须使用 managed copy，并从 Store + transform facts 重新生成 expected tree 做 drift verification。
 
 规则：
 
