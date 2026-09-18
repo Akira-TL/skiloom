@@ -5,12 +5,14 @@ import {
   type Result
 } from "../../../domain/errors/index.js";
 import type { FixedReleaseFact } from "../../../domain/resolver/candidates.js";
+import {
+  resolveGitHubExactCommit
+} from "./commit.js";
 import type { SourceAccessUnavailable } from "./repository.js";
 import type { GitHubJsonTransport } from "./transport.js";
 
 const RELEASE_PAGE_SIZE = "100";
 const MAX_RELEASE_PAGES = 1000;
-const EXACT_COMMIT_PATTERN = /^[0-9a-f]{40}$/u;
 
 export type GitHubPublishedReleaseFact = Omit<
   FixedReleaseFact<unknown>,
@@ -157,29 +159,33 @@ async function resolveActualTagCommit(
   input: AcquirePublishedGitHubReleaseFactsInput,
   actualTag: string
 ): Promise<Result<string, AcquirePublishedGitHubReleaseFactsError>> {
-  const response = await requestJson(
-    input,
-    {
-      path:
-        repositoryPath(input.repository) +
-        "/commits/" +
-        encodeURIComponent(actualTag)
-    },
-    "resolve-tag"
-  );
-  if (!response.ok) {
-    return response;
+  const resolved = await resolveGitHubExactCommit({
+    repository: input.repository,
+    requestedRef: actualTag,
+    transport: input.transport,
+    ...(input.credential === undefined
+      ? {}
+      : { credential: input.credential })
+  });
+  if (resolved.ok) {
+    return resolved;
   }
 
-  if (!isRecord(response.value.body)) {
-    return invalidCommitResponse(input.repository, actualTag);
+  switch (resolved.error.code) {
+    case "SourceAccessUnavailable":
+      return {
+        ok: false,
+        error: resolved.error
+      };
+    case "InvalidGitHubExactCommitResponse":
+      return invalidCommitResponse(input.repository, actualTag);
+    case "GitHubExactCommitTransportUnavailable":
+      return transportUnavailable(
+        input.repository,
+        "resolve-tag",
+        resolved.error.facts.status
+      );
   }
-  const sha = response.value.body.sha;
-  if (typeof sha !== "string" || !EXACT_COMMIT_PATTERN.test(sha)) {
-    return invalidCommitResponse(input.repository, actualTag);
-  }
-
-  return { ok: true, value: sha };
 }
 
 type JsonRequest = Readonly<{

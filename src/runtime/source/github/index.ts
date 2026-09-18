@@ -13,6 +13,20 @@ export {
 } from "./repository.js";
 
 export {
+  resolveGitHubExactCommit,
+  type GitHubExactCommitTransportUnavailable,
+  type InvalidGitHubExactCommitResponse,
+  type ResolveGitHubExactCommitError,
+  type ResolveGitHubExactCommitInput
+} from "./commit.js";
+
+export {
+  resolveExplicitGitHubGitSource,
+  type GitHubGitSourceFact,
+  type ResolveExplicitGitHubGitSourceInput
+} from "./git-ref.js";
+
+export {
   acquirePublishedGitHubReleaseFacts,
   type AcquirePublishedGitHubReleaseFactsError,
   type AcquirePublishedGitHubReleaseFactsInput,
