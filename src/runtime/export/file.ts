@@ -45,7 +45,6 @@ export async function writeExactExportFile(
     `.${basename(destinationPath)}.tmp-${process.pid}-${randomUUID()}`
   );
   let handle;
-  let linked = false;
 
   try {
     handle = await open(temporaryPath, "wx", 0o600);
@@ -61,7 +60,6 @@ export async function writeExactExportFile(
 
     try {
       await link(temporaryPath, destinationPath);
-      linked = true;
     } catch (error) {
       if (isNodeError(error) && error.code === "EEXIST") {
         return {
@@ -92,7 +90,6 @@ export async function writeExactExportFile(
   } finally {
     await handle?.close().catch(() => {});
     await rm(temporaryPath, { force: true }).catch(() => {});
-    void linked;
   }
 }
 

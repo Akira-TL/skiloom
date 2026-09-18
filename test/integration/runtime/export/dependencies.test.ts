@@ -3,6 +3,7 @@ import {
   lstat,
   mkdir,
   readFile,
+  readdir,
   rm,
   writeFile
 } from "node:fs/promises";
@@ -33,6 +34,9 @@ import {
 import {
   exportManagedDependencies
 } from "../../../../src/runtime/export/dependencies.js";
+import {
+  writeExactExportFile
+} from "../../../../src/runtime/export/file.js";
 import type {
   MachineRegistry,
   RegistryTargetState,
@@ -457,6 +461,55 @@ test("dependencies export fails closed on managed Target drift and missing immut
       }
     });
   });
+
+  await withRuntime(async ({ paths, targetRoot }) => {
+    await withRealLock(paths, async (lock) => {
+      const registry = await requireRegistry(paths, lock);
+      try {
+        const state = await installExportFixture({
+          paths,
+          targetRoot,
+          lock,
+          registry
+        });
+        const app = state.resolvedPackages.find(
+          (entry) => entry.packageCoordinate === "acme/app/app"
+        );
+        assert.notEqual(app, undefined);
+        await writeFile(
+          join(
+            paths.storePath,
+            `sha256-${app!.contentDigest.slice("sha256:".length)}`,
+            "payload",
+            "SKILL.md"
+          ),
+          "corrupt immutable store bytes\n",
+          "utf8"
+        );
+
+        const corruptStore = await exportManagedDependencies({
+          home: paths,
+          targetId,
+          targetRoot,
+          destinationPath: join(
+            targetRoot,
+            "corrupt-store.skiloom-export"
+          ),
+          lock,
+          registry
+        });
+        assert.equal(corruptStore.ok, false);
+        if (!corruptStore.ok) {
+          assert.equal(
+            corruptStore.error.code,
+            "CorruptStoreEntry"
+          );
+        }
+      } finally {
+        registry.close();
+      }
+    });
+  });
 });
 
 test("dependencies export keeps detached baseline managed payload but omits current user bytes with a warning", async () => {
@@ -578,6 +631,35 @@ test("dependencies export keeps detached baseline managed payload but omits curr
   });
 });
 
+test("atomic export publish leaves no final file when operation lock capability is lost before publish", async () => {
+  await withRuntime(async ({ paths, targetRoot }) => {
+    const destination = join(
+      targetRoot,
+      "lost-lock.skiloom-export"
+    );
+    const lock = lostLock(paths.operationLockPath);
+    const written = await writeExactExportFile({
+      destinationPath: destination,
+      bytes: Uint8Array.from(
+        Buffer.from("complete export bytes", "utf8")
+      ),
+      lock
+    });
+
+    assert.equal(written.ok, false);
+    if (!written.ok) {
+      assert.equal(written.error.code, "OperationLockLost");
+    }
+    await assert.rejects(lstat(destination));
+    assert.deepEqual(
+      (await readdir(targetRoot)).filter((name) =>
+        name.startsWith(".lost-lock.skiloom-export.tmp-")
+      ),
+      []
+    );
+  });
+});
+
 async function installExportFixture(
   input: Readonly<{
     paths: SkiloomHomePaths;
@@ -616,6 +698,25 @@ function withoutGeneration(
 ): RegistryTargetStateInput {
   const { generation: _generation, ...input } = state;
   return input;
+}
+
+function lostLock(
+  lockPath: string
+): OperationLockSession {
+  const error = {
+    code: "OperationLockLost" as const,
+    facts: {
+      lockPath,
+      reason: "session-not-held" as const
+    }
+  };
+  return {
+    held: false,
+    helperPid: undefined,
+    checkHeld: () => ({ ok: false, error }),
+    waitForLoss: async () => error,
+    release: async () => ({ ok: false, error })
+  };
 }
 
 function reverseReadRegistry(
