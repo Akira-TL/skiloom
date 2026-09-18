@@ -7,10 +7,15 @@ import {
   type ProductError,
   type Result
 } from "../../../domain/errors/index.js";
+import {
+  gitHubTransportAbortResult,
+  type GitHubTransportAborted
+} from "./transport.js";
 
 export type GitHubRepositoryTransportRequest = Readonly<{
   repository: RepositoryCoordinate;
   credential?: string;
+  signal?: AbortSignal;
 }>;
 
 export type GitHubRepositoryTransportResponse = Readonly<{
@@ -61,11 +66,13 @@ export type VerifyGitHubRepositoryError =
   | RepositoryCoordinateChanged
   | SourceAccessUnavailable
   | InvalidGitHubRepositoryResponse
-  | GitHubRepositoryTransportUnavailable;
+  | GitHubRepositoryTransportUnavailable
+  | GitHubTransportAborted;
 
 export type VerifyGitHubRepositoryInput = Readonly<{
   repository: RepositoryCoordinate;
   credential?: string;
+  signal?: AbortSignal;
   transport: GitHubRepositoryTransport;
 }>;
 
@@ -78,9 +85,20 @@ export async function verifyGitHubRepository(
       repository: input.repository,
       ...(input.credential === undefined
         ? {}
-        : { credential: input.credential })
+        : { credential: input.credential }),
+      ...(input.signal === undefined
+        ? {}
+        : { signal: input.signal })
     });
-  } catch {
+  } catch (error) {
+    const aborted = gitHubTransportAbortResult(
+      error,
+      input.repository.canonical,
+      "verify-repository"
+    );
+    if (aborted !== undefined) {
+      return { ok: false, error: aborted };
+    }
     return {
       ok: false,
       error: productError("GitHubRepositoryTransportUnavailable", {

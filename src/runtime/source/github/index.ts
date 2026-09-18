@@ -76,5 +76,8 @@ export {
   type GitHubFetchTransportOptions,
   type GitHubJsonTransport,
   type GitHubJsonTransportRequest,
-  type GitHubJsonTransportResponse
+  type GitHubJsonTransportResponse,
+  type GitHubTransportAborted,
+  type GitHubTransportAbortReason,
+  type GitHubTransportOperation
 } from "./transport.js";

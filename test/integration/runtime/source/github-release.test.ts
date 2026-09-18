@@ -9,6 +9,7 @@ import {
 } from "../../../../src/domain/resolver/candidates.js";
 import {
   acquirePublishedGitHubReleaseFacts,
+  createGitHubJsonFetchTransport,
   type GitHubJsonTransport
 } from "../../../../src/runtime/source/github/index.js";
 
@@ -249,6 +250,46 @@ test("tag resolution requires an exact 40-hex commit response", async () => {
   });
 });
 
+test("caller cancellation while resolving a Release tag reports resolve-tag without retry", async () => {
+  const controller = new AbortController();
+  let attempts = 0;
+  const result = await acquirePublishedGitHubReleaseFacts({
+    repository: repository("akira-tl/skiloom"),
+    signal: controller.signal,
+    transport: createGitHubJsonFetchTransport({
+      maxAttempts: 4,
+      retryDelayMs: 0,
+      fetchImpl: async (input, init) => {
+        attempts += 1;
+        const url = String(input);
+        if (url.includes("/releases?")) {
+          return jsonResponse(200, [
+            release("v1.0.0", false)
+          ]);
+        }
+        if (url.endsWith("/commits/v1.0.0")) {
+          controller.abort();
+          return waitForAbort(init?.signal);
+        }
+        throw new RangeError("unexpected release request");
+      }
+    })
+  });
+
+  assert.equal(attempts, 2);
+  assert.deepEqual(result, {
+    ok: false,
+    error: {
+      code: "GitHubTransportAborted",
+      facts: {
+        repositoryCoordinate: "akira-tl/skiloom",
+        operation: "resolve-tag",
+        reason: "cancelled"
+      }
+    }
+  });
+});
+
 test("Release transport exceptions are normalized without leaking exception text", async () => {
   const secret = "github_pat_release_transport_secret";
   const result = await acquirePublishedGitHubReleaseFacts({
@@ -272,6 +313,29 @@ test("Release transport exceptions are normalized without leaking exception text
     }
   });
 });
+
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" }
+  });
+}
+
+function waitForAbort(
+  signal: AbortSignal | null | undefined
+): Promise<Response> {
+  return new Promise((_resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("aborted", "AbortError"));
+      return;
+    }
+    signal?.addEventListener(
+      "abort",
+      () => reject(new DOMException("aborted", "AbortError")),
+      { once: true }
+    );
+  });
+}
 
 function repository(input: string) {
   const parsed = parseRepositoryCoordinate(input);

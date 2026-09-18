@@ -18,6 +18,7 @@ export type ResolveExplicitGitHubGitSourceInput = Readonly<{
   repository: RepositoryCoordinate;
   requestedRef: string;
   credential?: string;
+  signal?: AbortSignal;
   transport: GitHubJsonTransport;
 }>;
 
@@ -30,7 +31,10 @@ export async function resolveExplicitGitHubGitSource(
     transport: input.transport,
     ...(input.credential === undefined
       ? {}
-      : { credential: input.credential })
+      : { credential: input.credential }),
+    ...(input.signal === undefined
+      ? {}
+      : { signal: input.signal })
   });
   if (!exactCommit.ok) {
     return exactCommit;

@@ -5,7 +5,11 @@ import {
   parseRepositoryCoordinate
 } from "../../../../src/domain/coordinate/index.js";
 import {
-  createGitHubRepositoryFetchTransport
+  acquireGitHubGitBinding,
+  createGitHubJsonFetchTransport,
+  createGitHubRepositoryFetchTransport,
+  resolveExplicitGitHubGitSource,
+  verifyGitHubRepository
 } from "../../../../src/runtime/source/github/index.js";
 
 test("GitHub fetch transport maps canonical repository coordinates and credential headers", async () => {
@@ -67,6 +71,280 @@ test("GitHub fetch transport omits authorization without a credential and tolera
     body: null
   });
 });
+
+test("GitHub fetch transport retries only bounded transient failures and preserves normalized facts", async () => {
+  let attempts = 0;
+  const transport = createGitHubRepositoryFetchTransport({
+    maxAttempts: 3,
+    retryDelayMs: 0,
+    fetchImpl: async () => {
+      attempts += 1;
+      return attempts < 3
+        ? jsonResponse(503, { message: "transient" })
+        : jsonResponse(200, { full_name: "Akira-TL/Skiloom" });
+    }
+  });
+
+  const retried = await verifyGitHubRepository({
+    repository: repository("akira-tl/skiloom"),
+    transport
+  });
+  const immediate = await verifyGitHubRepository({
+    repository: repository("akira-tl/skiloom"),
+    transport: createGitHubRepositoryFetchTransport({
+      maxAttempts: 1,
+      fetchImpl: async () =>
+        jsonResponse(200, { full_name: "Akira-TL/Skiloom" })
+    })
+  });
+
+  assert.equal(attempts, 3);
+  assert.deepEqual(retried, immediate);
+});
+
+test("stable source-access status is not retried", async () => {
+  let attempts = 0;
+  const result = await verifyGitHubRepository({
+    repository: repository("akira-tl/private"),
+    transport: createGitHubRepositoryFetchTransport({
+      maxAttempts: 4,
+      retryDelayMs: 0,
+      fetchImpl: async () => {
+        attempts += 1;
+        return jsonResponse(403, { message: "ambiguous access" });
+      }
+    })
+  });
+
+  assert.equal(attempts, 1);
+  assert.deepEqual(result, {
+    ok: false,
+    error: {
+      code: "SourceAccessUnavailable",
+      facts: {
+        repositoryCoordinate: "akira-tl/private",
+        status: 403
+      }
+    }
+  });
+});
+
+test("caller cancellation aborts in-flight GitHub work without hidden retries", async () => {
+  const controller = new AbortController();
+  let attempts = 0;
+  const transport = createGitHubRepositoryFetchTransport({
+    maxAttempts: 4,
+    retryDelayMs: 0,
+    fetchImpl: async (_input, init) => {
+      attempts += 1;
+      return waitForAbort(init?.signal);
+    }
+  });
+
+  const pending = verifyGitHubRepository({
+    repository: repository("akira-tl/skiloom"),
+    signal: controller.signal,
+    credential: "credential-cancel-sentinel",
+    transport
+  });
+  controller.abort();
+
+  const result = await pending;
+  assert.equal(attempts, 1);
+  assert.equal(JSON.stringify(result).includes("credential-cancel-sentinel"), false);
+  assert.deepEqual(result, {
+    ok: false,
+    error: {
+      code: "GitHubTransportAborted",
+      facts: {
+        repositoryCoordinate: "akira-tl/skiloom",
+        operation: "verify-repository",
+        reason: "cancelled"
+      }
+    }
+  });
+});
+
+test("GitHub request timeout is a stable structured runtime result", async () => {
+  let attempts = 0;
+  const result = await verifyGitHubRepository({
+    repository: repository("akira-tl/skiloom"),
+    transport: createGitHubRepositoryFetchTransport({
+      maxAttempts: 1,
+      timeoutMs: 10,
+      fetchImpl: async (_input, init) => {
+        attempts += 1;
+        return waitForAbort(init?.signal);
+      }
+    })
+  });
+
+  assert.equal(attempts, 1);
+  assert.deepEqual(result, {
+    ok: false,
+    error: {
+      code: "GitHubTransportAborted",
+      facts: {
+        repositoryCoordinate: "akira-tl/skiloom",
+        operation: "verify-repository",
+        reason: "timeout"
+      }
+    }
+  });
+});
+
+test("stable missing Git ref response is not retried or converted into fallback", async () => {
+  let attempts = 0;
+  const result = await resolveExplicitGitHubGitSource({
+    repository: repository("akira-tl/skiloom"),
+    requestedRef: "missing-ref",
+    transport: createGitHubJsonFetchTransport({
+      maxAttempts: 4,
+      retryDelayMs: 0,
+      fetchImpl: async () => {
+        attempts += 1;
+        return jsonResponse(422, { message: "unprocessable" });
+      }
+    })
+  });
+
+  assert.equal(attempts, 1);
+  assert.deepEqual(result, {
+    ok: false,
+    error: {
+      code: "GitHubExactCommitTransportUnavailable",
+      facts: {
+        repositoryCoordinate: "akira-tl/skiloom",
+        requestedRef: "missing-ref",
+        status: 422
+      }
+    }
+  });
+});
+
+test("pipeline cancellation during exact snapshot acquisition keeps the precise operation", async () => {
+  const controller = new AbortController();
+  const exactCommit = "1".repeat(40);
+  let attempts = 0;
+
+  const result = await acquireGitHubGitBinding({
+    repository: repository("akira-tl/skiloom"),
+    requestedRef: "main",
+    signal: controller.signal,
+    repositoryTransport: async () => ({
+      status: 200,
+      body: { full_name: "Akira-TL/Skiloom" }
+    }),
+    transport: createGitHubJsonFetchTransport({
+      maxAttempts: 4,
+      retryDelayMs: 0,
+      fetchImpl: async (input, init) => {
+        attempts += 1;
+        const url = String(input);
+        if (url.endsWith("/commits/main")) {
+          return jsonResponse(200, { sha: exactCommit });
+        }
+        if (url.endsWith("/git/commits/" + exactCommit)) {
+          controller.abort();
+          return waitForAbort(init?.signal);
+        }
+        throw new RangeError("unexpected source request");
+      }
+    })
+  });
+
+  assert.equal(attempts, 2);
+  assert.deepEqual(result, {
+    ok: false,
+    error: {
+      code: "GitHubTransportAborted",
+      facts: {
+        repositoryCoordinate: "akira-tl/skiloom",
+        operation: "read-commit",
+        reason: "cancelled"
+      }
+    }
+  });
+});
+
+test("unclassified fetch exceptions are not retried as transient failures", async () => {
+  let attempts = 0;
+  const result = await verifyGitHubRepository({
+    repository: repository("akira-tl/skiloom"),
+    transport: createGitHubRepositoryFetchTransport({
+      maxAttempts: 4,
+      retryDelayMs: 0,
+      fetchImpl: async () => {
+        attempts += 1;
+        throw new RangeError("programming failure");
+      }
+    })
+  });
+
+  assert.equal(attempts, 1);
+  assert.deepEqual(result, {
+    ok: false,
+    error: {
+      code: "GitHubRepositoryTransportUnavailable",
+      facts: {
+        repositoryCoordinate: "akira-tl/skiloom",
+        status: null
+      }
+    }
+  });
+});
+
+test("transient network retry is bounded and secret-safe when exhausted", async () => {
+  let attempts = 0;
+  const result = await verifyGitHubRepository({
+    repository: repository("akira-tl/skiloom"),
+    credential: "credential-network-sentinel",
+    transport: createGitHubRepositoryFetchTransport({
+      maxAttempts: 2,
+      retryDelayMs: 0,
+      fetchImpl: async () => {
+        attempts += 1;
+        throw new TypeError("network failure credential-network-sentinel");
+      }
+    })
+  });
+
+  assert.equal(attempts, 2);
+  assert.equal(JSON.stringify(result).includes("credential-network-sentinel"), false);
+  assert.deepEqual(result, {
+    ok: false,
+    error: {
+      code: "GitHubRepositoryTransportUnavailable",
+      facts: {
+        repositoryCoordinate: "akira-tl/skiloom",
+        status: null
+      }
+    }
+  });
+});
+
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" }
+  });
+}
+
+function waitForAbort(
+  signal: AbortSignal | null | undefined
+): Promise<Response> {
+  return new Promise((_resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException("aborted", "AbortError"));
+      return;
+    }
+    signal?.addEventListener(
+      "abort",
+      () => reject(new DOMException("aborted", "AbortError")),
+      { once: true }
+    );
+  });
+}
 
 function repository(input: string) {
   const parsed = parseRepositoryCoordinate(input);

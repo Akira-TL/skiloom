@@ -85,6 +85,7 @@ export type BuildGitHubResolverRepositorySnapshotError =
 
 export type GitHubSourceRuntimeInput = Readonly<{
   credential?: string;
+  signal?: AbortSignal;
   sourceCachePath?: string;
   repositoryTransport: GitHubRepositoryTransport;
   transport: GitHubJsonTransport;
@@ -128,7 +129,10 @@ export async function acquireGitHubReleaseRepositorySource(
     transport: input.repositoryTransport,
     ...(input.credential === undefined
       ? {}
-      : { credential: input.credential })
+      : { credential: input.credential }),
+    ...(input.signal === undefined
+      ? {}
+      : { signal: input.signal })
   });
   if (!verified.ok) {
     return verified;
@@ -139,7 +143,10 @@ export async function acquireGitHubReleaseRepositorySource(
     transport: input.transport,
     ...(input.credential === undefined
       ? {}
-      : { credential: input.credential })
+      : { credential: input.credential }),
+    ...(input.signal === undefined
+      ? {}
+      : { signal: input.signal })
   });
   if (!releases.ok) {
     return releases;
@@ -184,7 +191,10 @@ export async function acquireGitHubGitBinding(
     transport: input.repositoryTransport,
     ...(input.credential === undefined
       ? {}
-      : { credential: input.credential })
+      : { credential: input.credential }),
+    ...(input.signal === undefined
+      ? {}
+      : { signal: input.signal })
   });
   if (!verified.ok) {
     return verified;
@@ -196,7 +206,10 @@ export async function acquireGitHubGitBinding(
     transport: input.transport,
     ...(input.credential === undefined
       ? {}
-      : { credential: input.credential })
+      : { credential: input.credential }),
+    ...(input.signal === undefined
+      ? {}
+      : { signal: input.signal })
   });
   if (!source.ok) {
     return source;
@@ -241,7 +254,10 @@ async function acquireRepositorySnapshot(
     transport: input.transport,
     ...(input.credential === undefined
       ? {}
-      : { credential: input.credential })
+      : { credential: input.credential }),
+    ...(input.signal === undefined
+      ? {}
+      : { signal: input.signal })
   } satisfies AcquireExactGitHubRepositorySnapshotInput;
 
   return input.sourceCachePath === undefined

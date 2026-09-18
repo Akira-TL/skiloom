@@ -5,7 +5,11 @@ import {
   type Result
 } from "../../../domain/errors/index.js";
 import type { SourceAccessUnavailable } from "./repository.js";
-import type { GitHubJsonTransport } from "./transport.js";
+import {
+  gitHubTransportAbortResult,
+  type GitHubJsonTransport,
+  type GitHubTransportAborted
+} from "./transport.js";
 
 const EXACT_COMMIT_PATTERN = /^[0-9a-f]{40}$/u;
 
@@ -29,12 +33,15 @@ export type GitHubExactCommitTransportUnavailable = ProductError<
 export type ResolveGitHubExactCommitError =
   | SourceAccessUnavailable
   | InvalidGitHubExactCommitResponse
-  | GitHubExactCommitTransportUnavailable;
+  | GitHubExactCommitTransportUnavailable
+  | GitHubTransportAborted;
 
 export type ResolveGitHubExactCommitInput = Readonly<{
   repository: RepositoryCoordinate;
   requestedRef: string;
   credential?: string;
+  signal?: AbortSignal;
+  operation?: "resolve-ref" | "resolve-tag";
   transport: GitHubJsonTransport;
 }>;
 
@@ -50,9 +57,20 @@ export async function resolveGitHubExactCommit(
         encodeURIComponent(input.requestedRef),
       ...(input.credential === undefined
         ? {}
-        : { credential: input.credential })
+        : { credential: input.credential }),
+      ...(input.signal === undefined
+        ? {}
+        : { signal: input.signal })
     });
-  } catch {
+  } catch (error) {
+    const aborted = gitHubTransportAbortResult(
+      error,
+      input.repository.canonical,
+      input.operation ?? "resolve-ref"
+    );
+    if (aborted !== undefined) {
+      return { ok: false, error: aborted };
+    }
     return transportUnavailable(input, null);
   }
 

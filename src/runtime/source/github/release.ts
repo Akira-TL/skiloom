@@ -9,7 +9,11 @@ import {
   resolveGitHubExactCommit
 } from "./commit.js";
 import type { SourceAccessUnavailable } from "./repository.js";
-import type { GitHubJsonTransport } from "./transport.js";
+import {
+  gitHubTransportAbortResult,
+  type GitHubJsonTransport,
+  type GitHubTransportAborted
+} from "./transport.js";
 
 const RELEASE_PAGE_SIZE = "100";
 const MAX_RELEASE_PAGES = 1000;
@@ -47,11 +51,13 @@ export type AcquirePublishedGitHubReleaseFactsError =
   | SourceAccessUnavailable
   | InvalidGitHubReleaseResponse
   | InvalidGitHubCommitResponse
-  | GitHubReleaseTransportUnavailable;
+  | GitHubReleaseTransportUnavailable
+  | GitHubTransportAborted;
 
 export type AcquirePublishedGitHubReleaseFactsInput = Readonly<{
   repository: RepositoryCoordinate;
   credential?: string;
+  signal?: AbortSignal;
   transport: GitHubJsonTransport;
 }>;
 
@@ -162,10 +168,14 @@ async function resolveActualTagCommit(
   const resolved = await resolveGitHubExactCommit({
     repository: input.repository,
     requestedRef: actualTag,
+    operation: "resolve-tag",
     transport: input.transport,
     ...(input.credential === undefined
       ? {}
-      : { credential: input.credential })
+      : { credential: input.credential }),
+    ...(input.signal === undefined
+      ? {}
+      : { signal: input.signal })
   });
   if (resolved.ok) {
     return resolved;
@@ -185,6 +195,11 @@ async function resolveActualTagCommit(
         "resolve-tag",
         resolved.error.facts.status
       );
+    case "GitHubTransportAborted":
+      return {
+        ok: false,
+        error: resolved.error
+      };
   }
 }
 
@@ -200,7 +215,9 @@ async function requestJson(
 ): Promise<
   Result<
     Readonly<{ body: unknown }>,
-    SourceAccessUnavailable | GitHubReleaseTransportUnavailable
+    | SourceAccessUnavailable
+    | GitHubReleaseTransportUnavailable
+    | GitHubTransportAborted
   >
 > {
   let response;
@@ -209,9 +226,20 @@ async function requestJson(
       ...request,
       ...(input.credential === undefined
         ? {}
-        : { credential: input.credential })
+        : { credential: input.credential }),
+      ...(input.signal === undefined
+        ? {}
+        : { signal: input.signal })
     });
-  } catch {
+  } catch (error) {
+    const aborted = gitHubTransportAbortResult(
+      error,
+      input.repository.canonical,
+      operation
+    );
+    if (aborted !== undefined) {
+      return { ok: false, error: aborted };
+    }
     return transportUnavailable(
       input.repository,
       operation,

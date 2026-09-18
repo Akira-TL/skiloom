@@ -8,7 +8,11 @@ import type {
   RepositorySnapshotEntry
 } from "../../../domain/snapshot/index.js";
 import type { SourceAccessUnavailable } from "./repository.js";
-import type { GitHubJsonTransport } from "./transport.js";
+import {
+  gitHubTransportAbortResult,
+  type GitHubJsonTransport,
+  type GitHubTransportAborted
+} from "./transport.js";
 
 const EXACT_COMMIT_PATTERN = /^[0-9a-f]{40}$/u;
 
@@ -85,12 +89,14 @@ export type AcquireExactGitHubRepositorySnapshotError =
   | GitHubTreeTruncated
   | UnsupportedGitTreeEntry
   | InvalidGitHubBlobResponse
-  | GitHubSnapshotTransportUnavailable;
+  | GitHubSnapshotTransportUnavailable
+  | GitHubTransportAborted;
 
 export type AcquireExactGitHubRepositorySnapshotInput = Readonly<{
   repository: RepositoryCoordinate;
   exactCommit: string;
   credential?: string;
+  signal?: AbortSignal;
   transport: GitHubJsonTransport;
 }>;
 
@@ -373,7 +379,9 @@ async function requestJson(
 ): Promise<
   Result<
     Readonly<{ body: unknown }>,
-    SourceAccessUnavailable | GitHubSnapshotTransportUnavailable
+    | SourceAccessUnavailable
+    | GitHubSnapshotTransportUnavailable
+    | GitHubTransportAborted
   >
 > {
   let response;
@@ -382,9 +390,20 @@ async function requestJson(
       ...request,
       ...(input.credential === undefined
         ? {}
-        : { credential: input.credential })
+        : { credential: input.credential }),
+      ...(input.signal === undefined
+        ? {}
+        : { signal: input.signal })
     });
-  } catch {
+  } catch (error) {
+    const aborted = gitHubTransportAbortResult(
+      error,
+      input.repository.canonical,
+      operation
+    );
+    if (aborted !== undefined) {
+      return { ok: false, error: aborted };
+    }
     return transportUnavailable(input.repository, operation, null);
   }
 
