@@ -355,6 +355,37 @@ test("post-acquisition helper loss prevents later protected Registry side effect
     );
     assert.equal(lost.code, "OperationLockLost");
 
+    const blockedPending = opened.value.beginPendingOperation(
+      "must-not-stage",
+      {
+        operationId: "must-not-stage-operation",
+        actions: [
+          {
+            stagingPath: join(paths.userHome, "must-not-stage"),
+            activationName: "demo"
+          }
+        ]
+      }
+    );
+    assert.equal(blockedPending.ok, false);
+    if (!blockedPending.ok) {
+      assert.equal(blockedPending.error.code, "OperationLockLost");
+    }
+
+    const blockedPendingRead = opened.value.readPendingOperations();
+    assert.equal(blockedPendingRead.ok, false);
+    if (!blockedPendingRead.ok) {
+      assert.equal(blockedPendingRead.error.code, "OperationLockLost");
+    }
+
+    const blockedPendingComplete = opened.value.completePendingOperation(
+      "must-not-stage-operation"
+    );
+    assert.equal(blockedPendingComplete.ok, false);
+    if (!blockedPendingComplete.ok) {
+      assert.equal(blockedPendingComplete.error.code, "OperationLockLost");
+    }
+
     const blocked = opened.value.replaceTargetState(
       minimalState("must-not-commit", fixedDigest("9"))
     );

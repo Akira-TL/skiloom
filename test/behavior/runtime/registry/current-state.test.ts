@@ -182,6 +182,72 @@ test("Machine Registry replace is atomic and constraint failure preserves previo
   });
 });
 
+test("Machine Registry persists pending staging before accepted state replacement and clears it explicitly", async () => {
+  await withTempHome(async (paths) => {
+    const fixture = await readFixture();
+    const registry = requireRegistry(paths);
+
+    try {
+      const initial = registry.replaceTargetState(fixture.state);
+      assert.equal(initial.ok, true);
+      if (!initial.ok) {
+        return;
+      }
+      assert.equal(initial.value.generation, 1);
+
+      const pending = registry.beginPendingOperation(fixture.state.targetId, {
+        operationId: "reconcile-1",
+        actions: [
+          {
+            stagingPath: join(paths.userHome, "target", ".skiloom-stage-alpha-owned"),
+            activationName: "alpha"
+          }
+        ]
+      });
+      assert.equal(pending.ok, true);
+      if (!pending.ok) {
+        return;
+      }
+      assert.deepEqual(pending.value, {
+        operationId: "reconcile-1",
+        targetId: fixture.state.targetId,
+        baseGeneration: 1,
+        nextGeneration: 2,
+        actions: [
+          {
+            stagingPath: join(paths.userHome, "target", ".skiloom-stage-alpha-owned"),
+            activationName: "alpha"
+          }
+        ]
+      });
+
+      assert.equal(
+        registry.readTargetState(fixture.state.targetId)?.generation,
+        1,
+        "recording staging cleanup facts must not advance accepted Target state"
+      );
+      assert.deepEqual(registry.readPendingOperations(), [pending.value]);
+
+      const committed = registry.replaceTargetState(fixture.state, pending.value.operationId);
+      assert.equal(committed.ok, true);
+      if (!committed.ok) {
+        return;
+      }
+      assert.equal(committed.value.generation, 2);
+      assert.deepEqual(
+        registry.readPendingOperations(),
+        [pending.value],
+        "pending cleanup facts remain until live Target reconciliation finishes"
+      );
+
+      registry.completePendingOperation(pending.value.operationId);
+      assert.deepEqual(registry.readPendingOperations(), []);
+    } finally {
+      registry.close();
+    }
+  });
+});
+
 test("Machine Registry SQLite constraints reject illegal source shapes and dangling graph rows", async () => {
   await withTempHome(async (paths) => {
     const registry = requireRegistry(paths);

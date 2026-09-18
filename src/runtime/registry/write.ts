@@ -12,17 +12,81 @@ import type {
 } from "./model.js";
 
 export class RegistryPendingOperationConflictError extends Error {
-  constructor() {
-    super("registry target already has a pending operation");
+  constructor(message: string) {
+    super(message);
     this.name = "RegistryPendingOperationConflictError";
+  }
+}
+
+export function beginPendingOperationRows(
+  database: DatabaseSync,
+  targetId: string,
+  pending: RegistryPendingOperationInput
+): RegistryPendingOperation {
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    database
+      .prepare("INSERT INTO targets(target_id, generation) VALUES (?, 0) ON CONFLICT(target_id) DO NOTHING")
+      .run(targetId);
+
+    const generation = readGeneration(database, targetId);
+    const existingPending = database
+      .prepare("SELECT COUNT(*) AS pending_count FROM pending_operations WHERE target_id = ?")
+      .get(targetId);
+    const count = existingPending?.pending_count;
+    if (typeof count !== "number" || !Number.isSafeInteger(count)) {
+      throw new Error("invalid pending operation count");
+    }
+    if (count !== 0) {
+      throw new RegistryPendingOperationConflictError(
+        "registry target already has a pending operation"
+      );
+    }
+
+    const operation = insertPendingOperation(
+      database,
+      targetId,
+      generation,
+      generation + 1,
+      pending
+    );
+    database.exec("COMMIT");
+    return operation;
+  } catch (error) {
+    try {
+      database.exec("ROLLBACK");
+    } catch {
+      // Preserve the original transaction failure.
+    }
+    throw error;
+  }
+}
+
+export function completePendingOperationRows(
+  database: DatabaseSync,
+  operationId: string
+): void {
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    database
+      .prepare("DELETE FROM pending_operations WHERE operation_id = ?")
+      .run(operationId);
+    database.exec("COMMIT");
+  } catch (error) {
+    try {
+      database.exec("ROLLBACK");
+    } catch {
+      // Preserve the original transaction failure.
+    }
+    throw error;
   }
 }
 
 export function replaceTargetRows(
   database: DatabaseSync,
   state: RegistryTargetStateInput,
-  pending?: RegistryPendingOperationInput
-): Readonly<{ generation: number; pending: RegistryPendingOperation | null }> {
+  pendingOperationId?: string
+): number {
   database.exec("BEGIN IMMEDIATE");
   try {
     database
@@ -30,18 +94,12 @@ export function replaceTargetRows(
       .run(state.targetId);
 
     const generationBefore = readGeneration(database, state.targetId);
-    if (pending !== undefined && pending.actions.length > 0) {
-      const existingPending = database
-        .prepare("SELECT COUNT(*) AS pending_count FROM pending_operations WHERE target_id = ?")
-        .get(state.targetId);
-      const count = existingPending?.pending_count;
-      if (typeof count !== "number" || !Number.isSafeInteger(count)) {
-        throw new Error("invalid pending operation count");
-      }
-      if (count !== 0) {
-        throw new RegistryPendingOperationConflictError();
-      }
-    }
+    validatePendingOperationForReplacement(
+      database,
+      state.targetId,
+      generationBefore,
+      pendingOperationId
+    );
 
     database.prepare("DELETE FROM target_locations WHERE target_id = ?").run(state.targetId);
     database.prepare("DELETE FROM direct_requirements WHERE target_id = ?").run(state.targetId);
@@ -62,19 +120,8 @@ export function replaceTargetRows(
       throw new Error("registry generation did not advance exactly once");
     }
 
-    let committedPending: RegistryPendingOperation | null = null;
-    if (pending !== undefined && pending.actions.length > 0) {
-      committedPending = insertPendingOperation(
-        database,
-        state.targetId,
-        generationBefore,
-        generation,
-        pending
-      );
-    }
-
     database.exec("COMMIT");
-    return { generation, pending: committedPending };
+    return generation;
   } catch (error) {
     try {
       database.exec("ROLLBACK");
@@ -82,6 +129,47 @@ export function replaceTargetRows(
       // Preserve the original transaction failure.
     }
     throw error;
+  }
+}
+
+function validatePendingOperationForReplacement(
+  database: DatabaseSync,
+  targetId: string,
+  generation: number,
+  pendingOperationId: string | undefined
+): void {
+  const rows = database
+    .prepare(`
+      SELECT operation_id, target_id, base_generation, next_generation
+      FROM pending_operations
+      WHERE target_id = ?
+      ORDER BY operation_id
+    `)
+    .all(targetId);
+
+  if (pendingOperationId === undefined) {
+    if (rows.length !== 0) {
+      throw new RegistryPendingOperationConflictError(
+        "registry target has a pending operation"
+      );
+    }
+    return;
+  }
+
+  const row = rows.find((candidate) => candidate.operation_id === pendingOperationId);
+  if (row === undefined) {
+    throw new RegistryPendingOperationConflictError(
+      "registry pending operation does not match target"
+    );
+  }
+  if (
+    row.target_id !== targetId ||
+    row.base_generation !== generation ||
+    row.next_generation !== generation + 1
+  ) {
+    throw new RegistryPendingOperationConflictError(
+      "registry pending operation generation does not match target"
+    );
   }
 }
 

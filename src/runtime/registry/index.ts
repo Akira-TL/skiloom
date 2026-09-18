@@ -2,6 +2,7 @@ export {
   openMachineRegistry,
   type MachineRegistry,
   type RegistryOpenError,
+  type RegistryPendingLockedError,
   type RegistryReplaceLockedError
 } from "./locked.js";
 export {

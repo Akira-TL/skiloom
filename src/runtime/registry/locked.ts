@@ -8,6 +8,7 @@ import {
   openMachineRegistry as openRawMachineRegistry,
   type MachineRegistry as RawMachineRegistry,
   type RegistryConnectionPragmas,
+  type RegistryPendingOperationRejected,
   type RegistryReplaceError
 } from "./database.js";
 import {
@@ -16,11 +17,16 @@ import {
   type RegistryMaintenanceError
 } from "./maintenance.js";
 import type {
+  RegistryPendingOperation,
+  RegistryPendingOperationInput,
   RegistryTargetState,
   RegistryTargetStateInput
 } from "./model.js";
 
 export type RegistryOpenError = RegistryMaintenanceError | RegistryCorrupt;
+export type RegistryPendingLockedError =
+  | RegistryPendingOperationRejected
+  | OperationLockLost;
 export type RegistryReplaceLockedError = RegistryReplaceError | OperationLockLost;
 
 export interface MachineRegistry {
@@ -29,8 +35,20 @@ export interface MachineRegistry {
   readTargetState(
     targetId: string
   ): Result<RegistryTargetState | undefined, OperationLockLost>;
+  readPendingOperations(): Result<
+    ReadonlyArray<RegistryPendingOperation>,
+    OperationLockLost
+  >;
+  beginPendingOperation(
+    targetId: string,
+    pending: RegistryPendingOperationInput
+  ): Result<RegistryPendingOperation, RegistryPendingLockedError>;
+  completePendingOperation(
+    operationId: string
+  ): Result<void, OperationLockLost>;
   replaceTargetState(
-    state: RegistryTargetStateInput
+    state: RegistryTargetStateInput,
+    pendingOperationId?: string
   ): Result<RegistryTargetState, RegistryReplaceLockedError>;
 }
 
@@ -65,14 +83,48 @@ class LockedMachineRegistry implements MachineRegistry {
     return { ok: true, value: this.#registry.readTargetState(targetId) };
   }
 
+  readPendingOperations(): Result<
+    ReadonlyArray<RegistryPendingOperation>,
+    OperationLockLost
+  > {
+    const held = this.#lock.checkHeld();
+    if (!held.ok) {
+      return held;
+    }
+    return { ok: true, value: this.#registry.readPendingOperations() };
+  }
+
+  beginPendingOperation(
+    targetId: string,
+    pending: RegistryPendingOperationInput
+  ): Result<RegistryPendingOperation, RegistryPendingLockedError> {
+    const held = this.#lock.checkHeld();
+    if (!held.ok) {
+      return held;
+    }
+    return this.#registry.beginPendingOperation(targetId, pending);
+  }
+
+  completePendingOperation(
+    operationId: string
+  ): Result<void, OperationLockLost> {
+    const held = this.#lock.checkHeld();
+    if (!held.ok) {
+      return held;
+    }
+    this.#registry.completePendingOperation(operationId);
+    return { ok: true, value: undefined };
+  }
+
   replaceTargetState(
-    state: RegistryTargetStateInput
+    state: RegistryTargetStateInput,
+    pendingOperationId?: string
   ): Result<RegistryTargetState, RegistryReplaceLockedError> {
     const held = this.#lock.checkHeld();
     if (!held.ok) {
       return held;
     }
-    return this.#registry.replaceTargetState(state);
+    return this.#registry.replaceTargetState(state, pendingOperationId);
   }
 }
 

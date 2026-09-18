@@ -7,14 +7,24 @@ import {
   type Result
 } from "../../domain/errors/index.js";
 import type { SkiloomHomePaths } from "../home.js";
-import type { RegistryTargetState, RegistryTargetStateInput } from "./model.js";
-import { readTargetRows } from "./read.js";
+import type {
+  RegistryPendingOperation,
+  RegistryPendingOperationInput,
+  RegistryTargetState,
+  RegistryTargetStateInput
+} from "./model.js";
+import { readPendingOperations as readPendingOperationRows, readTargetRows } from "./read.js";
 import {
   configureRegistryConnection,
   CURRENT_REGISTRY_SCHEMA_VERSION,
   initializeRegistrySchema
 } from "./schema.js";
-import { replaceTargetRows } from "./write.js";
+import {
+  beginPendingOperationRows,
+  completePendingOperationRows,
+  RegistryPendingOperationConflictError,
+  replaceTargetRows
+} from "./write.js";
 
 export type RegistrySchemaUnsupported = ProductError<
   "RegistrySchemaUnsupported",
@@ -33,7 +43,16 @@ export type RegistryStateRejected = ProductError<
 >;
 
 export type RegistryOpenError = RegistrySchemaUnsupported;
-export type RegistryReplaceError = RegistryStateRejected;
+export type RegistryPendingOperationRejected = ProductError<
+  "RegistryPendingOperationRejected",
+  Readonly<{
+    targetId: string;
+    reason: "conflict";
+  }>
+>;
+export type RegistryReplaceError =
+  | RegistryStateRejected
+  | RegistryPendingOperationRejected;
 
 export type RegistryConnectionPragmas = Readonly<{
   foreignKeys: boolean;
@@ -73,12 +92,56 @@ export class MachineRegistry {
     return readTargetRows(this.#database, targetId);
   }
 
+  readPendingOperations(): ReadonlyArray<RegistryPendingOperation> {
+    return readPendingOperationRows(this.#database);
+  }
+
+  beginPendingOperation(
+    targetId: string,
+    pending: RegistryPendingOperationInput
+  ): Result<RegistryPendingOperation, RegistryPendingOperationRejected> {
+    try {
+      return {
+        ok: true,
+        value: beginPendingOperationRows(this.#database, targetId, pending)
+      };
+    } catch (error) {
+      if (
+        error instanceof RegistryPendingOperationConflictError ||
+        isConstraintError(error)
+      ) {
+        return {
+          ok: false,
+          error: productError("RegistryPendingOperationRejected", {
+            targetId,
+            reason: "conflict"
+          })
+        };
+      }
+      throw error;
+    }
+  }
+
+  completePendingOperation(operationId: string): void {
+    completePendingOperationRows(this.#database, operationId);
+  }
+
   replaceTargetState(
-    state: RegistryTargetStateInput
+    state: RegistryTargetStateInput,
+    pendingOperationId?: string
   ): Result<RegistryTargetState, RegistryReplaceError> {
     try {
-      replaceTargetRows(this.#database, state);
+      replaceTargetRows(this.#database, state, pendingOperationId);
     } catch (error) {
+      if (error instanceof RegistryPendingOperationConflictError) {
+        return {
+          ok: false,
+          error: productError("RegistryPendingOperationRejected", {
+            targetId: state.targetId,
+            reason: "conflict"
+          })
+        };
+      }
       if (isConstraintError(error)) {
         return {
           ok: false,
