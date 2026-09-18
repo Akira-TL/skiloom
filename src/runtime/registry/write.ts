@@ -4,20 +4,44 @@ import type {
   RegistryDependencyObservation,
   RegistryDetachedBaseline,
   RegistryDirectRequirement,
+  RegistryPendingOperation,
+  RegistryPendingOperationInput,
   RegistryProjection,
   RegistryResolvedSource,
   RegistryTargetStateInput
 } from "./model.js";
 
+export class RegistryPendingOperationConflictError extends Error {
+  constructor() {
+    super("registry target already has a pending operation");
+    this.name = "RegistryPendingOperationConflictError";
+  }
+}
+
 export function replaceTargetRows(
   database: DatabaseSync,
-  state: RegistryTargetStateInput
-): number {
+  state: RegistryTargetStateInput,
+  pending?: RegistryPendingOperationInput
+): Readonly<{ generation: number; pending: RegistryPendingOperation | null }> {
   database.exec("BEGIN IMMEDIATE");
   try {
     database
       .prepare("INSERT INTO targets(target_id, generation) VALUES (?, 0) ON CONFLICT(target_id) DO NOTHING")
       .run(state.targetId);
+
+    const generationBefore = readGeneration(database, state.targetId);
+    if (pending !== undefined && pending.actions.length > 0) {
+      const existingPending = database
+        .prepare("SELECT COUNT(*) AS pending_count FROM pending_operations WHERE target_id = ?")
+        .get(state.targetId);
+      const count = existingPending?.pending_count;
+      if (typeof count !== "number" || !Number.isSafeInteger(count)) {
+        throw new Error("invalid pending operation count");
+      }
+      if (count !== 0) {
+        throw new RegistryPendingOperationConflictError();
+      }
+    }
 
     database.prepare("DELETE FROM target_locations WHERE target_id = ?").run(state.targetId);
     database.prepare("DELETE FROM direct_requirements WHERE target_id = ?").run(state.targetId);
@@ -33,15 +57,24 @@ export function replaceTargetRows(
     insertObservations(database, state.targetId, state.dependencyObservations);
 
     database.prepare("UPDATE targets SET generation = generation + 1 WHERE target_id = ?").run(state.targetId);
-    const row = database
-      .prepare("SELECT generation FROM targets WHERE target_id = ?")
-      .get(state.targetId);
-    const generation = row?.generation;
-    if (typeof generation !== "number" || !Number.isSafeInteger(generation)) {
-      throw new Error("registry generation is not a safe integer");
+    const generation = readGeneration(database, state.targetId);
+    if (generation !== generationBefore + 1) {
+      throw new Error("registry generation did not advance exactly once");
     }
+
+    let committedPending: RegistryPendingOperation | null = null;
+    if (pending !== undefined && pending.actions.length > 0) {
+      committedPending = insertPendingOperation(
+        database,
+        state.targetId,
+        generationBefore,
+        generation,
+        pending
+      );
+    }
+
     database.exec("COMMIT");
-    return generation;
+    return { generation, pending: committedPending };
   } catch (error) {
     try {
       database.exec("ROLLBACK");
@@ -50,6 +83,63 @@ export function replaceTargetRows(
     }
     throw error;
   }
+}
+
+function readGeneration(database: DatabaseSync, targetId: string): number {
+  const row = database
+    .prepare("SELECT generation FROM targets WHERE target_id = ?")
+    .get(targetId);
+  const generation = row?.generation;
+  if (typeof generation !== "number" || !Number.isSafeInteger(generation)) {
+    throw new Error("registry generation is not a safe integer");
+  }
+  return generation;
+}
+
+function insertPendingOperation(
+  database: DatabaseSync,
+  targetId: string,
+  baseGeneration: number,
+  nextGeneration: number,
+  pending: RegistryPendingOperationInput
+): RegistryPendingOperation {
+  database.prepare(`
+    INSERT INTO pending_operations(
+      operation_id, target_id, base_generation, next_generation
+    ) VALUES (?, ?, ?, ?)
+  `).run(
+    pending.operationId,
+    targetId,
+    baseGeneration,
+    nextGeneration
+  );
+
+  const actions = [...pending.actions].sort((left, right) => {
+    const activation = compareStrings(left.activationName, right.activationName);
+    return activation !== 0
+      ? activation
+      : compareStrings(left.stagingPath, right.stagingPath);
+  });
+  const insertAction = database.prepare(`
+    INSERT INTO pending_projection_actions(
+      operation_id, staging_path, activation_name
+    ) VALUES (?, ?, ?)
+  `);
+  for (const action of actions) {
+    insertAction.run(
+      pending.operationId,
+      action.stagingPath,
+      action.activationName
+    );
+  }
+
+  return {
+    operationId: pending.operationId,
+    targetId,
+    baseGeneration,
+    nextGeneration,
+    actions
+  };
 }
 
 function insertLocations(database: DatabaseSync, state: RegistryTargetStateInput): void {
@@ -222,6 +312,16 @@ function insertDetachedBaselines(
       );
     }
   }
+}
+
+function compareStrings(left: string, right: string): number {
+  if (left < right) {
+    return -1;
+  }
+  if (left > right) {
+    return 1;
+  }
+  return 0;
 }
 
 function insertObservations(

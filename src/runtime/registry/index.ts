@@ -20,6 +20,7 @@ export {
 export {
   CURRENT_REGISTRY_SCHEMA_VERSION
 } from "./schema.js";
+export { readPendingOperations } from "./read.js";
 export type {
   RegistryDependencyEdge,
   RegistryDependencyObservation,
@@ -30,5 +31,8 @@ export type {
   RegistryResolvedSource,
   RegistryTargetLocation,
   RegistryTargetState,
-  RegistryTargetStateInput
+  RegistryTargetStateInput,
+  RegistryPendingOperation,
+  RegistryPendingOperationInput,
+  RegistryPendingProjectionAction
 } from "./model.js";

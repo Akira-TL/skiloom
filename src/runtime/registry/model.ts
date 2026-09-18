@@ -99,3 +99,21 @@ export type RegistryTargetState = Readonly<{
 }>;
 
 export type RegistryTargetStateInput = Omit<RegistryTargetState, "generation">;
+
+export type RegistryPendingProjectionAction = Readonly<{
+  stagingPath: string;
+  activationName: string;
+}>;
+
+export type RegistryPendingOperation = Readonly<{
+  operationId: string;
+  targetId: string;
+  baseGeneration: number;
+  nextGeneration: number;
+  actions: ReadonlyArray<RegistryPendingProjectionAction>;
+}>;
+
+export type RegistryPendingOperationInput = Readonly<{
+  operationId: string;
+  actions: ReadonlyArray<RegistryPendingProjectionAction>;
+}>;

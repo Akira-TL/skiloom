@@ -9,7 +9,9 @@ import type {
   RegistryResolvedPackage,
   RegistryResolvedSource,
   RegistryTargetLocation,
-  RegistryTargetState
+  RegistryTargetState,
+  RegistryPendingOperation,
+  RegistryPendingProjectionAction
 } from "./model.js";
 
 export function readTargetRows(
@@ -285,6 +287,35 @@ function readObservations(
         note: nullableStringField(row, "note")
       };
     });
+}
+
+export function readPendingOperations(database: DatabaseSync): ReadonlyArray<RegistryPendingOperation> {
+  return database.prepare(`
+    SELECT operation_id, target_id, base_generation, next_generation
+    FROM pending_operations
+    ORDER BY operation_id
+  `).all().map((row) => {
+    const operationId = stringField(row, "operation_id");
+    return {
+      operationId,
+      targetId: stringField(row, "target_id"),
+      baseGeneration: numberField(row, "base_generation"),
+      nextGeneration: numberField(row, "next_generation"),
+      actions: readPendingActions(database, operationId)
+    };
+  });
+}
+
+function readPendingActions(database: DatabaseSync, operationId: string): ReadonlyArray<RegistryPendingProjectionAction> {
+  return database.prepare(`
+    SELECT staging_path, activation_name
+    FROM pending_projection_actions
+    WHERE operation_id = ?
+    ORDER BY staging_path, activation_name
+  `).all(operationId).map((row) => ({
+    stagingPath: stringField(row, "staging_path"),
+    activationName: stringField(row, "activation_name")
+  }));
 }
 
 function stringField(row: Record<string, SQLOutputValue>, key: string): string {
