@@ -40,6 +40,10 @@ import {
   prepareManagedProjection,
   verifyManagedProjection
 } from "../target-projection/index.js";
+import {
+  recoverInterruptedDetach,
+  type DetachRecoveryError
+} from "./detach-recovery.js";
 import { sameAcceptedState } from "./target-reconcile-state.js";
 
 export type InvalidExactRepairInputReason =
@@ -85,7 +89,8 @@ export type LocalLifecycleError =
   | TargetReconciliationError
   | PackageStoreError
   | InvalidExactRepairInput
-  | InvalidLocalLifecycleInput;
+  | InvalidLocalLifecycleInput
+  | DetachRecoveryError;
 
 export type SyncAcceptedTargetStateInput =
   ReconcileAcceptedTargetStateInput;
@@ -125,6 +130,10 @@ export type RebindDetachedProjectionInput = Readonly<{
 export async function syncAcceptedTargetState(
   input: SyncAcceptedTargetStateInput
 ): Promise<Result<RegistryTargetState, LocalLifecycleError>> {
+  const recovered = await recoverInterruptedDetach(input);
+  if (!recovered.ok) {
+    return recovered;
+  }
   return reconcileAcceptedTargetState(input);
 }
 

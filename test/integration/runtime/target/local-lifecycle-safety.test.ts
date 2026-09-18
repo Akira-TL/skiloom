@@ -1,5 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -17,7 +24,10 @@ import {
   acquireOperationLock,
   type OperationLockSession
 } from "../../../../src/native/skiloom-lock.js";
-import { detachTargetProjection } from "../../../../src/runtime/orchestration/local-lifecycle.js";
+import {
+  detachTargetProjection,
+  syncAcceptedTargetState
+} from "../../../../src/runtime/orchestration/local-lifecycle.js";
 import {
   resolveSkiloomHomePaths,
   type SkiloomHomePaths
@@ -98,6 +108,165 @@ test("modified managed content blocks detach without changing Registry authority
     assert.equal(
       await readFile(join(targetRoot, "demo", "SKILL.md"), "utf8"),
       modifiedBytes
+    );
+  });
+});
+
+test("sync completes a detach that was interrupted after the Registry became authoritative", async () => {
+  await withRuntime(async ({ paths, targetRoot }) => {
+    const snapshot = snapshotFor("detach recovery bytes\n");
+    const published = await publishPackageSnapshot(paths, snapshot);
+    assert.equal(published.ok, true);
+
+    const projection = projectionFor(snapshot.contentDigest);
+    const materialized = await materializeManagedProjection({
+      home: paths,
+      targetRoot,
+      projection,
+      materialization: "symlink"
+    });
+    assert.equal(materialized.ok, true);
+
+    const managedState = registryState(
+      targetRoot,
+      snapshot.contentDigest,
+      "symlink"
+    );
+    const cleanupPath = join(
+      targetRoot,
+      ".skiloom-stage-demo-interrupted"
+    );
+    await mkdir(cleanupPath);
+
+    const raw = openRawMachineRegistry(paths);
+    assert.equal(raw.ok, true);
+    if (!raw.ok) {
+      return;
+    }
+    let detachedState: RegistryTargetStateInput;
+    try {
+      const first = raw.value.replaceTargetState(managedState);
+      assert.equal(first.ok, true);
+
+      const pending = raw.value.beginPendingOperation(
+        managedState.targetId,
+        {
+          operationId: "detach-interrupted-after-commit",
+          actions: [
+            {
+              stagingPath: cleanupPath,
+              activationName: "demo"
+            }
+          ]
+        }
+      );
+      assert.equal(pending.ok, true);
+
+      detachedState = {
+        ...managedState,
+        projections: [
+          {
+            packageCoordinate,
+            activationName: "demo",
+            ownership: "detached",
+            materialization: "copy",
+            transformJson: null
+          }
+        ],
+        detachedBaselines: [
+          {
+            packageCoordinate,
+            repositoryCoordinate: "acme/demo",
+            sourceKind: "github-release",
+            version: "1.0.0",
+            actualTag: "v1.0.0",
+            exactCommit: "1111111111111111111111111111111111111111",
+            packageRoot: ".",
+            contentDigest: snapshot.contentDigest
+          }
+        ]
+      };
+      const committed = raw.value.replaceTargetState(
+        detachedState,
+        "detach-interrupted-after-commit"
+      );
+      assert.equal(committed.ok, true);
+      if (committed.ok) {
+        assert.equal(committed.value.generation, 2);
+      }
+    } finally {
+      raw.value.close();
+    }
+
+    const before = await lstat(join(targetRoot, "demo"));
+    assert.equal(before.isSymbolicLink(), true);
+
+    const detachedOwned: TargetOwnedProjection = {
+      projection,
+      ownership: "detached",
+      materialization: "copy"
+    };
+    const desiredPlan: TargetPlan = {
+      projections: [projection],
+      reachablePackages: [packageCoordinate],
+      unreachableManagedPackages: []
+    };
+    const preflight = preflightTargetOwnership({
+      desiredPlan,
+      currentProjections: [detachedOwned],
+      observedPaths: [
+        {
+          activationName: "demo",
+          kind: "managed",
+          packageCoordinate,
+          contentDigest: snapshot.contentDigest,
+          materialization: "symlink",
+          expectedViewMatches: true
+        }
+      ]
+    });
+    assert.equal(preflight.ok, true);
+    if (!preflight.ok) {
+      return;
+    }
+    assert.equal(preflight.value.actions[0]?.action, "preserve-user");
+
+    await withRealLock(paths, async (lock) => {
+      const registry = await requireLockedRegistry(paths, lock);
+      try {
+        const synced = await syncAcceptedTargetState({
+          home: paths,
+          targetRoot,
+          operationId: "sync-interrupted-detach",
+          lock,
+          registry,
+          desiredPlan,
+          preflight: preflight.value,
+          currentProjections: [detachedOwned],
+          acceptedState: detachedState
+        });
+        assert.equal(synced.ok, true);
+
+        const accepted = registry.readTargetState(detachedState.targetId);
+        assert.equal(accepted.ok, true);
+        if (accepted.ok) {
+          assert.equal(accepted.value?.generation, 2);
+        }
+        assert.deepEqual(registry.readPendingOperations(), {
+          ok: true,
+          value: []
+        });
+      } finally {
+        registry.close();
+      }
+    });
+
+    const after = await lstat(join(targetRoot, "demo"));
+    assert.equal(after.isDirectory(), true);
+    assert.equal(after.isSymbolicLink(), false);
+    assert.match(
+      await readFile(join(targetRoot, "demo", "SKILL.md"), "utf8"),
+      /detach recovery bytes/u
     );
   });
 });
@@ -207,7 +376,8 @@ function projectionFor(contentDigest: string): TargetProjection {
 
 function registryState(
   targetRoot: string,
-  contentDigest: string
+  contentDigest: string,
+  materialization: "symlink" | "junction" | "copy" = "copy"
 ): RegistryTargetStateInput {
   return {
     targetId: "target-lifecycle-safety",
@@ -244,7 +414,7 @@ function registryState(
         packageCoordinate,
         activationName: "demo",
         ownership: "managed",
-        materialization: "copy",
+        materialization,
         transformJson: null
       }
     ],
