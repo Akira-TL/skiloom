@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  lstat,
   mkdir,
   mkdtemp,
   readFile,
@@ -34,6 +35,7 @@ import {
   type RegistryTargetStateInput
 } from "../../../../src/runtime/registry/index.js";
 import {
+  detachTargetProjection,
   repairAcceptedTargetState,
   syncAcceptedTargetState
 } from "../../../../src/runtime/orchestration/local-lifecycle.js";
@@ -41,6 +43,9 @@ import {
   publishPackageSnapshot,
   verifyPackageStoreEntry
 } from "../../../../src/runtime/store.js";
+import {
+  materializeManagedProjection
+} from "../../../../src/runtime/target-projection/index.js";
 
 const helperExecutable = requiredHelperExecutable();
 const packageCoordinate = "acme/demo/demo";
@@ -379,6 +384,149 @@ test("repair replaces a corrupt Store entry for the accepted digest before resto
   });
 });
 
+test("detach transfers a verified managed link into an in-place user-owned copy and later sync preserves user edits", async () => {
+  await withRuntime(async ({ paths, targetRoot }) => {
+    const snapshot = snapshotFor("detach baseline\n");
+    const published = await publishPackageSnapshot(paths, snapshot);
+    assert.equal(published.ok, true);
+    if (!published.ok) {
+      return;
+    }
+
+    const projection = projectionFor(snapshot.contentDigest);
+    const current: TargetOwnedProjection = {
+      projection,
+      ownership: "managed",
+      materialization: "symlink"
+    };
+    const live = await materializeManagedProjection({
+      home: paths,
+      targetRoot,
+      projection,
+      materialization: "symlink"
+    });
+    assert.equal(live.ok, true);
+
+    const acceptedState = registryState(
+      targetRoot,
+      snapshot.contentDigest,
+      0,
+      "symlink"
+    );
+    seedRawState(paths, acceptedState);
+
+    let detachedState;
+    await withRealLock(paths, async (lock) => {
+      const registry = await requireLockedRegistry(paths, lock);
+      try {
+        const detached = await detachTargetProjection({
+          home: paths,
+          targetRoot,
+          operationId: "detach-demo",
+          lock,
+          registry,
+          acceptedState,
+          packageCoordinate,
+          current
+        });
+        assert.equal(detached.ok, true);
+        if (!detached.ok) {
+          return;
+        }
+        detachedState = detached.value;
+
+        assert.equal(detached.value.generation, 2);
+        assert.deepEqual(detached.value.projections, [
+          {
+            packageCoordinate,
+            activationName: "demo",
+            ownership: "detached",
+            materialization: "copy",
+            transformJson: null
+          }
+        ]);
+        assert.deepEqual(detached.value.detachedBaselines, [
+          {
+            packageCoordinate,
+            repositoryCoordinate: "acme/demo",
+            sourceKind: "github-release",
+            version: "1.0.0",
+            actualTag: "v1.0.0",
+            exactCommit: "1111111111111111111111111111111111111111",
+            packageRoot: ".",
+            contentDigest: snapshot.contentDigest
+          }
+        ]);
+      } finally {
+        registry.close();
+      }
+    });
+
+    const detachedStat = await lstat(join(targetRoot, "demo"));
+    assert.equal(detachedStat.isDirectory(), true);
+    assert.equal(detachedStat.isSymbolicLink(), false);
+    assert.match(
+      await readFile(join(targetRoot, "demo", "SKILL.md"), "utf8"),
+      /detach baseline/u
+    );
+
+    await writeFile(
+      join(targetRoot, "demo", "SKILL.md"),
+      "---\nname: demo\ndescription: lifecycle fixture\n---\nuser-owned edit\n",
+      "utf8"
+    );
+
+    assert.notEqual(detachedState, undefined);
+    const acceptedDetached = withoutGeneration(detachedState!);
+    const desiredPlan = targetPlan(projection);
+    const detachedOwned: TargetOwnedProjection = {
+      projection,
+      ownership: "detached",
+      materialization: "copy"
+    };
+    const preflight = preflightTargetOwnership({
+      desiredPlan,
+      currentProjections: [detachedOwned],
+      observedPaths: [
+        {
+          activationName: "demo",
+          kind: "existing"
+        }
+      ]
+    });
+    assert.equal(preflight.ok, true);
+    if (!preflight.ok) {
+      return;
+    }
+    assert.equal(preflight.value.actions[0]?.action, "preserve-user");
+
+    await withRealLock(paths, async (lock) => {
+      const registry = await requireLockedRegistry(paths, lock);
+      try {
+        const synced = await syncAcceptedTargetState({
+          home: paths,
+          targetRoot,
+          operationId: "sync-detached-demo",
+          lock,
+          registry,
+          desiredPlan,
+          preflight: preflight.value,
+          currentProjections: [detachedOwned],
+          acceptedState: acceptedDetached
+        });
+        assert.equal(synced.ok, true);
+      } finally {
+        registry.close();
+      }
+    });
+
+    assert.match(
+      await readFile(join(targetRoot, "demo", "SKILL.md"), "utf8"),
+      /user-owned edit/u
+    );
+  });
+});
+
 function snapshotFor(body: string) {
   const snapshot = createPackageSnapshot([
     {
@@ -418,7 +566,8 @@ function targetPlan(projection: TargetProjection): TargetPlan {
 function registryState(
   targetRoot: string,
   contentDigest: string,
-  observedGeneration: number
+  observedGeneration: number,
+  materialization: "symlink" | "junction" | "copy" = "copy"
 ): RegistryTargetStateInput {
   return {
     targetId: "target-local-lifecycle",
@@ -455,13 +604,31 @@ function registryState(
         packageCoordinate,
         activationName: "demo",
         ownership: "managed",
-        materialization: "copy",
+        materialization,
         transformJson: null
       }
     ],
     detachedBaselines: [],
     dependencyObservations: []
   };
+}
+
+function withoutGeneration(
+  state: Readonly<{
+    targetId: string;
+    generation: number;
+    locations: RegistryTargetStateInput["locations"];
+    directRequirements: RegistryTargetStateInput["directRequirements"];
+    resolvedSources: RegistryTargetStateInput["resolvedSources"];
+    resolvedPackages: RegistryTargetStateInput["resolvedPackages"];
+    dependencyEdges: RegistryTargetStateInput["dependencyEdges"];
+    projections: RegistryTargetStateInput["projections"];
+    detachedBaselines: RegistryTargetStateInput["detachedBaselines"];
+    dependencyObservations: RegistryTargetStateInput["dependencyObservations"];
+  }>
+): RegistryTargetStateInput {
+  const { generation: _generation, ...input } = state;
+  return input;
 }
 
 function seedRawState(
