@@ -99,7 +99,7 @@ export type UpdateAcceptedTargetInput = Readonly<{
     | LifecycleCandidateAcceptanceResponse
     | Promise<LifecycleCandidateAcceptanceResponse>;
   acceptCandidate: LifecycleCandidateAcceptanceCallback;
-  syncMarker: (
+  syncMarker?: (
     marker: TargetRecoveryMarkerFacts
   ) => void | Promise<void>;
   createOperationId?: () => string;
@@ -172,7 +172,9 @@ export async function updateAcceptedTarget(
 
       return await input.acceptCandidate(plan);
     },
-    syncMarker: input.syncMarker,
+    ...(input.syncMarker === undefined
+      ? {}
+      : { syncMarker: input.syncMarker }),
     ...(input.createOperationId === undefined
       ? {}
       : { createOperationId: input.createOperationId })

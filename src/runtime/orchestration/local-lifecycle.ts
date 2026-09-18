@@ -23,6 +23,12 @@ import {
   type TargetReconciliationError
 } from "./target-reconcile.js";
 import { sameAcceptedState } from "./target-reconcile-state.js";
+import { buildMarkerFacts } from "./lifecycle/apply.js";
+import {
+  syncLifecycleMarker,
+  type LifecycleMarkerSyncCallback,
+  type LifecycleMarkerSyncFailed
+} from "./lifecycle/marker/index.js";
 
 export type InvalidExactRepairInputReason =
   | "accepted-state-mismatch"
@@ -43,10 +49,12 @@ export type LocalLifecycleError =
   | TargetReconciliationError
   | PackageStoreError
   | InvalidExactRepairInput
-  | DetachRecoveryError;
+  | DetachRecoveryError
+  | LifecycleMarkerSyncFailed;
 
 export type SyncAcceptedTargetStateInput =
-  ReconcileAcceptedTargetStateInput;
+  ReconcileAcceptedTargetStateInput &
+  Readonly<{ syncMarker?: LifecycleMarkerSyncCallback }>;
 
 export type ExactPackageRepairInput = Readonly<{
   package: RegistryResolvedPackage;
@@ -67,7 +75,25 @@ export async function syncAcceptedTargetState(
   if (!recovered.ok) {
     return recovered;
   }
-  return reconcileAcceptedTargetState(input);
+  const reconciled = await reconcileAcceptedTargetState(input);
+  if (!reconciled.ok) {
+    return reconciled;
+  }
+  const marker = buildMarkerFacts(
+    reconciled.value,
+    input.desiredPlan
+  );
+  const markerSynced = await syncLifecycleMarker({
+    targetRoot: input.targetRoot,
+    marker,
+    ...(input.syncMarker === undefined
+      ? {}
+      : { override: input.syncMarker })
+  });
+  if (!markerSynced.ok) {
+    return markerSynced;
+  }
+  return reconciled;
 }
 
 export async function repairAcceptedTargetState(

@@ -50,6 +50,9 @@ import {
 import {
   materializeManagedProjection
 } from "../../../../src/runtime/target-projection/index.js";
+import {
+  readTargetStateMarkerFile
+} from "../../../../src/runtime/target-state-marker.js";
 
 const helperExecutable = requiredHelperExecutable();
 const packageCoordinate = "acme/demo/demo";
@@ -125,6 +128,12 @@ test("sync restores a missing managed projection strictly from the current accep
       await readFile(join(targetRoot, "demo", "SKILL.md"), "utf8"),
       /sync exact state/u
     );
+    const marker = await readTargetStateMarkerFile(targetRoot);
+    assert.equal(marker.ok, true);
+    if (marker.ok) {
+      assert.equal(marker.value?.generation, 1);
+      assert.equal(marker.value?.targetId, acceptedState.targetId);
+    }
   });
 });
 
@@ -710,14 +719,14 @@ function registryState(
   materialization: "symlink" | "junction" | "copy" = "copy"
 ): RegistryTargetStateInput {
   return {
-    targetId: "target-local-lifecycle",
+    targetId: "77777777-7777-4777-8777-777777777777",
     locations: [{ path: targetRoot, observedGeneration }],
     directRequirements: [
       {
         kind: "package",
         coordinate: packageCoordinate,
         sourceKind: "github-release",
-        versionRequirement: "^1"
+        versionRequirement: "^1.0.0"
       }
     ],
     resolvedSources: [

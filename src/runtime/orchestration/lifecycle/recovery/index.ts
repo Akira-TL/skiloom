@@ -31,9 +31,11 @@ import {
   cleanupPendingTargetStaging,
   type TargetReconciliationError
 } from "../../target-reconcile.js";
-import type {
-  LifecycleMarkerSyncFailed
-} from "../first-install.js";
+import {
+  syncLifecycleMarker,
+  type LifecycleMarkerSyncCallback,
+  type LifecycleMarkerSyncFailed
+} from "../marker/index.js";
 import type {
   InvalidTargetReconciliationRecoveryManifest
 } from "../../target-reconcile/recovery.js";
@@ -106,9 +108,7 @@ export type RecoverInterruptedLifecycleInput = Readonly<{
   targetRoot: string;
   lock: OperationLockSession;
   registry: MachineRegistry;
-  syncMarker: (
-    marker: TargetRecoveryMarkerFacts
-  ) => void | Promise<void>;
+  syncMarker?: LifecycleMarkerSyncCallback;
 }>;
 
 
@@ -261,19 +261,15 @@ export async function recoverInterruptedLifecycle(
     state,
     desiredPlan.value
   );
-  try {
-    await input.syncMarker(marker);
-  } catch {
-    return {
-      ok: false,
-      error: productError(
-        "LifecycleMarkerSyncFailed",
-        {
-          targetId: state.targetId,
-          generation: state.generation
-        }
-      )
-    };
+  const markerSynced = await syncLifecycleMarker({
+    targetRoot,
+    marker,
+    ...(input.syncMarker === undefined
+      ? {}
+      : { override: input.syncMarker })
+  });
+  if (!markerSynced.ok) {
+    return markerSynced;
   }
 
   const heldBeforeCleanup = input.lock.checkHeld();

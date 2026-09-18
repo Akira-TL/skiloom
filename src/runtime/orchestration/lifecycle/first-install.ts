@@ -56,6 +56,11 @@ import {
   type LifecycleCandidateAcceptanceCallback
 } from "./acceptance.js";
 import {
+  syncLifecycleMarker,
+  type LifecycleMarkerSyncCallback,
+  type LifecycleMarkerSyncFailed
+} from "./marker/index.js";
+import {
   acquireLifecycleCandidatePackageSnapshots,
   buildMarkerFacts,
   planLifecycleTarget,
@@ -93,14 +98,7 @@ export type LifecycleTargetObservationFailed = ProductError<
   Readonly<{ activationName: string }>
 >;
 
-export type LifecycleMarkerSyncFailed = ProductError<
-  "LifecycleMarkerSyncFailed",
-  Readonly<{
-    targetId: string;
-    generation: number;
-  }>
->;
-
+export type { LifecycleMarkerSyncFailed } from "./marker/index.js";
 export type FirstAcceptedInstallError =
   | LifecycleCandidateError
   | OperationLockLost
@@ -143,9 +141,7 @@ export type FirstAcceptedInstallInput =
       lock: OperationLockSession;
       registry: MachineRegistry;
       acceptCandidate: LifecycleCandidateAcceptanceCallback;
-      syncMarker: (
-        marker: TargetRecoveryMarkerFacts
-      ) => void | Promise<void>;
+      syncMarker?: LifecycleMarkerSyncCallback;
       createTargetId?: () => string;
       createOperationId?: () => string;
     }>;
@@ -336,16 +332,15 @@ export async function executeFirstAcceptedInstall(
     reconciled.value,
     desiredPlan.value
   );
-  try {
-    await input.syncMarker(marker);
-  } catch {
-    return {
-      ok: false,
-      error: productError("LifecycleMarkerSyncFailed", {
-        targetId: reconciled.value.targetId,
-        generation: reconciled.value.generation
-      })
-    };
+  const markerSynced = await syncLifecycleMarker({
+    targetRoot: resolve(input.targetRoot),
+    marker,
+    ...(input.syncMarker === undefined
+      ? {}
+      : { override: input.syncMarker })
+  });
+  if (!markerSynced.ok) {
+    return markerSynced;
   }
 
   const completed = await cleanupPendingTargetStaging({

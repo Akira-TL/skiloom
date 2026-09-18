@@ -43,7 +43,9 @@ export async function addAcceptedTargetRoots(
       ...input.additions
     ],
     acceptCandidate: input.acceptCandidate,
-    syncMarker: input.syncMarker,
+    ...(input.syncMarker === undefined
+      ? {}
+      : { syncMarker: input.syncMarker }),
     ...(input.credential === undefined
       ? {}
       : { credential: input.credential }),

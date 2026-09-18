@@ -84,7 +84,7 @@ export type RemoveAcceptedTargetRequirementInput = Readonly<{
   repositoryTransport: GitHubRepositoryTransport;
   transport: GitHubJsonTransport;
   acceptCandidate: LifecycleCandidateAcceptanceCallback;
-  syncMarker: (
+  syncMarker?: (
     marker: TargetRecoveryMarkerFacts
   ) => void | Promise<void>;
   createOperationId?: () => string;
@@ -150,7 +150,9 @@ export async function removeAcceptedTargetRequirement(
           )
       ),
     acceptCandidate: input.acceptCandidate,
-    syncMarker: input.syncMarker,
+    ...(input.syncMarker === undefined
+      ? {}
+      : { syncMarker: input.syncMarker }),
     ...(input.credential === undefined
       ? {}
       : { credential: input.credential }),

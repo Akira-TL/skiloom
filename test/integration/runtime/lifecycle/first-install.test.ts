@@ -31,6 +31,9 @@ import {
   type MachineRegistry
 } from "../../../../src/runtime/registry/index.js";
 import {
+  readTargetStateMarkerFile
+} from "../../../../src/runtime/target-state-marker.js";
+import {
   release,
   releasePackageRequirement,
   releaseRepository,
@@ -156,6 +159,69 @@ test("accepted first install publishes Store before DB authority and materialize
             process.platform === "win32" ? "junction" : "symlink"
           );
         }
+      } finally {
+        opened.value.close();
+      }
+    });
+  });
+});
+
+test("first install persists the canonical public marker by default", async () => {
+  await withRuntime(async ({ paths, targetRoot }) => {
+    await withRealLock(paths, async (lock) => {
+      const opened = await openMachineRegistry(paths, lock);
+      assert.equal(opened.ok, true);
+      if (!opened.ok) {
+        return;
+      }
+      const fixture = sourceFixture([
+        releaseRepository("acme/app", [
+          release("v1.0.0", "9", [
+            skillPackage(".", "app", "Default marker application.")
+          ])
+        ])
+      ]);
+
+      try {
+        const result = await executeFirstAcceptedInstall({
+          home: paths,
+          targetRoot,
+          lock,
+          registry: opened.value,
+          directRequirements: [
+            releasePackageRequirement("acme/app/app", "^1.0.0")
+          ],
+          repositoryTransport: fixture.repositoryTransport,
+          transport: fixture.transport,
+          acceptCandidate: () => true,
+          createTargetId: () => targetId,
+          createOperationId: () => "install-default-marker"
+        });
+
+        assert.equal(result.ok, true);
+        if (!result.ok || result.value.status !== "installed") {
+          return;
+        }
+        assert.deepEqual(
+          await readTargetStateMarkerFile(targetRoot),
+          {
+            ok: true,
+            value: {
+              targetId,
+              generation: 1,
+              requirements: [
+                {
+                  kind: "package",
+                  coordinate: "acme/app/app",
+                  sourceKind: "github-release",
+                  versionRequirement: "^1.0.0"
+                }
+              ],
+              projectionOverrides: [],
+              detached: []
+            }
+          }
+        );
       } finally {
         opened.value.close();
       }

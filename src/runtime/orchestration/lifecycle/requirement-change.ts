@@ -79,9 +79,13 @@ import {
   registryRequirementsToDomain
 } from "./requirements.js";
 import type {
-  LifecycleInstallAcceptanceFailed,
-  LifecycleMarkerSyncFailed
+  LifecycleInstallAcceptanceFailed
 } from "./first-install.js";
+import {
+  syncLifecycleMarker,
+  type LifecycleMarkerSyncCallback,
+  type LifecycleMarkerSyncFailed
+} from "./marker/index.js";
 
 export type InvalidAcceptedRequirementChangeState = ProductError<
   "InvalidAcceptedRequirementChangeState",
@@ -149,9 +153,7 @@ export type AcceptedRequirementChangeInput = Readonly<{
   repositoryTransport: GitHubRepositoryTransport;
   transport: GitHubJsonTransport;
   acceptCandidate: LifecycleCandidateAcceptanceCallback;
-  syncMarker: (
-    marker: TargetRecoveryMarkerFacts
-  ) => void | Promise<void>;
+  syncMarker?: LifecycleMarkerSyncCallback;
   createOperationId?: () => string;
 }>;
 
@@ -379,16 +381,15 @@ export async function applyAcceptedRequirementChange(
     reconciled.value,
     desiredPlan.value
   );
-  try {
-    await input.syncMarker(marker);
-  } catch {
-    return {
-      ok: false,
-      error: productError("LifecycleMarkerSyncFailed", {
-        targetId: reconciled.value.targetId,
-        generation: reconciled.value.generation
-      })
-    };
+  const markerSynced = await syncLifecycleMarker({
+    targetRoot,
+    marker,
+    ...(input.syncMarker === undefined
+      ? {}
+      : { override: input.syncMarker })
+  });
+  if (!markerSynced.ok) {
+    return markerSynced;
   }
 
   const completed = await cleanupPendingTargetStaging({

@@ -40,6 +40,9 @@ import {
   materializeManagedProjection
 } from "../../../../src/runtime/target-projection/index.js";
 import {
+  readTargetStateMarkerFile
+} from "../../../../src/runtime/target-state-marker.js";
+import {
   release,
   releasePackageRequirement,
   releaseRepository,
@@ -83,8 +86,7 @@ test("adding a Package root recomputes the complete graph and keeps one shared d
           repositoryTransport: fixture.repositoryTransport,
           transport: fixture.transport,
           acceptCandidate: () => true,
-          createOperationId: () => "add-tool-root",
-          syncMarker: () => {}
+          createOperationId: () => "add-tool-root"
         });
 
         assert.equal(result.ok, true);
@@ -134,6 +136,21 @@ test("adding a Package root recomputes the complete graph and keeps one shared d
         assert.equal(existsSync(join(targetRoot, "app")), true);
         assert.equal(existsSync(join(targetRoot, "shared")), true);
         assert.equal(existsSync(join(targetRoot, "tool")), true);
+        const marker = await readTargetStateMarkerFile(targetRoot);
+        assert.equal(marker.ok, true);
+        if (marker.ok) {
+          assert.equal(marker.value?.generation, 2);
+          assert.deepEqual(
+            marker.value?.requirements.map((entry) => [
+              entry.kind,
+              entry.coordinate
+            ]),
+            [
+              ["package", "acme/app/app"],
+              ["package", "acme/tool/tool"]
+            ]
+          );
+        }
       } finally {
         registry.close();
       }

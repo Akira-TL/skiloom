@@ -13,6 +13,9 @@ import {
   updateAcceptedTarget
 } from "../../../../../src/runtime/orchestration/lifecycle/update.js";
 import {
+  readTargetStateMarkerFile
+} from "../../../../../src/runtime/target-state-marker.js";
+import {
   releasePackageRequirement
 } from "../github-source-fixture.js";
 import {
@@ -354,8 +357,7 @@ test("post-commit removal recovery uses pending proof to delete only the previou
           targetId,
           targetRoot,
           lock,
-          registry,
-          syncMarker: () => {}
+          registry
         });
         assert.equal(recovered.ok, true);
         assert.equal(
@@ -372,6 +374,12 @@ test("post-commit removal recovery uses pending proof to delete only the previou
           registry.readPendingOperations(),
           { ok: true, value: [] }
         );
+        const marker = await readTargetStateMarkerFile(targetRoot);
+        assert.equal(marker.ok, true);
+        if (marker.ok) {
+          assert.equal(marker.value?.generation, 2);
+          assert.deepEqual(marker.value?.requirements, []);
+        }
         const accepted = registry.readTargetState(targetId);
         assert.equal(accepted.ok, true);
         if (accepted.ok) {
