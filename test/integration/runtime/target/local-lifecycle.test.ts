@@ -4,6 +4,7 @@ import {
   mkdir,
   mkdtemp,
   readFile,
+  rename,
   rm,
   writeFile
 } from "node:fs/promises";
@@ -36,6 +37,7 @@ import {
 } from "../../../../src/runtime/registry/index.js";
 import {
   detachTargetProjection,
+  rebindDetachedProjection,
   repairAcceptedTargetState,
   syncAcceptedTargetState
 } from "../../../../src/runtime/orchestration/local-lifecycle.js";
@@ -523,6 +525,142 @@ test("detach transfers a verified managed link into an in-place user-owned copy 
     assert.match(
       await readFile(join(targetRoot, "demo", "SKILL.md"), "utf8"),
       /user-owned edit/u
+    );
+  });
+});
+
+test("moved detached content stays broken until explicit rebind to the caller-selected activation", async () => {
+  await withRuntime(async ({ paths, targetRoot }) => {
+    const snapshot = snapshotFor("detached before move\n");
+    const published = await publishPackageSnapshot(paths, snapshot);
+    assert.equal(published.ok, true);
+    if (!published.ok) {
+      return;
+    }
+
+    const projection = projectionFor(snapshot.contentDigest);
+    const current: TargetOwnedProjection = {
+      projection,
+      ownership: "managed",
+      materialization: "copy"
+    };
+    const materialized = await materializeManagedProjection({
+      home: paths,
+      targetRoot,
+      projection,
+      materialization: "copy"
+    });
+    assert.equal(materialized.ok, true);
+
+    const acceptedState = registryState(
+      targetRoot,
+      snapshot.contentDigest,
+      0,
+      "copy"
+    );
+    seedRawState(paths, acceptedState);
+
+    let detached;
+    await withRealLock(paths, async (lock) => {
+      const registry = await requireLockedRegistry(paths, lock);
+      try {
+        const result = await detachTargetProjection({
+          home: paths,
+          targetRoot,
+          operationId: "detach-before-rebind",
+          lock,
+          registry,
+          acceptedState,
+          packageCoordinate,
+          current
+        });
+        assert.equal(result.ok, true);
+        if (result.ok) {
+          detached = result.value;
+        }
+      } finally {
+        registry.close();
+      }
+    });
+    assert.notEqual(detached, undefined);
+
+    await rename(
+      join(targetRoot, "demo"),
+      join(targetRoot, "demo-moved")
+    );
+    await mkdir(join(targetRoot, "unrelated-user-skill"));
+    await writeFile(
+      join(targetRoot, "demo-moved", "SKILL.md"),
+      "---\nname: demo\ndescription: lifecycle fixture\n---\nmoved user bytes\n",
+      "utf8"
+    );
+
+    const acceptedDetached = withoutGeneration(detached!);
+    const detachedOwned: TargetOwnedProjection = {
+      projection,
+      ownership: "detached",
+      materialization: "copy"
+    };
+    const broken = preflightTargetOwnership({
+      desiredPlan: targetPlan(projection),
+      currentProjections: [detachedOwned],
+      observedPaths: [
+        {
+          activationName: "demo-moved",
+          kind: "existing"
+        },
+        {
+          activationName: "unrelated-user-skill",
+          kind: "existing"
+        }
+      ]
+    });
+    assert.equal(broken.ok, true);
+    if (broken.ok) {
+      assert.equal(
+        broken.value.actions[0]?.action,
+        "preserve-broken-binding"
+      );
+    }
+
+    await withRealLock(paths, async (lock) => {
+      const registry = await requireLockedRegistry(paths, lock);
+      try {
+        const rebound = await rebindDetachedProjection({
+          targetRoot,
+          lock,
+          registry,
+          acceptedState: acceptedDetached,
+          packageCoordinate,
+          activationName: "demo-moved"
+        });
+        assert.equal(rebound.ok, true);
+        if (rebound.ok) {
+          assert.equal(rebound.value.generation, 3);
+          assert.deepEqual(rebound.value.projections, [
+            {
+              packageCoordinate,
+              activationName: "demo-moved",
+              ownership: "detached",
+              materialization: "copy",
+              transformJson: null
+            }
+          ]);
+        }
+      } finally {
+        registry.close();
+      }
+    });
+
+    assert.match(
+      await readFile(
+        join(targetRoot, "demo-moved", "SKILL.md"),
+        "utf8"
+      ),
+      /moved user bytes/u
+    );
+    await assert.rejects(
+      readFile(join(targetRoot, "demo", "SKILL.md"))
     );
   });
 });

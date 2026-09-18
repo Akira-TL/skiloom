@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { lstat } from "node:fs/promises";
 import {
   join,
   resolve
 } from "node:path";
 
+import { isValidSkillName } from "../../domain/coordinate/index.js";
 import {
   productError,
   type ProductError,
@@ -61,8 +63,15 @@ export type InvalidLocalLifecycleInputReason =
   | "package-not-found"
   | "projection-not-found"
   | "projection-not-managed"
+  | "projection-not-detached"
   | "projection-mismatch"
-  | "detached-baseline-exists";
+  | "detached-baseline-exists"
+  | "detached-baseline-missing"
+  | "invalid-activation-name"
+  | "activation-name-conflict"
+  | "binding-not-broken"
+  | "selected-path-missing"
+  | "selected-path-not-directory";
 
 export type InvalidLocalLifecycleInput = ProductError<
   "InvalidLocalLifecycleInput",
@@ -102,6 +111,15 @@ export type DetachTargetProjectionInput = Readonly<{
   acceptedState: RegistryTargetStateInput;
   packageCoordinate: string;
   current: TargetOwnedProjection;
+}>;
+
+export type RebindDetachedProjectionInput = Readonly<{
+  targetRoot: string;
+  lock: OperationLockSession;
+  registry: MachineRegistry;
+  acceptedState: RegistryTargetStateInput;
+  packageCoordinate: string;
+  activationName: string;
 }>;
 
 export async function syncAcceptedTargetState(
@@ -303,6 +321,128 @@ export async function detachTargetProjection(
   return committed;
 }
 
+export async function rebindDetachedProjection(
+  input: RebindDetachedProjectionInput
+): Promise<Result<RegistryTargetState, LocalLifecycleError>> {
+  const held = input.lock.checkHeld();
+  if (!held.ok) {
+    return held;
+  }
+
+  const accepted = input.registry.readTargetState(
+    input.acceptedState.targetId
+  );
+  if (!accepted.ok) {
+    return accepted;
+  }
+  if (
+    accepted.value === undefined ||
+    !sameAcceptedState(accepted.value, input.acceptedState)
+  ) {
+    return invalidLocal(
+      input.packageCoordinate,
+      "accepted-state-mismatch"
+    );
+  }
+  if (
+    !input.acceptedState.locations.some(
+      (location) => resolve(location.path) === resolve(input.targetRoot)
+    )
+  ) {
+    return invalidLocal(
+      input.packageCoordinate,
+      "target-location-mismatch"
+    );
+  }
+  if (!isValidSkillName(input.activationName)) {
+    return invalidLocal(
+      input.packageCoordinate,
+      "invalid-activation-name"
+    );
+  }
+
+  const projection = input.acceptedState.projections.find(
+    (candidate) =>
+      candidate.packageCoordinate === input.packageCoordinate
+  );
+  if (projection === undefined) {
+    return invalidLocal(input.packageCoordinate, "projection-not-found");
+  }
+  if (projection.ownership !== "detached") {
+    return invalidLocal(
+      input.packageCoordinate,
+      "projection-not-detached"
+    );
+  }
+  if (
+    !input.acceptedState.detachedBaselines.some(
+      (baseline) =>
+        baseline.packageCoordinate === input.packageCoordinate
+    )
+  ) {
+    return invalidLocal(
+      input.packageCoordinate,
+      "detached-baseline-missing"
+    );
+  }
+  if (
+    input.acceptedState.projections.some(
+      (candidate) =>
+        candidate.packageCoordinate !== input.packageCoordinate &&
+        candidate.activationName === input.activationName
+    )
+  ) {
+    return invalidLocal(
+      input.packageCoordinate,
+      "activation-name-conflict"
+    );
+  }
+
+  const oldPath = join(input.targetRoot, projection.activationName);
+  if (await pathExists(oldPath)) {
+    return invalidLocal(
+      input.packageCoordinate,
+      "binding-not-broken"
+    );
+  }
+
+  const selectedPath = join(input.targetRoot, input.activationName);
+  let selectedStat;
+  try {
+    selectedStat = await lstat(selectedPath);
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ENOENT") {
+      return invalidLocal(
+        input.packageCoordinate,
+        "selected-path-missing"
+      );
+    }
+    throw error;
+  }
+  if (
+    !selectedStat.isDirectory() ||
+    selectedStat.isSymbolicLink()
+  ) {
+    return invalidLocal(
+      input.packageCoordinate,
+      "selected-path-not-directory"
+    );
+  }
+
+  const nextState: RegistryTargetStateInput = {
+    ...input.acceptedState,
+    projections: input.acceptedState.projections.map((candidate) =>
+      candidate.packageCoordinate === input.packageCoordinate
+        ? {
+            ...candidate,
+            activationName: input.activationName
+          }
+        : candidate
+    )
+  };
+  return input.registry.replaceTargetState(nextState);
+}
+
 export async function repairAcceptedTargetState(
   input: RepairAcceptedTargetStateInput
 ): Promise<Result<RegistryTargetState, LocalLifecycleError>> {
@@ -421,6 +561,22 @@ function transformJson(
     rename: transform.rename,
     dependencyRoutes: transform.dependencyRoutes
   });
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await lstat(path);
+    return true;
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ENOENT") {
+      return false;
+    }
+    throw error;
+  }
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error;
 }
 
 function invalidLocal(
