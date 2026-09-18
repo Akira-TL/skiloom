@@ -3,29 +3,19 @@ import { lstat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import {
-  parsePackageCoordinate,
-  parseRepositoryCoordinate
-} from "../../../domain/coordinate/index.js";
-import {
   productError,
   type ProductError,
   type Result
 } from "../../../domain/errors/index.js";
 import type {
-  DirectInstallRequirement,
-  ResolverCandidateGraph,
-  ResolverSourceBindingSummary
+  DirectInstallRequirement
 } from "../../../domain/resolver/index.js";
-import {
-  buildPackageSnapshot,
-  type PackageSnapshot,
-  type PackageSnapshotError
+import type {
+  PackageSnapshotError
 } from "../../../domain/snapshot/index.js";
-import {
-  planTargetProjections,
-  type TargetPlan,
-  type TargetPlanError,
-  type TargetProjection
+import type {
+  TargetPlan,
+  TargetPlanError
 } from "../../../domain/target/index.js";
 import {
   preflightTargetOwnership,
@@ -42,21 +32,13 @@ import type {
 import type { SkiloomHomePaths } from "../../home.js";
 import type {
   MachineRegistry,
-  RegistryDirectRequirement,
-  RegistryResolvedSource,
   RegistryTargetState,
   RegistryTargetStateInput
 } from "../../registry/index.js";
-import {
-  publishPackageSnapshot,
-  type PackageStoreError
-} from "../../store.js";
-import {
-  acquireCachedExactGitHubRepositorySnapshot,
-  acquireExactGitHubRepositorySnapshot,
-  buildGitHubResolverRepositorySnapshot,
-  type AcquireExactGitHubRepositorySnapshotError,
-  type BuildGitHubResolverRepositorySnapshotError
+import type { PackageStoreError } from "../../store.js";
+import type {
+  AcquireExactGitHubRepositorySnapshotError,
+  BuildGitHubResolverRepositorySnapshotError
 } from "../../source/github/index.js";
 import {
   computeLifecycleCandidate,
@@ -68,6 +50,18 @@ import {
   prepareTargetReconciliation,
   type TargetReconciliationError
 } from "../target-reconcile.js";
+import {
+  acquireLifecycleCandidatePackageSnapshots,
+  buildMarkerFacts,
+  planLifecycleTarget,
+  projectionMaterialization,
+  projectionTransformJson,
+  publishLifecycleCandidateSnapshots,
+  registryDirectRequirement,
+  registryResolvedSource,
+  repositoryFromPackageCoordinate,
+  type LifecycleCandidateSnapshotMismatch
+} from "./apply.js";
 
 const TARGET_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -87,17 +81,7 @@ export type InvalidLifecycleTargetIdentity = ProductError<
   Readonly<{ targetId: string }>
 >;
 
-export type LifecycleCandidateSnapshotMismatch = ProductError<
-  "LifecycleCandidateSnapshotMismatch",
-  Readonly<{
-    packageCoordinate: string;
-    reason:
-      | "invalid-repository-coordinate"
-      | "missing-source-package"
-      | "package-root-mismatch"
-      | "content-digest-mismatch";
-  }>
->;
+export type { LifecycleCandidateSnapshotMismatch } from "./apply.js";
 
 export type LifecycleTargetObservationFailed = ProductError<
   "LifecycleTargetObservationFailed",
@@ -157,11 +141,6 @@ export type FirstAcceptedInstallInput =
       createTargetId?: () => string;
       createOperationId?: () => string;
     }>;
-
-type CandidatePackageSnapshot = Readonly<{
-  packageCoordinate: string;
-  snapshot: PackageSnapshot;
-}>;
 
 export async function executeFirstAcceptedInstall(
   input: FirstAcceptedInstallInput
@@ -241,7 +220,7 @@ export async function executeFirstAcceptedInstall(
     };
   }
 
-  const desiredPlan = planFreshTarget(
+  const desiredPlan = planLifecycleTarget(
     planned.value.directRequirements,
     planned.value.candidate
   );
@@ -266,26 +245,22 @@ export async function executeFirstAcceptedInstall(
     return preflight;
   }
 
-  const packageSnapshots = await acquireCandidatePackageSnapshots(
-    input,
-    planned.value.candidate
-  );
+  const packageSnapshots =
+    await acquireLifecycleCandidatePackageSnapshots(
+      input,
+      planned.value.candidate
+    );
   if (!packageSnapshots.ok) {
     return packageSnapshots;
   }
 
-  for (const packageSnapshot of packageSnapshots.value) {
-    const held = input.lock.checkHeld();
-    if (!held.ok) {
-      return held;
-    }
-    const published = await publishPackageSnapshot(
-      input.home,
-      packageSnapshot.snapshot
-    );
-    if (!published.ok) {
-      return published;
-    }
+  const published = await publishLifecycleCandidateSnapshots(
+    input.home,
+    input.lock,
+    packageSnapshots.value
+  );
+  if (!published.ok) {
+    return published;
   }
 
   const stillHeld = input.lock.checkHeld();
@@ -358,37 +333,6 @@ export async function executeFirstAcceptedInstall(
   };
 }
 
-function planFreshTarget(
-  directRequirements: ReadonlyArray<DirectInstallRequirement>,
-  candidate: ResolverCandidateGraph
-): Result<TargetPlan, TargetPlanError> {
-  const directRoots = new Set<string>();
-
-  for (const requirement of directRequirements) {
-    if (requirement.kind === "package") {
-      directRoots.add(requirement.coordinate.canonical);
-      continue;
-    }
-
-    for (const packageFact of candidate.packages) {
-      if (
-        repositoryFromPackageCoordinate(
-          packageFact.packageCoordinate
-        ) === requirement.coordinate.canonical
-      ) {
-        directRoots.add(packageFact.packageCoordinate);
-      }
-    }
-  }
-
-  return planTargetProjections({
-    packages: candidate.packages,
-    dependencyEdges: candidate.dependencyEdges,
-    directRoots: [...directRoots].sort(compareUtf8),
-    renames: []
-  });
-}
-
 async function observeFreshTarget(
   targetRoot: string,
   plan: TargetPlan
@@ -425,158 +369,6 @@ async function observeFreshTarget(
   }
 
   return { ok: true, value: observations };
-}
-
-async function acquireCandidatePackageSnapshots(
-  input: FirstAcceptedInstallInput,
-  candidate: ResolverCandidateGraph
-): Promise<
-  Result<
-    ReadonlyArray<CandidatePackageSnapshot>,
-    | OperationLockLost
-    | LifecycleCandidateSnapshotMismatch
-    | AcquireExactGitHubRepositorySnapshotError
-    | BuildGitHubResolverRepositorySnapshotError
-    | PackageSnapshotError
-  >
-> {
-  const snapshots = new Map<string, PackageSnapshot>();
-
-  for (const source of candidate.sourceBindings) {
-    const held = input.lock.checkHeld();
-    if (!held.ok) {
-      return held;
-    }
-
-    const repository = parseRepositoryCoordinate(
-      source.repositoryCoordinate
-    );
-    if (!repository.ok) {
-      return snapshotMismatch(
-        source.repositoryCoordinate,
-        "invalid-repository-coordinate"
-      );
-    }
-
-    const acquired =
-      input.sourceCachePath === undefined
-        ? await acquireExactGitHubRepositorySnapshot({
-            repository: repository.value,
-            exactCommit: source.exactCommit,
-            transport: input.transport,
-            ...(input.credential === undefined
-              ? {}
-              : { credential: input.credential }),
-            ...(input.signal === undefined
-              ? {}
-              : { signal: input.signal })
-          })
-        : await acquireCachedExactGitHubRepositorySnapshot({
-            repository: repository.value,
-            exactCommit: source.exactCommit,
-            cacheRoot: input.sourceCachePath,
-            transport: input.transport,
-            ...(input.credential === undefined
-              ? {}
-              : { credential: input.credential }),
-            ...(input.signal === undefined
-              ? {}
-              : { signal: input.signal })
-          });
-    if (!acquired.ok) {
-      return acquired;
-    }
-
-    const fullRepository =
-      buildGitHubResolverRepositorySnapshot(acquired.value);
-    if (!fullRepository.ok) {
-      return fullRepository;
-    }
-
-    const discoveredByCoordinate = new Map(
-      fullRepository.value.packages.map((packageFact) => [
-        packageFact.coordinate.canonical,
-        packageFact
-      ])
-    );
-    const discoveredRoots =
-      fullRepository.value.packages.map(
-        (packageFact) => packageFact.packageRoot
-      );
-    const candidatePackages = candidate.packages.filter(
-      (packageFact) =>
-        repositoryFromPackageCoordinate(
-          packageFact.packageCoordinate
-        ) === source.repositoryCoordinate
-    );
-
-    for (const packageFact of candidatePackages) {
-      const discovered = discoveredByCoordinate.get(
-        packageFact.packageCoordinate
-      );
-      if (discovered === undefined) {
-        return snapshotMismatch(
-          packageFact.packageCoordinate,
-          "missing-source-package"
-        );
-      }
-      if (discovered.packageRoot !== packageFact.packageRoot) {
-        return snapshotMismatch(
-          packageFact.packageCoordinate,
-          "package-root-mismatch"
-        );
-      }
-
-      const snapshot = buildPackageSnapshot({
-        packageRoot: packageFact.packageRoot,
-        discoveredPackageRoots: discoveredRoots,
-        entries: acquired.value.entries
-      });
-      if (!snapshot.ok) {
-        return snapshot;
-      }
-      if (
-        snapshot.value.contentDigest !==
-          packageFact.contentDigest ||
-        discovered.contentDigest !== packageFact.contentDigest
-      ) {
-        return snapshotMismatch(
-          packageFact.packageCoordinate,
-          "content-digest-mismatch"
-        );
-      }
-      snapshots.set(
-        packageFact.packageCoordinate,
-        snapshot.value
-      );
-    }
-  }
-
-  if (snapshots.size !== candidate.packages.length) {
-    const missing = candidate.packages.find(
-      (packageFact) =>
-        !snapshots.has(packageFact.packageCoordinate)
-    );
-    return snapshotMismatch(
-      missing?.packageCoordinate ?? "",
-      "missing-source-package"
-    );
-  }
-
-  return {
-    ok: true,
-    value: [...snapshots.entries()]
-      .map(([packageCoordinate, snapshot]) => ({
-        packageCoordinate,
-        snapshot
-      }))
-      .sort((left, right) =>
-        compareUtf8(
-          left.packageCoordinate,
-          right.packageCoordinate
-        )
-      )
-  };
 }
 
 function buildFreshRegistryState(
@@ -624,127 +416,6 @@ function buildFreshRegistryState(
     })),
     detachedBaselines: [],
     dependencyObservations: []
-  };
-}
-
-function registryDirectRequirement(
-  requirement: DirectInstallRequirement
-): RegistryDirectRequirement {
-  return requirement.sourceKind === "git"
-    ? {
-        kind: requirement.kind,
-        coordinate: requirement.coordinate.canonical,
-        sourceKind: "git",
-        requestedRef: requirement.requestedRef
-      }
-    : {
-        kind: requirement.kind,
-        coordinate: requirement.coordinate.canonical,
-        sourceKind: "github-release",
-        versionRequirement:
-          requirement.versionRequirement ?? null
-      };
-}
-
-function registryResolvedSource(
-  source: ResolverSourceBindingSummary
-): RegistryResolvedSource {
-  return source.sourceKind === "git"
-    ? {
-        repositoryCoordinate: source.repositoryCoordinate,
-        sourceKind: "git",
-        requestedRef: source.requestedRef,
-        exactCommit: source.exactCommit
-      }
-    : {
-        repositoryCoordinate: source.repositoryCoordinate,
-        sourceKind: "github-release",
-        version: source.version,
-        actualTag: source.actualTag,
-        exactCommit: source.exactCommit,
-        immutable: source.immutable
-      };
-}
-
-function projectionMaterialization(
-  projection: TargetProjection
-): "symlink" | "junction" | "copy" {
-  if (projection.transform !== null) {
-    return "copy";
-  }
-  return process.platform === "win32"
-    ? "junction"
-    : "symlink";
-}
-
-function projectionTransformJson(
-  projection: TargetProjection
-): string | null {
-  return projection.transform === null
-    ? null
-    : JSON.stringify({
-        rename: projection.transform.rename,
-        dependencyRoutes:
-          projection.transform.dependencyRoutes
-      });
-}
-
-function buildMarkerFacts(
-  state: RegistryTargetState,
-  plan: TargetPlan
-): TargetRecoveryMarkerFacts {
-  const projectionOverrides =
-    plan.projections.flatMap((projection) => {
-      const coordinate = parsePackageCoordinate(
-        projection.packageCoordinate
-      );
-      if (
-        !coordinate.ok ||
-        coordinate.value.packageName ===
-          projection.activationName
-      ) {
-        return [];
-      }
-      return [
-        {
-          packageCoordinate: projection.packageCoordinate,
-          activationName: projection.activationName
-        }
-      ];
-    });
-
-  return {
-    targetId: state.targetId,
-    generation: state.generation,
-    requirements: state.directRequirements,
-    projectionOverrides,
-    detached: []
-  };
-}
-
-function repositoryFromPackageCoordinate(
-  packageCoordinate: string
-): string {
-  return packageCoordinate
-    .split("/")
-    .slice(0, 2)
-    .join("/");
-}
-
-function snapshotMismatch(
-  packageCoordinate: string,
-  reason:
-    LifecycleCandidateSnapshotMismatch["facts"]["reason"]
-): Result<never, LifecycleCandidateSnapshotMismatch> {
-  return {
-    ok: false,
-    error: productError(
-      "LifecycleCandidateSnapshotMismatch",
-      {
-        packageCoordinate,
-        reason
-      }
-    )
   };
 }
 
