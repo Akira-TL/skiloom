@@ -23,43 +23,7 @@ export function beginPendingOperationRows(
   targetId: string,
   pending: RegistryPendingOperationInput
 ): RegistryPendingOperation {
-  database.exec("BEGIN IMMEDIATE");
-  try {
-    database
-      .prepare("INSERT INTO targets(target_id, generation) VALUES (?, 0) ON CONFLICT(target_id) DO NOTHING")
-      .run(targetId);
-
-    const generation = readGeneration(database, targetId);
-    const existingPending = database
-      .prepare("SELECT COUNT(*) AS pending_count FROM pending_operations WHERE target_id = ?")
-      .get(targetId);
-    const count = existingPending?.pending_count;
-    if (typeof count !== "number" || !Number.isSafeInteger(count)) {
-      throw new Error("invalid pending operation count");
-    }
-    if (count !== 0) {
-      throw new RegistryPendingOperationConflictError(
-        "registry target already has a pending operation"
-      );
-    }
-
-    const operation = insertPendingOperation(
-      database,
-      targetId,
-      generation,
-      generation + 1,
-      pending
-    );
-    database.exec("COMMIT");
-    return operation;
-  } catch (error) {
-    try {
-      database.exec("ROLLBACK");
-    } catch {
-      // Preserve the original transaction failure.
-    }
-    throw error;
-  }
+  return beginPendingRows(database, targetId, pending, "next-generation");
 }
 
 export function beginPendingReconciliationRows(
@@ -67,10 +31,25 @@ export function beginPendingReconciliationRows(
   targetId: string,
   pending: RegistryPendingOperationInput
 ): RegistryPendingOperation {
+  return beginPendingRows(database, targetId, pending, "accepted-generation");
+}
+
+function beginPendingRows(
+  database: DatabaseSync,
+  targetId: string,
+  pending: RegistryPendingOperationInput,
+  mode: "next-generation" | "accepted-generation"
+): RegistryPendingOperation {
   database.exec("BEGIN IMMEDIATE");
   try {
+    if (mode === "next-generation") {
+      database
+        .prepare("INSERT INTO targets(target_id, generation) VALUES (?, 0) ON CONFLICT(target_id) DO NOTHING")
+        .run(targetId);
+    }
+
     const generation = readGeneration(database, targetId);
-    if (generation < 1) {
+    if (mode === "accepted-generation" && generation < 1) {
       throw new RegistryPendingOperationConflictError(
         "registry target has no accepted generation to reconcile"
       );
@@ -89,11 +68,15 @@ export function beginPendingReconciliationRows(
       );
     }
 
+    const baseGeneration =
+      mode === "next-generation" ? generation : generation - 1;
+    const nextGeneration =
+      mode === "next-generation" ? generation + 1 : generation;
     const operation = insertPendingOperation(
       database,
       targetId,
-      generation - 1,
-      generation,
+      baseGeneration,
+      nextGeneration,
       pending
     );
     database.exec("COMMIT");

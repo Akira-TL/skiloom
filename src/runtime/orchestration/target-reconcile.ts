@@ -25,6 +25,7 @@ import type { SkiloomHomePaths } from "../home.js";
 import type {
   MachineRegistry,
   RegistryPendingLockedError,
+  RegistryPendingOperationInput,
   RegistryReplaceLockedError,
   RegistryTargetState,
   RegistryTargetStateInput
@@ -136,6 +137,16 @@ type ReconciliationRequests = Readonly<{
   removals: ReadonlyArray<RemovalRequest>;
 }>;
 
+type PendingStarter = (
+  targetId: string,
+  pending: RegistryPendingOperationInput
+) => ReturnType<MachineRegistry["beginPendingOperation"]>;
+
+type PreparedReconciliationStaging = Readonly<{
+  staged: ReadonlyArray<StagedProjection>;
+  hasPending: boolean;
+}>;
+
 export async function cleanupPendingTargetStaging(
   input: CleanupPendingTargetStagingInput
 ): Promise<Result<void, TargetReconciliationError>> {
@@ -232,82 +243,22 @@ export async function reconcileAcceptedTargetState(
     return requests;
   }
 
-  for (const packageFact of [...input.acceptedState.resolvedPackages].sort(
-    (left, right) =>
-      compareStrings(left.packageCoordinate, right.packageCoordinate)
-  )) {
-    const stillHeld = input.lock.checkHeld();
-    if (!stillHeld.ok) {
-      return stillHeld;
-    }
-    const verified = await verifyPackageStoreEntry(
-      input.home,
-      packageFact.contentDigest
-    );
-    if (!verified.ok) {
-      return verified;
-    }
-  }
-
-  const pending =
-    requests.value.stages.length === 0
-      ? null
-      : input.registry.beginPendingReconciliation(
-          input.acceptedState.targetId,
-          {
-            operationId: input.operationId,
-            actions: requests.value.stages.map((request) => ({
-              stagingPath: request.cleanupPath,
-              activationName: request.activationName
-            }))
-          }
-        );
-  if (pending !== null && !pending.ok) {
-    return pending;
-  }
-
-  const staged: StagedProjection[] = [];
-  for (const request of requests.value.stages) {
-    const stillHeld = input.lock.checkHeld();
-    if (!stillHeld.ok) {
-      return stillHeld;
-    }
-    const prepared = await prepareManagedProjection({
-      home: input.home,
-      targetRoot: input.targetRoot,
-      projection: request.projection,
-      materialization: request.materialization,
-      cleanupPath: request.cleanupPath,
-      ...(request.current === undefined
-        ? {}
-        : {
-            current: {
-              projection: request.current.projection,
-              materialization: request.current.materialization
-            }
-          })
-    });
-    if (!prepared.ok) {
-      await cleanupBeforeCommit(
-        orchestrationInput,
-        staged,
-        pending?.ok === true
-      );
-      return prepared;
-    }
-    staged.push({
-      activationName: request.activationName,
-      cleanupPath: request.cleanupPath,
-      prepared: prepared.value
-    });
+  const staging = await prepareReconciliationStaging(
+    orchestrationInput,
+    requests.value,
+    (targetId, pending) =>
+      input.registry.beginPendingReconciliation(targetId, pending)
+  );
+  if (!staging.ok) {
+    return staging;
   }
 
   return committedHandle(
     orchestrationInput,
     accepted.value,
-    staged,
+    staging.value.staged,
     requests.value.removals,
-    pending?.ok === true
+    staging.value.hasPending
   ).reconcileLiveTarget();
 }
 
@@ -324,67 +275,14 @@ export async function prepareTargetReconciliation(
     return requests;
   }
 
-  for (const packageFact of [...input.nextState.resolvedPackages].sort((left, right) =>
-    compareStrings(left.packageCoordinate, right.packageCoordinate)
-  )) {
-    const stillHeld = input.lock.checkHeld();
-    if (!stillHeld.ok) {
-      return stillHeld;
-    }
-    const verified = await verifyPackageStoreEntry(
-      input.home,
-      packageFact.contentDigest
-    );
-    if (!verified.ok) {
-      return verified;
-    }
-  }
-
-  const pending =
-    requests.value.stages.length === 0
-      ? null
-      : input.registry.beginPendingOperation(input.nextState.targetId, {
-          operationId: input.operationId,
-          actions: requests.value.stages.map((request) => ({
-            stagingPath: request.cleanupPath,
-            activationName: request.activationName
-          }))
-        });
-  if (pending !== null && !pending.ok) {
-    return pending;
-  }
-
-  const staged: StagedProjection[] = [];
-  for (const request of requests.value.stages) {
-    const stillHeld = input.lock.checkHeld();
-    if (!stillHeld.ok) {
-      return stillHeld;
-    }
-
-    const prepared = await prepareManagedProjection({
-      home: input.home,
-      targetRoot: input.targetRoot,
-      projection: request.projection,
-      materialization: request.materialization,
-      cleanupPath: request.cleanupPath,
-      ...(request.current === undefined
-        ? {}
-        : {
-            current: {
-              projection: request.current.projection,
-              materialization: request.current.materialization
-            }
-          })
-    });
-    if (!prepared.ok) {
-      await cleanupBeforeCommit(input, staged, pending?.ok === true);
-      return prepared;
-    }
-    staged.push({
-      activationName: request.activationName,
-      cleanupPath: request.cleanupPath,
-      prepared: prepared.value
-    });
+  const staging = await prepareReconciliationStaging(
+    input,
+    requests.value,
+    (targetId, pending) =>
+      input.registry.beginPendingOperation(targetId, pending)
+  );
+  if (!staging.ok) {
+    return staging;
   }
 
   let committed = false;
@@ -404,11 +302,15 @@ export async function prepareTargetReconciliation(
 
         const replaced = input.registry.replaceTargetState(
           input.nextState,
-          pending?.ok === true ? input.operationId : undefined
+          staging.value.hasPending ? input.operationId : undefined
         );
         if (!replaced.ok) {
           if (replaced.error.code !== "OperationLockLost") {
-            await cleanupBeforeCommit(input, staged, pending?.ok === true);
+            await cleanupBeforeCommit(
+              input,
+              staging.value.staged,
+              staging.value.hasPending
+            );
           }
           return replaced;
         }
@@ -419,12 +321,96 @@ export async function prepareTargetReconciliation(
           value: committedHandle(
             input,
             replaced.value,
-            staged,
+            staging.value.staged,
             requests.value.removals,
-            pending?.ok === true
+            staging.value.hasPending
           )
         };
       }
+    }
+  };
+}
+
+async function prepareReconciliationStaging(
+  input: PrepareTargetReconciliationInput,
+  requests: ReconciliationRequests,
+  beginPending: PendingStarter
+): Promise<
+  Result<PreparedReconciliationStaging, TargetReconciliationError>
+> {
+  for (const packageFact of [...input.nextState.resolvedPackages].sort(
+    (left, right) =>
+      compareStrings(left.packageCoordinate, right.packageCoordinate)
+  )) {
+    const stillHeld = input.lock.checkHeld();
+    if (!stillHeld.ok) {
+      return stillHeld;
+    }
+    const verified = await verifyPackageStoreEntry(
+      input.home,
+      packageFact.contentDigest
+    );
+    if (!verified.ok) {
+      return verified;
+    }
+  }
+
+  const pending =
+    requests.stages.length === 0
+      ? null
+      : beginPending(input.nextState.targetId, {
+          operationId: input.operationId,
+          actions: requests.stages.map((request) => ({
+            stagingPath: request.cleanupPath,
+            activationName: request.activationName
+          }))
+        });
+  if (pending !== null && !pending.ok) {
+    return pending;
+  }
+
+  const staged: StagedProjection[] = [];
+  for (const request of requests.stages) {
+    const stillHeld = input.lock.checkHeld();
+    if (!stillHeld.ok) {
+      return stillHeld;
+    }
+
+    const prepared = await prepareManagedProjection({
+      home: input.home,
+      targetRoot: input.targetRoot,
+      projection: request.projection,
+      materialization: request.materialization,
+      cleanupPath: request.cleanupPath,
+      ...(request.current === undefined
+        ? {}
+        : {
+            current: {
+              projection: request.current.projection,
+              materialization: request.current.materialization
+            }
+          })
+    });
+    if (!prepared.ok) {
+      await cleanupBeforeCommit(
+        input,
+        staged,
+        pending?.ok === true
+      );
+      return prepared;
+    }
+    staged.push({
+      activationName: request.activationName,
+      cleanupPath: request.cleanupPath,
+      prepared: prepared.value
+    });
+  }
+
+  return {
+    ok: true,
+    value: {
+      staged,
+      hasPending: pending?.ok === true
     }
   };
 }
