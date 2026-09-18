@@ -272,6 +272,81 @@ test("current accepted state is comparison-only and cannot pin update candidate 
   );
 });
 
+test("nullable accepted immutable provenance is preserved instead of being fabricated as false", async () => {
+  const fixture = sourceFixture([
+    releaseRepository("acme/app", [
+      release("v1.0.0", "e", [
+        skillPackage(".", "app", "Application.")
+      ])
+    ])
+  ]);
+
+  const initial = await computeLifecycleCandidate({
+    directRequirements: [
+      releasePackageRequirement("acme/app/app", "^1.0.0")
+    ],
+    repositoryTransport: fixture.repositoryTransport,
+    transport: fixture.transport
+  });
+  assert.equal(initial.ok, true);
+  if (!initial.ok) {
+    return;
+  }
+
+  const candidatePackage = initial.value.candidate.packages[0]!;
+  const currentState = registryState({
+    directRequirements: [
+      {
+        kind: "package",
+        coordinate: "acme/app/app",
+        sourceKind: "github-release",
+        versionRequirement: "^1.0.0"
+      }
+    ],
+    sources: [
+      {
+        repositoryCoordinate: "acme/app",
+        sourceKind: "github-release",
+        version: "1.0.0",
+        actualTag: "v1.0.0",
+        exactCommit: commit("e"),
+        immutable: null
+      }
+    ],
+    packages: [
+      {
+        packageCoordinate: candidatePackage.packageCoordinate,
+        repositoryCoordinate: "acme/app",
+        packageRoot: candidatePackage.packageRoot,
+        contentDigest: candidatePackage.contentDigest
+      }
+    ]
+  });
+
+  const result = await computeLifecycleCandidate({
+    directRequirements: [
+      releasePackageRequirement("acme/app/app", "^1.0.0")
+    ],
+    currentState,
+    repositoryTransport: fixture.repositoryTransport,
+    transport: fixture.transport
+  });
+
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    assert.equal(result.value.noChange, false);
+    assert.deepEqual(result.value.comparison.sourceDeltas, [
+      {
+        kind: "immutable-signal-changed",
+        repositoryCoordinate: "acme/app",
+        previousImmutable: null,
+        candidateImmutable: true,
+        advisory: true
+      }
+    ]);
+  }
+});
+
 test("identical accepted direct requirements and exact graph are a semantic no-change", async () => {
   const fixture = sourceFixture([
     releaseRepository("acme/app", [
@@ -421,6 +496,69 @@ test("inaccessible speculative higher Release does not block a lower viable cand
         immutable: true
       }
     ]);
+  }
+});
+
+test("mixed branch failures preserve aggregate Resolver diagnostics instead of collapsing to one speculative source error", async () => {
+  const fixture = sourceFixture([
+    releaseRepository("acme/app", [
+      release("v2.0.0", "f", [
+        skillPackage(
+          ".",
+          "app",
+          "Private dependency candidate.",
+          { "acme/private/private": "^1.0.0" }
+        )
+      ]),
+      release("v1.0.0", "1", [
+        skillPackage(
+          ".",
+          "app",
+          "Unsatisfied public dependency candidate.",
+          { "acme/lib/lib": "^2.0.0" }
+        )
+      ])
+    ]),
+    releaseRepository("acme/lib", [
+      release("v1.0.0", "2", [
+        skillPackage(".", "lib", "Library.")
+      ])
+    ])
+  ]);
+
+  const result = await computeLifecycleCandidate({
+    directRequirements: [
+      releasePackageRequirement("acme/app/app")
+    ],
+    repositoryTransport: fixture.repositoryTransport,
+    transport: fixture.transport
+  });
+
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.error.code, "UnresolvableDependencyGraph");
+    if (result.error.code === "UnresolvableDependencyGraph") {
+      assert.equal(result.error.facts.repositoryCoordinate, "acme/app");
+      assert.deepEqual(
+        result.error.facts.attempts.map((attempt) => ({
+          version: attempt.version,
+          rootFailureCode: attempt.rootFailureCode,
+          subjectCoordinate: attempt.subjectCoordinate
+        })),
+        [
+          {
+            version: "2.0.0",
+            rootFailureCode: "UnsatisfiableReleaseRequirements",
+            subjectCoordinate: "acme/private"
+          },
+          {
+            version: "1.0.0",
+            rootFailureCode: "UnsatisfiableReleaseRequirements",
+            subjectCoordinate: "acme/lib"
+          }
+        ]
+      );
+    }
   }
 });
 

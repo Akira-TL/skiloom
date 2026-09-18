@@ -317,52 +317,6 @@ function shouldAcquireReleaseRepository(
   );
 }
 
-function candidateRepositoryCoordinates(
-  error: ResolverSearchError
-): ReadonlyArray<string> {
-  const coordinates = new Set<string>();
-
-  switch (error.code) {
-    case "UnsatisfiableReleaseRequirements":
-    case "UnresolvableDependencyGraph":
-    case "RepositorySourceConflict":
-    case "AmbiguousReleaseVersion":
-    case "AmbiguousReleasePrecedence":
-      coordinates.add(error.facts.repositoryCoordinate);
-      break;
-    case "PackageNotFound":
-      coordinates.add(
-        repositoryFromPackageCoordinate(
-          error.facts.packageCoordinate
-        )
-      );
-      break;
-    case "InvalidReleaseRequirement":
-      coordinates.add(
-        repositoryFromPackageCoordinate(
-          "originCoordinate" in error.facts
-            ? error.facts.originCoordinate
-            : error.facts.targetPackageCoordinate
-        )
-      );
-      break;
-  }
-
-  if (error.code === "UnresolvableDependencyGraph") {
-    for (const attempt of error.facts.attempts) {
-      coordinates.add(
-        normalizeSubjectRepository(
-          attempt.subjectCoordinate
-        )
-      );
-    }
-  }
-
-  return [...coordinates]
-    .filter((coordinate) => coordinate.length > 0)
-    .sort(compareUtf8);
-}
-
 function normalizeSubjectRepository(
   coordinate: string
 ): string {
@@ -436,38 +390,59 @@ function firstRelevantDeferredError(
   error: ResolverSearchError,
   state: SourceState
 ): AcquireGitHubReleaseRepositorySourceError | undefined {
+  if (error.code === "UnsatisfiableReleaseRequirements") {
+    return state.deferredSourceErrors.get(
+      error.facts.repositoryCoordinate
+    );
+  }
+  if (error.code !== "UnresolvableDependencyGraph") {
+    return undefined;
+  }
+
+  const deferredByAttempt = error.facts.attempts.map((attempt) =>
+    deferredCoordinatesForSubject(
+      normalizeSubjectRepository(attempt.subjectCoordinate),
+      state
+    )
+  );
   if (
-    error.code !== "UnsatisfiableReleaseRequirements" &&
-    error.code !== "UnresolvableDependencyGraph"
+    deferredByAttempt.length === 0 ||
+    deferredByAttempt.some((coordinates) => coordinates.length === 0)
   ) {
     return undefined;
   }
 
-  const candidates = new Set(
-    candidateRepositoryCoordinates(error)
+  const common = deferredByAttempt[0]!.filter((coordinate) =>
+    deferredByAttempt.every((coordinates) =>
+      coordinates.includes(coordinate)
+    )
   );
+  if (common.length !== 1) {
+    return undefined;
+  }
 
-  for (const coordinate of candidateRepositoryCoordinates(error)) {
-    const direct = state.deferredSourceErrors.get(coordinate);
-    if (direct !== undefined) {
-      return direct;
-    }
-    for (const dependency of dependencyRepositoriesForSource(
-      coordinate,
-      state
-    )) {
-      candidates.add(dependency.canonical);
+  return state.deferredSourceErrors.get(common[0]!);
+}
+
+function deferredCoordinatesForSubject(
+  repositoryCoordinate: string,
+  state: SourceState
+): ReadonlyArray<string> {
+  const coordinates = new Set<string>();
+
+  if (state.deferredSourceErrors.has(repositoryCoordinate)) {
+    coordinates.add(repositoryCoordinate);
+  }
+  for (const dependency of dependencyRepositoriesForSource(
+    repositoryCoordinate,
+    state
+  )) {
+    if (state.deferredSourceErrors.has(dependency.canonical)) {
+      coordinates.add(dependency.canonical);
     }
   }
 
-  for (const coordinate of [...candidates].sort(compareUtf8)) {
-    const sourceError = state.deferredSourceErrors.get(coordinate);
-    if (sourceError !== undefined) {
-      return sourceError;
-    }
-  }
-
-  return undefined;
+  return [...coordinates].sort(compareUtf8);
 }
 
 function registryStateToCandidateGraph(
@@ -491,7 +466,7 @@ function registryStateToCandidateGraph(
               version: source.version,
               actualTag: source.actualTag,
               exactCommit: source.exactCommit,
-              immutable: source.immutable ?? false
+              immutable: source.immutable
             }
       )
       .sort((left, right) =>

@@ -102,7 +102,7 @@ export type ResolverSourceBindingSummary =
       version: string;
       actualTag: string;
       exactCommit: string;
-      immutable: boolean;
+      immutable: boolean | null;
     }>
   | Readonly<{
       repositoryCoordinate: string;

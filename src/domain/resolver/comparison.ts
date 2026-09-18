@@ -63,8 +63,8 @@ export type SourceAuthorizationDelta =
   | Readonly<{
       kind: "immutable-signal-changed";
       repositoryCoordinate: string;
-      previousImmutable: boolean;
-      candidateImmutable: boolean;
+      previousImmutable: boolean | null;
+      candidateImmutable: boolean | null;
       advisory: true;
     }>;
 
@@ -670,7 +670,11 @@ function compareSourceBindings(
 function sourceBindingKey(binding: ResolverSourceBindingSummary): string {
   return binding.sourceKind === "git"
     ? `git\u0000${binding.requestedRef}\u0000${binding.exactCommit}`
-    : `github-release\u0000${binding.version}\u0000${binding.actualTag}\u0000${binding.exactCommit}\u0000${binding.immutable ? "1" : "0"}`;
+    : `github-release\u0000${binding.version}\u0000${binding.actualTag}\u0000${binding.exactCommit}\u0000${immutableKey(binding.immutable)}`;
+}
+
+function immutableKey(value: boolean | null): string {
+  return value === null ? "n" : value ? "1" : "0";
 }
 
 function compareNormalizedEdges(left: NormalizedEdge, right: NormalizedEdge): number {
