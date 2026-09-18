@@ -1,0 +1,67 @@
+{
+  "fixtureVersion": 1,
+  "valid": {
+    "manifest": "format = \"SKILOOM-EXPORT-V1\"\nmode = \"dependencies\"\n\n[[requirements]]\nkind = \"package\"\ncoordinate = \"acme/demo/demo\"\nsource = \"github-release\"\nversion = \"^1.0.0\"\n\n[[sources]]\nrepository = \"acme/demo\"\nkind = \"github-release\"\nversion = \"1.0.0\"\ntag = \"v1.0.0\"\ncommit = \"0123456789abcdef0123456789abcdef01234567\"\nimmutable = true\n\n[[packages]]\ncoordinate = \"acme/demo/demo\"\npackage-root = \".\"\ncontent-digest = \"sha256:9fb27d8c29f7e2dce0630bed77971698b62914f258e6e9a6a57334618e8278f5\"\npayload = \"package:sha256:9fb27d8c29f7e2dce0630bed77971698b62914f258e6e9a6a57334618e8278f5\"\n\n[[projections]]\npackage = \"acme/demo/demo\"\nactivation-name = \"demo\"\n",
+    "managedContent": "---\nname: demo\ndescription: export fixture\n---\n",
+    "contentDigest": "sha256:9fb27d8c29f7e2dce0630bed77971698b62914f258e6e9a6a57334618e8278f5",
+    "payloadId": "package:sha256:9fb27d8c29f7e2dce0630bed77971698b62914f258e6e9a6a57334618e8278f5",
+    "containerBase64": "U0tJTE9PTS1FWFBPUlQtVjEAgAIAAAAAAABmb3JtYXQgPSAiU0tJTE9PTS1FWFBPUlQtVjEiCm1vZGUgPSAiZGVwZW5kZW5jaWVzIgoKW1tyZXF1aXJlbWVudHNdXQpraW5kID0gInBhY2thZ2UiCmNvb3JkaW5hdGUgPSAiYWNtZS9kZW1vL2RlbW8iCnNvdXJjZSA9ICJnaXRodWItcmVsZWFzZSIKdmVyc2lvbiA9ICJeMS4wLjAiCgpbW3NvdXJjZXNdXQpyZXBvc2l0b3J5ID0gImFjbWUvZGVtbyIKa2luZCA9ICJnaXRodWItcmVsZWFzZSIKdmVyc2lvbiA9ICIxLjAuMCIKdGFnID0gInYxLjAuMCIKY29tbWl0ID0gIjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmMDEyMzQ1NjciCmltbXV0YWJsZSA9IHRydWUKCltbcGFja2FnZXNdXQpjb29yZGluYXRlID0gImFjbWUvZGVtby9kZW1vIgpwYWNrYWdlLXJvb3QgPSAiLiIKY29udGVudC1kaWdlc3QgPSAic2hhMjU2OjlmYjI3ZDhjMjlmN2UyZGNlMDYzMGJlZDc3OTcxNjk4YjYyOTE0ZjI1OGU2ZTlhNmE1NzMzNDYxOGU4Mjc4ZjUiCnBheWxvYWQgPSAicGFja2FnZTpzaGEyNTY6OWZiMjdkOGMyOWY3ZTJkY2UwNjMwYmVkNzc5NzE2OThiNjI5MTRmMjU4ZTZlOWE2YTU3MzM0NjE4ZTgyNzhmNSIKCltbcHJvamVjdGlvbnNdXQpwYWNrYWdlID0gImFjbWUvZGVtby9kZW1vIgphY3RpdmF0aW9uLW5hbWUgPSAiZGVtbyIKTwAAAAAAAABwYWNrYWdlOnNoYTI1Njo5ZmIyN2Q4YzI5ZjdlMmRjZTA2MzBiZWQ3Nzk3MTY5OGI2MjkxNGYyNThlNmU5YTZhNTczMzQ2MThlODI3OGY1CAAAAAAAAABTS0lMTC5tZAAvAAAAAAAAAC0tLQpuYW1lOiBkZW1vCmRlc2NyaXB0aW9uOiBleHBvcnQgZml4dHVyZQotLS0K"
+  },
+  "invalidManifests": [
+    {
+      "id": "future-version",
+      "source": "format = \"SKILOOM-EXPORT-V2\"\nmode = \"dependencies\"\n",
+      "code": "UnsupportedExportVersion",
+      "format": "SKILOOM-EXPORT-V2"
+    },
+    {
+      "id": "unknown-top-level",
+      "source": "format = \"SKILOOM-EXPORT-V1\"\nmode = \"dependencies\"\ncreated-at = \"now\"\n",
+      "code": "InvalidExportPackage",
+      "reason": "unknown-field",
+      "path": "created-at"
+    },
+    {
+      "id": "invalid-mode",
+      "source": "format = \"SKILOOM-EXPORT-V1\"\nmode = \"snapshot\"\n",
+      "code": "InvalidExportPackage",
+      "reason": "invalid-field",
+      "path": "mode"
+    },
+    {
+      "id": "duplicate-package",
+      "source": "format = \"SKILOOM-EXPORT-V1\"\nmode = \"dependencies\"\n\n[[requirements]]\nkind = \"package\"\ncoordinate = \"acme/demo/demo\"\nsource = \"github-release\"\nversion = \"^1.0.0\"\n\n[[sources]]\nrepository = \"acme/demo\"\nkind = \"github-release\"\nversion = \"1.0.0\"\ntag = \"v1.0.0\"\ncommit = \"0123456789abcdef0123456789abcdef01234567\"\nimmutable = true\n\n[[packages]]\ncoordinate = \"acme/demo/demo\"\npackage-root = \".\"\ncontent-digest = \"sha256:9fb27d8c29f7e2dce0630bed77971698b62914f258e6e9a6a57334618e8278f5\"\npayload = \"package:sha256:9fb27d8c29f7e2dce0630bed77971698b62914f258e6e9a6a57334618e8278f5\"\n\n[[packages]]\ncoordinate = \"acme/demo/demo\"\npackage-root = \".\"\ncontent-digest = \"sha256:9fb27d8c29f7e2dce0630bed77971698b62914f258e6e9a6a57334618e8278f5\"\npayload = \"package:sha256:9fb27d8c29f7e2dce0630bed77971698b62914f258e6e9a6a57334618e8278f5\"\n\n[[projections]]\npackage = \"acme/demo/demo\"\nactivation-name = \"demo\"\n",
+      "code": "InvalidExportPackage",
+      "reason": "duplicate-package",
+      "path": "packages[1]"
+    },
+    {
+      "id": "dangling-dependency",
+      "source": "format = \"SKILOOM-EXPORT-V1\"\nmode = \"dependencies\"\n\n[[requirements]]\nkind = \"package\"\ncoordinate = \"acme/demo/demo\"\nsource = \"github-release\"\nversion = \"^1.0.0\"\n\n[[sources]]\nrepository = \"acme/demo\"\nkind = \"github-release\"\nversion = \"1.0.0\"\ntag = \"v1.0.0\"\ncommit = \"0123456789abcdef0123456789abcdef01234567\"\nimmutable = true\n\n[[packages]]\ncoordinate = \"acme/demo/demo\"\npackage-root = \".\"\ncontent-digest = \"sha256:9fb27d8c29f7e2dce0630bed77971698b62914f258e6e9a6a57334618e8278f5\"\npayload = \"package:sha256:9fb27d8c29f7e2dce0630bed77971698b62914f258e6e9a6a57334618e8278f5\"\n\n[[dependencies]]\nfrom = \"acme/demo/demo\"\nto = \"acme/missing/missing\"\n\n[[projections]]\npackage = \"acme/demo/demo\"\nactivation-name = \"demo\"\n",
+      "code": "InvalidExportPackage",
+      "reason": "dangling-reference",
+      "path": "dependencies[0].to"
+    },
+    {
+      "id": "dependencies-with-user-skill",
+      "source": "format = \"SKILOOM-EXPORT-V1\"\nmode = \"dependencies\"\n\n[[requirements]]\nkind = \"package\"\ncoordinate = \"acme/demo/demo\"\nsource = \"github-release\"\nversion = \"^1.0.0\"\n\n[[sources]]\nrepository = \"acme/demo\"\nkind = \"github-release\"\nversion = \"1.0.0\"\ntag = \"v1.0.0\"\ncommit = \"0123456789abcdef0123456789abcdef01234567\"\nimmutable = true\n\n[[packages]]\ncoordinate = \"acme/demo/demo\"\npackage-root = \".\"\ncontent-digest = \"sha256:9fb27d8c29f7e2dce0630bed77971698b62914f258e6e9a6a57334618e8278f5\"\npayload = \"package:sha256:9fb27d8c29f7e2dce0630bed77971698b62914f258e6e9a6a57334618e8278f5\"\n\n[[projections]]\npackage = \"acme/demo/demo\"\nactivation-name = \"demo\"\n\n[[user-skills]]\nactivation-name = \"local\"\nskill-name = \"local\"\npayload = \"user:sha256:0000000000000000000000000000000000000000000000000000000000000000\"\ncontent-digest = \"sha256:0000000000000000000000000000000000000000000000000000000000000000\"\n",
+      "code": "InvalidExportPackage",
+      "reason": "mode-conflict",
+      "path": "user-skills"
+    },
+    {
+      "id": "requirement-source-conflict",
+      "source": "format = \"SKILOOM-EXPORT-V1\"\nmode = \"dependencies\"\n\n[[requirements]]\nkind = \"package\"\ncoordinate = \"acme/demo/demo\"\nsource = \"git\"\nref = \"main\"\n\n[[sources]]\nrepository = \"acme/demo\"\nkind = \"github-release\"\nversion = \"1.0.0\"\ntag = \"v1.0.0\"\ncommit = \"0123456789abcdef0123456789abcdef01234567\"\nimmutable = true\n\n[[packages]]\ncoordinate = \"acme/demo/demo\"\npackage-root = \".\"\ncontent-digest = \"sha256:9fb27d8c29f7e2dce0630bed77971698b62914f258e6e9a6a57334618e8278f5\"\npayload = \"package:sha256:9fb27d8c29f7e2dce0630bed77971698b62914f258e6e9a6a57334618e8278f5\"\n\n[[projections]]\npackage = \"acme/demo/demo\"\nactivation-name = \"demo\"\n",
+      "code": "InvalidExportPackage",
+      "reason": "source-conflict",
+      "path": "requirements[0].source"
+    },
+    {
+      "id": "release-requirement-mismatch",
+      "source": "format = \"SKILOOM-EXPORT-V1\"\nmode = \"dependencies\"\n\n[[requirements]]\nkind = \"package\"\ncoordinate = \"acme/demo/demo\"\nsource = \"github-release\"\nversion = \"^2.0.0\"\n\n[[sources]]\nrepository = \"acme/demo\"\nkind = \"github-release\"\nversion = \"1.0.0\"\ntag = \"v1.0.0\"\ncommit = \"0123456789abcdef0123456789abcdef01234567\"\nimmutable = true\n\n[[packages]]\ncoordinate = \"acme/demo/demo\"\npackage-root = \".\"\ncontent-digest = \"sha256:9fb27d8c29f7e2dce0630bed77971698b62914f258e6e9a6a57334618e8278f5\"\npayload = \"package:sha256:9fb27d8c29f7e2dce0630bed77971698b62914f258e6e9a6a57334618e8278f5\"\n\n[[projections]]\npackage = \"acme/demo/demo\"\nactivation-name = \"demo\"\n",
+      "code": "InvalidExportPackage",
+      "reason": "requirement-mismatch",
+      "path": "requirements[0].version"
+    }
+  ]
+}
