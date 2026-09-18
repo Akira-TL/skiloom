@@ -1,4 +1,13 @@
 import assert from "node:assert/strict";
+import {
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  writeFile
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import {
@@ -15,6 +24,9 @@ import {
   type GitHubJsonTransport,
   type GitHubRepositoryTransport
 } from "../../../../src/runtime/source/github/index.js";
+import {
+  resolveSkiloomHomePaths
+} from "../../../../src/runtime/home.js";
 
 test("live Release facts are re-discovered, re-hashed, and fed into the existing whole-target resolver", async () => {
   const repository = repositoryCoordinate("Akira-TL/Skills");
@@ -193,6 +205,114 @@ test("explicit Git source is acquired as an exact snapshot without Release fallb
         exactCommit
       }
     ]);
+  }
+});
+
+test("exact-source cache reuses only canonical repository plus exact commit and refetches corruption", async () => {
+  const cacheRoot = await mkdtemp(join(tmpdir(), "skiloom-source-cache-"));
+  const repository = repositoryCoordinate("Akira-TL/Cached-Skill");
+  const exactCommit = "4".repeat(40);
+  const sourceCachePath = resolveSkiloomHomePaths(
+    join(cacheRoot, "home")
+  ).sourceCachePath;
+  const secret = "github_pat_cache_must_not_persist";
+  const fixture = repositoryFixture({
+    exactCommit,
+    files: {
+      "SKILL.md": skill("cached-skill", "Cached exact source.")
+    }
+  });
+
+  try {
+    const firstPaths: string[] = [];
+    const first = await acquireGitHubGitBinding({
+      repository,
+      requestedRef: "main",
+      credential: secret,
+      sourceCachePath,
+      repositoryTransport: verifiedRepositoryTransport("Akira-TL/Cached-Skill"),
+      transport: gitAndSnapshotTransport({
+        requestedRef: "main",
+        exactCommit,
+        fixture,
+        seenPaths: firstPaths
+      })
+    });
+    assert.equal(first.ok, true);
+    if (!first.ok) {
+      return;
+    }
+    assert.equal(
+      firstPaths.some((path) => path.includes("/git/trees/")),
+      true,
+      "cold acquisition must fetch exact tree"
+    );
+
+    const cacheFiles = (await readdir(sourceCachePath, { recursive: true }))
+      .filter((path) => path.endsWith(".json"));
+    assert.equal(cacheFiles.length, 1);
+    const cachePath = join(sourceCachePath, cacheFiles[0]!);
+    const cacheText = await readFile(cachePath, "utf8");
+    assert.equal(cacheText.includes(secret), false);
+    assert.equal(cacheText.includes('"contentDigest"'), false);
+    assert.equal(cachePath.includes("main"), false);
+
+    const secondPaths: string[] = [];
+    const second = await acquireGitHubGitBinding({
+      repository,
+      requestedRef: "stable",
+      credential: secret,
+      sourceCachePath,
+      repositoryTransport: verifiedRepositoryTransport("Akira-TL/Cached-Skill"),
+      transport: gitAndSnapshotTransport({
+        requestedRef: "stable",
+        exactCommit,
+        fixture,
+        seenPaths: secondPaths
+      })
+    });
+    assert.equal(second.ok, true);
+    if (!second.ok) {
+      return;
+    }
+    assert.deepEqual(second.value.snapshot, first.value.snapshot);
+    assert.equal(
+      secondPaths.some((path) => path.includes("/git/")),
+      false,
+      "mutable ref still resolves, but exact tree/blob acquisition must hit cache"
+    );
+
+    const corruptCache = JSON.parse(cacheText) as {
+      integrity: string;
+    };
+    corruptCache.integrity = `sha256:${"0".repeat(64)}`;
+    await writeFile(cachePath, JSON.stringify(corruptCache), "utf8");
+    const recoveryPaths: string[] = [];
+    const recovered = await acquireGitHubGitBinding({
+      repository,
+      requestedRef: "main",
+      sourceCachePath,
+      repositoryTransport: verifiedRepositoryTransport("Akira-TL/Cached-Skill"),
+      transport: gitAndSnapshotTransport({
+        requestedRef: "main",
+        exactCommit,
+        fixture,
+        seenPaths: recoveryPaths
+      })
+    });
+    assert.equal(recovered.ok, true);
+    if (recovered.ok) {
+      assert.deepEqual(recovered.value.snapshot, first.value.snapshot);
+    }
+    assert.equal(
+      recoveryPaths.some((path) => path.includes("/git/trees/")),
+      true,
+      "corrupt cache must be discarded and refetched"
+    );
+    const recoveredCache = await readFile(cachePath, "utf8");
+    assert.doesNotThrow(() => JSON.parse(recoveredCache));
+  } finally {
+    await rm(cacheRoot, { recursive: true, force: true });
   }
 });
 

@@ -48,6 +48,7 @@ test("Skiloom Home paths are rooted under the caller home", async () => {
     registryPath: join(userHome, ".skiloom", "registry.sqlite3"),
     operationLockPath: join(userHome, ".skiloom", "operation.lock"),
     storePath: join(userHome, ".skiloom", "store"),
+    sourceCachePath: join(userHome, ".skiloom", "cache", "sources"),
     backupsPath: join(userHome, ".skiloom", "backups")
   });
 });

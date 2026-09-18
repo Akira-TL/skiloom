@@ -6,6 +6,7 @@ export type SkiloomHomePaths = Readonly<{
   registryPath: string;
   operationLockPath: string;
   storePath: string;
+  sourceCachePath: string;
   backupsPath: string;
 }>;
 
@@ -19,6 +20,7 @@ export function resolveSkiloomHomePaths(userHome: string): SkiloomHomePaths {
     registryPath: join(homeRoot, "registry.sqlite3"),
     operationLockPath: join(homeRoot, "operation.lock"),
     storePath: join(homeRoot, "store"),
+    sourceCachePath: join(homeRoot, "cache", "sources"),
     backupsPath: join(homeRoot, "backups")
   };
 }

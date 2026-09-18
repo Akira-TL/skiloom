@@ -43,9 +43,13 @@ import {
   type VerifyGitHubRepositoryError
 } from "./repository.js";
 import {
+  acquireCachedExactGitHubRepositorySnapshot
+} from "./cache/index.js";
+import {
   acquireExactGitHubRepositorySnapshot,
   type AcquiredGitHubRepositorySnapshot,
-  type AcquireExactGitHubRepositorySnapshotError
+  type AcquireExactGitHubRepositorySnapshotError,
+  type AcquireExactGitHubRepositorySnapshotInput
 } from "./snapshot.js";
 import type { GitHubJsonTransport } from "./transport.js";
 
@@ -81,6 +85,7 @@ export type BuildGitHubResolverRepositorySnapshotError =
 
 export type GitHubSourceRuntimeInput = Readonly<{
   credential?: string;
+  sourceCachePath?: string;
   repositoryTransport: GitHubRepositoryTransport;
   transport: GitHubJsonTransport;
 }>;
@@ -142,14 +147,11 @@ export async function acquireGitHubReleaseRepositorySource(
 
   const resolvedReleases: FixedReleaseRepositorySource["releases"][number][] = [];
   for (const release of releases.value) {
-    const acquired = await acquireExactGitHubRepositorySnapshot({
-      repository: verified.value.repository,
-      exactCommit: release.exactCommit,
-      transport: input.transport,
-      ...(input.credential === undefined
-        ? {}
-        : { credential: input.credential })
-    });
+    const acquired = await acquireRepositorySnapshot(
+      input,
+      verified.value.repository,
+      release.exactCommit
+    );
     if (!acquired.ok) {
       return acquired;
     }
@@ -200,14 +202,11 @@ export async function acquireGitHubGitBinding(
     return source;
   }
 
-  const acquired = await acquireExactGitHubRepositorySnapshot({
-    repository: verified.value.repository,
-    exactCommit: source.value.exactCommit,
-    transport: input.transport,
-    ...(input.credential === undefined
-      ? {}
-      : { credential: input.credential })
-  });
+  const acquired = await acquireRepositorySnapshot(
+    input,
+    verified.value.repository,
+    source.value.exactCommit
+  );
   if (!acquired.ok) {
     return acquired;
   }
@@ -224,6 +223,33 @@ export async function acquireGitHubGitBinding(
       snapshot: snapshot.value
     }
   };
+}
+
+async function acquireRepositorySnapshot(
+  input: GitHubSourceRuntimeInput,
+  repository: AcquiredGitHubRepositorySnapshot["repository"],
+  exactCommit: string
+): Promise<
+  Result<
+    AcquiredGitHubRepositorySnapshot,
+    AcquireExactGitHubRepositorySnapshotError
+  >
+> {
+  const request = {
+    repository,
+    exactCommit,
+    transport: input.transport,
+    ...(input.credential === undefined
+      ? {}
+      : { credential: input.credential })
+  } satisfies AcquireExactGitHubRepositorySnapshotInput;
+
+  return input.sourceCachePath === undefined
+    ? acquireExactGitHubRepositorySnapshot(request)
+    : acquireCachedExactGitHubRepositorySnapshot({
+        ...request,
+        cacheRoot: input.sourceCachePath
+      });
 }
 
 export function buildGitHubResolverRepositorySnapshot(

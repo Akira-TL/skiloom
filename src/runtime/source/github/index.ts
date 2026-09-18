@@ -51,6 +51,12 @@ export {
 } from "./snapshot.js";
 
 export {
+  acquireCachedExactGitHubRepositorySnapshot,
+  sourceCacheEntryPath,
+  type AcquireCachedExactGitHubRepositorySnapshotInput
+} from "./cache/index.js";
+
+export {
   acquireGitHubGitBinding,
   acquireGitHubReleaseRepositorySource,
   buildGitHubResolverRepositorySnapshot,
