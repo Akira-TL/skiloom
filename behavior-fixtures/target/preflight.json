@@ -1,0 +1,227 @@
+{
+  "fixtureVersion": 1,
+  "ownershipSuccess": [
+    {
+      "id": "managed-and-detached-actions-are-safe-and-canonical",
+      "desiredPlan": {
+        "projections": [
+          { "packageCoordinate": "org/app/helper", "packageRoot": "helper", "contentDigest": "sha256:helper", "activationName": "helper", "projectionKind": "direct", "transform": null },
+          { "packageCoordinate": "org/app/main", "packageRoot": "main", "contentDigest": "sha256:main", "activationName": "main", "projectionKind": "direct", "transform": null },
+          { "packageCoordinate": "org/app/next", "packageRoot": "next", "contentDigest": "sha256:next", "activationName": "next", "projectionKind": "direct", "transform": null },
+          { "packageCoordinate": "org/local/custom", "packageRoot": "custom", "contentDigest": "sha256:custom-new", "activationName": "custom", "projectionKind": "direct", "transform": null }
+        ],
+        "reachablePackages": ["org/app/helper", "org/app/main", "org/app/next", "org/local/custom"],
+        "unreachableManagedPackages": ["org/old/gone", "org/old/missing", "org/old/remove"]
+      },
+      "currentProjections": [
+        {
+          "projection": { "packageCoordinate": "org/old/remove", "packageRoot": "remove", "contentDigest": "sha256:remove", "activationName": "remove", "projectionKind": "direct", "transform": null },
+          "ownership": "managed",
+          "materialization": "copy"
+        },
+        {
+          "projection": { "packageCoordinate": "org/app/main", "packageRoot": "main", "contentDigest": "sha256:main", "activationName": "main", "projectionKind": "direct", "transform": null },
+          "ownership": "managed",
+          "materialization": "symlink"
+        },
+        {
+          "projection": { "packageCoordinate": "org/old/gone", "packageRoot": "gone", "contentDigest": "sha256:gone", "activationName": "next", "projectionKind": "direct", "transform": null },
+          "ownership": "managed",
+          "materialization": "copy"
+        },
+        {
+          "projection": { "packageCoordinate": "org/local/custom", "packageRoot": "custom", "contentDigest": "sha256:custom-baseline", "activationName": "custom", "projectionKind": "direct", "transform": null },
+          "ownership": "detached",
+          "materialization": "copy"
+        },
+        {
+          "projection": { "packageCoordinate": "org/old/missing", "packageRoot": "missing", "contentDigest": "sha256:missing", "activationName": "old-missing", "projectionKind": "direct", "transform": null },
+          "ownership": "managed",
+          "materialization": "junction"
+        },
+        {
+          "projection": { "packageCoordinate": "org/local/broken", "packageRoot": "broken", "contentDigest": "sha256:broken", "activationName": "broken", "projectionKind": "direct", "transform": null },
+          "ownership": "detached",
+          "materialization": "copy"
+        }
+      ],
+      "observedPaths": [
+        { "activationName": "custom", "kind": "existing" },
+        { "activationName": "remove", "kind": "managed", "packageCoordinate": "org/old/remove", "contentDigest": "sha256:remove", "materialization": "copy", "expectedViewMatches": true },
+        { "activationName": "next", "kind": "managed", "packageCoordinate": "org/old/gone", "contentDigest": "sha256:gone", "materialization": "copy", "expectedViewMatches": true },
+        { "activationName": "main", "kind": "managed", "packageCoordinate": "org/app/main", "contentDigest": "sha256:main", "materialization": "symlink", "expectedViewMatches": true }
+      ],
+      "expected": {
+        "actions": [
+          { "activationName": "broken", "classification": "broken-detached", "action": "preserve-broken-binding", "currentPackageCoordinate": "org/local/broken", "desiredPackageCoordinate": null },
+          { "activationName": "custom", "classification": "detached-user-owned", "action": "preserve-user", "currentPackageCoordinate": "org/local/custom", "desiredPackageCoordinate": "org/local/custom" },
+          { "activationName": "helper", "classification": "missing-managed", "action": "materialize", "currentPackageCoordinate": null, "desiredPackageCoordinate": "org/app/helper" },
+          { "activationName": "main", "classification": "pristine-managed", "action": "keep", "currentPackageCoordinate": "org/app/main", "desiredPackageCoordinate": "org/app/main" },
+          { "activationName": "next", "classification": "pristine-managed", "action": "replace", "currentPackageCoordinate": "org/old/gone", "desiredPackageCoordinate": "org/app/next" },
+          { "activationName": "old-missing", "classification": "missing-managed", "action": "drop-missing", "currentPackageCoordinate": "org/old/missing", "desiredPackageCoordinate": null },
+          { "activationName": "remove", "classification": "pristine-managed", "action": "remove", "currentPackageCoordinate": "org/old/remove", "desiredPackageCoordinate": null }
+        ]
+      }
+    },
+    {
+      "id": "detached-activation-mismatch-is-broken-not-rematerialized",
+      "desiredPlan": {
+        "projections": [
+          { "packageCoordinate": "org/local/custom", "packageRoot": "custom", "contentDigest": "sha256:new", "activationName": "custom-new", "projectionKind": "transformed-copy", "transform": { "rename": { "fromActivationName": "custom", "toActivationName": "custom-new" }, "dependencyRoutes": [] } }
+        ],
+        "reachablePackages": ["org/local/custom"],
+        "unreachableManagedPackages": []
+      },
+      "currentProjections": [
+        {
+          "projection": { "packageCoordinate": "org/local/custom", "packageRoot": "custom", "contentDigest": "sha256:baseline", "activationName": "custom", "projectionKind": "direct", "transform": null },
+          "ownership": "detached",
+          "materialization": "copy"
+        }
+      ],
+      "observedPaths": [
+        { "activationName": "custom", "kind": "existing" }
+      ],
+      "expected": {
+        "actions": [
+          { "activationName": "custom", "classification": "broken-detached", "action": "preserve-broken-binding", "currentPackageCoordinate": "org/local/custom", "desiredPackageCoordinate": "org/local/custom" }
+        ]
+      }
+    }
+  ],
+  "ownershipErrors": [
+    {
+      "id": "foreign-content-at-new-planned-path-fails-closed",
+      "desiredPlan": {
+        "projections": [
+          { "packageCoordinate": "org/app/main", "packageRoot": "main", "contentDigest": "sha256:main", "activationName": "main", "projectionKind": "direct", "transform": null }
+        ],
+        "reachablePackages": ["org/app/main"],
+        "unreachableManagedPackages": []
+      },
+      "currentProjections": [],
+      "observedPaths": [
+        { "activationName": "main", "kind": "existing" }
+      ],
+      "expectedError": {
+        "code": "ForeignTargetPathConflict",
+        "facts": {
+          "activationName": "main",
+          "desiredPackageCoordinate": "org/app/main"
+        }
+      }
+    },
+    {
+      "id": "modified-managed-view-fails-closed",
+      "desiredPlan": {
+        "projections": [
+          { "packageCoordinate": "org/app/main", "packageRoot": "main", "contentDigest": "sha256:main", "activationName": "main", "projectionKind": "direct", "transform": null }
+        ],
+        "reachablePackages": ["org/app/main"],
+        "unreachableManagedPackages": []
+      },
+      "currentProjections": [
+        {
+          "projection": { "packageCoordinate": "org/app/main", "packageRoot": "main", "contentDigest": "sha256:main", "activationName": "main", "projectionKind": "direct", "transform": null },
+          "ownership": "managed",
+          "materialization": "copy"
+        }
+      ],
+      "observedPaths": [
+        { "activationName": "main", "kind": "managed", "packageCoordinate": "org/app/main", "contentDigest": "sha256:main", "materialization": "copy", "expectedViewMatches": false }
+      ],
+      "expectedError": {
+        "code": "ModifiedManagedProjection",
+        "facts": {
+          "activationName": "main",
+          "packageCoordinate": "org/app/main",
+          "reason": "view-modified"
+        }
+      }
+    },
+    {
+      "id": "replaced-managed-path-fails-closed",
+      "desiredPlan": { "projections": [], "reachablePackages": [], "unreachableManagedPackages": ["org/app/main"] },
+      "currentProjections": [
+        {
+          "projection": { "packageCoordinate": "org/app/main", "packageRoot": "main", "contentDigest": "sha256:main", "activationName": "main", "projectionKind": "direct", "transform": null },
+          "ownership": "managed",
+          "materialization": "symlink"
+        }
+      ],
+      "observedPaths": [
+        { "activationName": "main", "kind": "existing" }
+      ],
+      "expectedError": {
+        "code": "ModifiedManagedProjection",
+        "facts": {
+          "activationName": "main",
+          "packageCoordinate": "org/app/main",
+          "reason": "replaced-or-unknown"
+        }
+      }
+    },
+    {
+      "id": "managed-package-identity-mismatch-fails-closed",
+      "desiredPlan": { "projections": [], "reachablePackages": [], "unreachableManagedPackages": ["org/app/main"] },
+      "currentProjections": [
+        {
+          "projection": { "packageCoordinate": "org/app/main", "packageRoot": "main", "contentDigest": "sha256:main", "activationName": "main", "projectionKind": "direct", "transform": null },
+          "ownership": "managed",
+          "materialization": "copy"
+        }
+      ],
+      "observedPaths": [
+        { "activationName": "main", "kind": "managed", "packageCoordinate": "other/repo/main", "contentDigest": "sha256:main", "materialization": "copy", "expectedViewMatches": true }
+      ],
+      "expectedError": {
+        "code": "ModifiedManagedProjection",
+        "facts": { "activationName": "main", "packageCoordinate": "org/app/main", "reason": "package-mismatch" }
+      }
+    },
+    {
+      "id": "managed-content-digest-mismatch-fails-closed",
+      "desiredPlan": { "projections": [], "reachablePackages": [], "unreachableManagedPackages": ["org/app/main"] },
+      "currentProjections": [
+        {
+          "projection": { "packageCoordinate": "org/app/main", "packageRoot": "main", "contentDigest": "sha256:main", "activationName": "main", "projectionKind": "direct", "transform": null },
+          "ownership": "managed",
+          "materialization": "copy"
+        }
+      ],
+      "observedPaths": [
+        { "activationName": "main", "kind": "managed", "packageCoordinate": "org/app/main", "contentDigest": "sha256:changed", "materialization": "copy", "expectedViewMatches": true }
+      ],
+      "expectedError": {
+        "code": "ModifiedManagedProjection",
+        "facts": { "activationName": "main", "packageCoordinate": "org/app/main", "reason": "content-digest-mismatch" }
+      }
+    },
+    {
+      "id": "managed-materialization-mismatch-fails-closed",
+      "desiredPlan": { "projections": [], "reachablePackages": [], "unreachableManagedPackages": ["org/app/main"] },
+      "currentProjections": [
+        {
+          "projection": { "packageCoordinate": "org/app/main", "packageRoot": "main", "contentDigest": "sha256:main", "activationName": "main", "projectionKind": "direct", "transform": null },
+          "ownership": "managed",
+          "materialization": "symlink"
+        }
+      ],
+      "observedPaths": [
+        { "activationName": "main", "kind": "managed", "packageCoordinate": "org/app/main", "contentDigest": "sha256:main", "materialization": "copy", "expectedViewMatches": true }
+      ],
+      "expectedError": {
+        "code": "ModifiedManagedProjection",
+        "facts": { "activationName": "main", "packageCoordinate": "org/app/main", "reason": "materialization-mismatch" }
+      }
+    }
+  ],
+  "generation": [
+    { "id": "current", "input": { "registryGeneration": 7, "targetPathPresent": true, "markerGeneration": 7, "projectionsVerifiedExact": true }, "expected": { "status": "current", "registryGeneration": 7, "markerGeneration": 7 } },
+    { "id": "stale-behind", "input": { "registryGeneration": 7, "targetPathPresent": true, "markerGeneration": 4, "projectionsVerifiedExact": false }, "expected": { "status": "stale-behind", "registryGeneration": 7, "markerGeneration": 4 } },
+    { "id": "ahead-anomaly", "input": { "registryGeneration": 7, "targetPathPresent": true, "markerGeneration": 9, "projectionsVerifiedExact": false }, "expected": { "status": "ahead-anomaly", "registryGeneration": 7, "markerGeneration": 9 } },
+    { "id": "missing-marker-repairable", "input": { "registryGeneration": 7, "targetPathPresent": true, "markerGeneration": null, "projectionsVerifiedExact": true }, "expected": { "status": "missing-marker-repairable", "registryGeneration": 7, "markerGeneration": null } },
+    { "id": "missing-marker-needs-reconcile", "input": { "registryGeneration": 7, "targetPathPresent": true, "markerGeneration": null, "projectionsVerifiedExact": false }, "expected": { "status": "missing-marker-reconcile-required", "registryGeneration": 7, "markerGeneration": null } },
+    { "id": "dormant", "input": { "registryGeneration": 7, "targetPathPresent": false, "markerGeneration": null, "projectionsVerifiedExact": false }, "expected": { "status": "dormant", "registryGeneration": 7, "markerGeneration": null } }
+  ]
+}

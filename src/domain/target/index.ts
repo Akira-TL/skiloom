@@ -443,3 +443,5 @@ function edgeKey(edge: TargetDependencyEdge): string {
 function compareUtf8(left: string, right: string): number {
   return Buffer.compare(Buffer.from(left, "utf8"), Buffer.from(right, "utf8"));
 }
+
+export * from "./preflight.js";
