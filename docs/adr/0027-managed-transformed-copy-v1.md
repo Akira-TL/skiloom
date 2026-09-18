@@ -13,7 +13,7 @@ Skiloom v0 已接受 flat Target、Target-local rename 与 Dependency Routing Ov
 
 ## 决定
 
-1. v1 managed transformed copy 的 path set 与原 Store Package Snapshot 完全相同；除顶层 `SKILL.md` 外所有 bytes 与 executable bits 不变。
+1. v1 managed transformed copy 的 path set 与原 Store Package Snapshot 完全相同；除顶层 `SKILL.md` 外所有 bytes 不变。在支持 POSIX executable bit 的 filesystem 上 mode 也必须保持；Windows 不新增 sidecar/ADS 去伪造不可表示的 POSIX executable bit，logical bit 继续留在 Store Snapshot。
 2. rename 只替换顶层 frontmatter `name` value node 的 YAML source range，不 canonicalize 整份 YAML，也不改正文自然语言。
 3. Dependency Routing Overlay 不创建目录 alias 或隐藏 sidecar；只向直接反向依赖 Package 的 `SKILL.md` 末尾追加 canonical `SKILOOM-DEPENDENCY-ROUTING-V1` Markdown instruction block。
 4. routing block 是 generated-byte sentinel，不是公开输入格式、恢复权威或 Package metadata。原 Store `SKILL.md` 与 reserved marker 冲突时 fail closed。

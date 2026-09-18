@@ -33,8 +33,8 @@ v1 transformed copy 的输出 path set 必须与输入 Store Package Snapshot �
 - 不新增 sidecar manifest；
 - 不删除、重命名或移动 Package 内文件；
 - 除顶层 `SKILL.md` 外，所有 regular-file bytes 必须逐字节保持不变；
-- 所有文件的 executable bit 必须与 Store Snapshot 完全相同；
-- 顶层 `SKILL.md` 的 executable bit 也保持不变。
+- 在具备 POSIX-style executable bit 的 filesystem 上，所有文件的 executable bit 必须与 Store Snapshot 完全相同，顶层 `SKILL.md` 也不例外；
+- Windows Target filesystem 不伪造 POSIX executable bit，也不为此新增 sidecar/ADS。logical executable fact 仍属于 Store Snapshot；Windows managed copy 的 live verification 比较 path/type/bytes，不把不可表示的 POSIX executable bit 当作 filesystem drift signal。
 
 因此 v1 的所有 Target-local transform 都只修改 `SKILL.md` bytes。
 
@@ -154,7 +154,7 @@ Store Snapshot
 
 - path set 完全相等；
 - 每个 regular file bytes 完全相等；
-- executable bit 完全相等；
+- 在可观察 POSIX executable bit 的平台上，executable bit 完全相等；Windows 不比较不可表示的 POSIX executable bit；
 - 不允许 symlink、junction、device、FIFO 或其他额外特殊条目出现在 copy 内。
 
 任何差异都属于 managed drift / modified managed content，普通 sync/update/remove 必须按 ownership preflight fail closed 或进入明确 repair 流程；不得把 live bytes 反向 adopt 成新的 Package identity。
