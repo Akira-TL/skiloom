@@ -1,0 +1,495 @@
+{
+  "fixtureVersion": 1,
+  "cases": [
+    {
+      "id": "current-exact-target",
+      "input": {
+        "registry": {
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "generation": 3
+        },
+        "marker": {
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "generation": 3,
+          "requirements": [],
+          "projectionOverrides": [],
+          "detached": []
+        },
+        "target": {
+          "pathPresent": true,
+          "projectionsVerifiedExact": true
+        },
+        "staleChoice": null
+      },
+      "expected": {
+        "ok": true,
+        "value": {
+          "kind": "current",
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "generation": 3
+        }
+      }
+    },
+    {
+      "id": "current-marker-with-projection-drift-reconciles-from-registry",
+      "input": {
+        "registry": {
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "generation": 3
+        },
+        "marker": {
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "generation": 3,
+          "requirements": [],
+          "projectionOverrides": [],
+          "detached": []
+        },
+        "target": {
+          "pathPresent": true,
+          "projectionsVerifiedExact": false
+        },
+        "staleChoice": null
+      },
+      "expected": {
+        "ok": true,
+        "value": {
+          "kind": "reconcile-to-registry",
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "generation": 3,
+          "reason": "projection-drift"
+        }
+      }
+    },
+    {
+      "id": "stale-copy-requires-explicit-choice",
+      "input": {
+        "registry": {
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "generation": 3
+        },
+        "marker": {
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "generation": 2,
+          "requirements": [],
+          "projectionOverrides": [],
+          "detached": []
+        },
+        "target": {
+          "pathPresent": true,
+          "projectionsVerifiedExact": false
+        },
+        "staleChoice": null
+      },
+      "expected": {
+        "ok": true,
+        "value": {
+          "kind": "choice-required",
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "markerGeneration": 2,
+          "registryGeneration": 3,
+          "choices": ["sync", "fork"]
+        }
+      }
+    },
+    {
+      "id": "stale-copy-explicit-sync-is-one-way",
+      "input": {
+        "registry": {
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "generation": 3
+        },
+        "marker": {
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "generation": 2,
+          "requirements": [],
+          "projectionOverrides": [],
+          "detached": []
+        },
+        "target": {
+          "pathPresent": true,
+          "projectionsVerifiedExact": false
+        },
+        "staleChoice": {
+          "kind": "sync"
+        }
+      },
+      "expected": {
+        "ok": true,
+        "value": {
+          "kind": "sync-to-registry",
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "fromGeneration": 2,
+          "toGeneration": 3
+        }
+      }
+    },
+    {
+      "id": "marker-generation-ahead-fails-closed",
+      "input": {
+        "registry": {
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "generation": 3
+        },
+        "marker": {
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "generation": 4,
+          "requirements": [],
+          "projectionOverrides": [],
+          "detached": []
+        },
+        "target": {
+          "pathPresent": true,
+          "projectionsVerifiedExact": true
+        },
+        "staleChoice": null
+      },
+      "expected": {
+        "ok": false,
+        "error": {
+          "code": "TargetRecoveryConflict",
+          "facts": {
+            "reason": "marker-generation-ahead",
+            "registryTargetId": "11111111-1111-4111-8111-111111111111",
+            "markerTargetId": "11111111-1111-4111-8111-111111111111"
+          }
+        }
+      }
+    },
+    {
+      "id": "missing-marker-exact-target-can-repair-marker",
+      "input": {
+        "registry": {
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "generation": 3
+        },
+        "marker": null,
+        "target": {
+          "pathPresent": true,
+          "projectionsVerifiedExact": true
+        },
+        "staleChoice": null
+      },
+      "expected": {
+        "ok": true,
+        "value": {
+          "kind": "repair-marker",
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "generation": 3
+        }
+      }
+    },
+    {
+      "id": "missing-marker-nonexact-target-requires-registry-reconcile",
+      "input": {
+        "registry": {
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "generation": 3
+        },
+        "marker": null,
+        "target": {
+          "pathPresent": true,
+          "projectionsVerifiedExact": false
+        },
+        "staleChoice": null
+      },
+      "expected": {
+        "ok": true,
+        "value": {
+          "kind": "reconcile-to-registry",
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "generation": 3,
+          "reason": "missing-marker"
+        }
+      }
+    },
+    {
+      "id": "missing-target-path-keeps-registry-identity-dormant",
+      "input": {
+        "registry": {
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "generation": 3
+        },
+        "marker": null,
+        "target": {
+          "pathPresent": false,
+          "projectionsVerifiedExact": false
+        },
+        "staleChoice": null
+      },
+      "expected": {
+        "ok": true,
+        "value": {
+          "kind": "dormant",
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "generation": 3
+        }
+      }
+    },
+    {
+      "id": "registry-and-marker-target-id-mismatch-fails-closed",
+      "input": {
+        "registry": {
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "generation": 3
+        },
+        "marker": {
+          "targetId": "22222222-2222-4222-8222-222222222222",
+          "generation": 3,
+          "requirements": [],
+          "projectionOverrides": [],
+          "detached": []
+        },
+        "target": {
+          "pathPresent": true,
+          "projectionsVerifiedExact": true
+        },
+        "staleChoice": null
+      },
+      "expected": {
+        "ok": false,
+        "error": {
+          "code": "TargetRecoveryConflict",
+          "facts": {
+            "reason": "target-id-mismatch",
+            "registryTargetId": "11111111-1111-4111-8111-111111111111",
+            "markerTargetId": "22222222-2222-4222-8222-222222222222"
+          }
+        }
+      }
+    },
+    {
+      "id": "database-loss-marker-forms-recovery-candidate",
+      "input": {
+        "registry": null,
+        "marker": {
+          "targetId": "22222222-2222-4222-8222-222222222222",
+          "generation": 7,
+          "requirements": [
+            {
+              "kind": "repository",
+              "coordinate": "vendor/tools",
+              "sourceKind": "git",
+              "requestedRef": "main"
+            },
+            {
+              "kind": "package",
+              "coordinate": "acme/demo/demo",
+              "sourceKind": "github-release",
+              "versionRequirement": "^1"
+            }
+          ],
+          "projectionOverrides": [
+            {
+              "packageCoordinate": "vendor/tools/helper",
+              "activationName": "helper-local"
+            },
+            {
+              "packageCoordinate": "acme/demo/demo",
+              "activationName": "demo-local"
+            }
+          ],
+          "detached": [
+            {
+              "packageCoordinate": "vendor/tools/helper",
+              "sourceKind": "github-release",
+              "version": "2.0.0",
+              "actualTag": "v2.0.0",
+              "exactCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "packageRoot": "skills/helper",
+              "contentDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          ]
+        },
+        "target": {
+          "pathPresent": true,
+          "projectionsVerifiedExact": false
+        },
+        "staleChoice": null
+      },
+      "expected": {
+        "ok": true,
+        "value": {
+          "kind": "recover-candidate",
+          "targetId": "22222222-2222-4222-8222-222222222222",
+          "intent": {
+            "requirements": [
+              {
+                "kind": "package",
+                "coordinate": "acme/demo/demo",
+                "sourceKind": "github-release",
+                "versionRequirement": "^1"
+              },
+              {
+                "kind": "repository",
+                "coordinate": "vendor/tools",
+                "sourceKind": "git",
+                "requestedRef": "main"
+              }
+            ],
+            "projectionOverrides": [
+              {
+                "packageCoordinate": "acme/demo/demo",
+                "activationName": "demo-local"
+              },
+              {
+                "packageCoordinate": "vendor/tools/helper",
+                "activationName": "helper-local"
+              }
+            ],
+            "detached": [
+              {
+                "packageCoordinate": "vendor/tools/helper",
+                "sourceKind": "github-release",
+                "version": "2.0.0",
+                "actualTag": "v2.0.0",
+                "exactCommit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "packageRoot": "skills/helper",
+                "contentDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              }
+            ]
+          },
+          "requiresSourceConfirmation": true
+        }
+      }
+    },
+    {
+      "id": "registry-and-marker-loss-fails-closed",
+      "input": {
+        "registry": null,
+        "marker": null,
+        "target": {
+          "pathPresent": true,
+          "projectionsVerifiedExact": false
+        },
+        "staleChoice": null
+      },
+      "expected": {
+        "ok": false,
+        "error": {
+          "code": "TargetRecoveryConflict",
+          "facts": {
+            "reason": "registry-and-marker-unavailable",
+            "registryTargetId": null,
+            "markerTargetId": null
+          }
+        }
+      }
+    },
+    {
+      "id": "stale-copy-explicit-fork-uses-new-identity-and-marker-intent-only",
+      "input": {
+        "registry": {
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "generation": 8
+        },
+        "marker": {
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "generation": 6,
+          "requirements": [
+            {
+              "kind": "repository",
+              "coordinate": "vendor/tools",
+              "sourceKind": "git",
+              "requestedRef": "main"
+            },
+            {
+              "kind": "package",
+              "coordinate": "acme/demo/demo",
+              "sourceKind": "github-release",
+              "versionRequirement": "^1"
+            }
+          ],
+          "projectionOverrides": [
+            {
+              "packageCoordinate": "vendor/tools/helper",
+              "activationName": "helper-local"
+            },
+            {
+              "packageCoordinate": "acme/demo/demo",
+              "activationName": "demo-local"
+            }
+          ],
+          "detached": []
+        },
+        "target": {
+          "pathPresent": true,
+          "projectionsVerifiedExact": false
+        },
+        "staleChoice": {
+          "kind": "fork",
+          "newTargetId": "33333333-3333-4333-8333-333333333333"
+        }
+      },
+      "expected": {
+        "ok": true,
+        "value": {
+          "kind": "fork-candidate",
+          "targetId": "33333333-3333-4333-8333-333333333333",
+          "intent": {
+            "requirements": [
+              {
+                "kind": "package",
+                "coordinate": "acme/demo/demo",
+                "sourceKind": "github-release",
+                "versionRequirement": "^1"
+              },
+              {
+                "kind": "repository",
+                "coordinate": "vendor/tools",
+                "sourceKind": "git",
+                "requestedRef": "main"
+              }
+            ],
+            "projectionOverrides": [
+              {
+                "packageCoordinate": "acme/demo/demo",
+                "activationName": "demo-local"
+              },
+              {
+                "packageCoordinate": "vendor/tools/helper",
+                "activationName": "helper-local"
+              }
+            ],
+            "detached": []
+          },
+          "requiresSourceConfirmation": true
+        }
+      }
+    },
+    {
+      "id": "fork-cannot-reuse-old-target-identity",
+      "input": {
+        "registry": {
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "generation": 8
+        },
+        "marker": {
+          "targetId": "11111111-1111-4111-8111-111111111111",
+          "generation": 6,
+          "requirements": [],
+          "projectionOverrides": [],
+          "detached": []
+        },
+        "target": {
+          "pathPresent": true,
+          "projectionsVerifiedExact": false
+        },
+        "staleChoice": {
+          "kind": "fork",
+          "newTargetId": "11111111-1111-4111-8111-111111111111"
+        }
+      },
+      "expected": {
+        "ok": false,
+        "error": {
+          "code": "TargetRecoveryConflict",
+          "facts": {
+            "reason": "invalid-fork-target-id",
+            "registryTargetId": "11111111-1111-4111-8111-111111111111",
+            "markerTargetId": "11111111-1111-4111-8111-111111111111"
+          }
+        }
+      }
+    }
+  ]
+}

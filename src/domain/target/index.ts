@@ -445,3 +445,4 @@ function compareUtf8(left: string, right: string): number {
 }
 
 export * from "./preflight.js";
+export * from "./recovery.js";
