@@ -37,6 +37,9 @@ import {
   type RegistryTargetState
 } from "../../../../src/runtime/registry/index.js";
 import {
+  materializeManagedProjection
+} from "../../../../src/runtime/target-projection/index.js";
+import {
   release,
   releasePackageRequirement,
   releaseRepository,
@@ -352,6 +355,117 @@ test("foreign path for a newly added root fails ownership preflight before Store
         assert.equal(
           await readFile(join(foreign, "KEEP"), "utf8"),
           "foreign tool bytes\n"
+        );
+      } finally {
+        registry.close();
+      }
+    });
+  });
+});
+
+test("adding a root preserves an existing managed activation-name override", async () => {
+  await withRuntime(async ({ paths, targetRoot }) => {
+    await withRealLock(paths, async (lock) => {
+      const registry = await requireRegistry(paths, lock);
+      const fixture = sharedFixture();
+      try {
+        const initial = await installApp({
+          paths,
+          targetRoot,
+          lock,
+          registry,
+          fixture
+        });
+        const appPackage = initial.resolvedPackages.find(
+          (entry) => entry.packageCoordinate === "acme/app/app"
+        )!;
+        const renamedProjection = {
+          packageCoordinate: appPackage.packageCoordinate,
+          packageRoot: appPackage.packageRoot,
+          contentDigest: appPackage.contentDigest,
+          activationName: "app-local",
+          projectionKind: "transformed-copy" as const,
+          transform: {
+            rename: {
+              fromActivationName: "app",
+              toActivationName: "app-local"
+            },
+            dependencyRoutes: []
+          }
+        };
+        const materialized = await materializeManagedProjection({
+          home: paths,
+          targetRoot,
+          projection: renamedProjection,
+          materialization: "copy"
+        });
+        assert.equal(materialized.ok, true);
+        if (!materialized.ok) {
+          return;
+        }
+        await rm(join(targetRoot, "app"), {
+          recursive: true,
+          force: true
+        });
+
+        const renamedState = registry.replaceTargetState({
+          ...initial,
+          projections: initial.projections.map((projection) =>
+            projection.packageCoordinate === "acme/app/app"
+              ? {
+                  ...projection,
+                  activationName: "app-local",
+                  materialization: "copy",
+                  transformJson: JSON.stringify(
+                    renamedProjection.transform
+                  )
+                }
+              : projection
+          )
+        });
+        assert.equal(renamedState.ok, true);
+        if (!renamedState.ok) {
+          return;
+        }
+        assert.equal(renamedState.value.generation, 2);
+
+        const result = await addAcceptedTargetRoots({
+          home: paths,
+          targetId,
+          targetRoot,
+          lock,
+          registry,
+          additions: [
+            releasePackageRequirement("acme/tool/tool")
+          ],
+          repositoryTransport: fixture.repositoryTransport,
+          transport: fixture.transport,
+          acceptCandidate: () => true,
+          createOperationId: () => "add-root-preserve-rename",
+          syncMarker: () => {}
+        });
+
+        assert.equal(result.ok, true);
+        if (!result.ok || result.value.status !== "applied") {
+          return;
+        }
+        assert.equal(result.value.state.generation, 3);
+        const appProjection = result.value.state.projections.find(
+          (projection) =>
+            projection.packageCoordinate === "acme/app/app"
+        );
+        assert.equal(appProjection?.activationName, "app-local");
+        assert.equal(appProjection?.ownership, "managed");
+        assert.equal(appProjection?.materialization, "copy");
+        assert.equal(existsSync(join(targetRoot, "app")), false);
+        assert.equal(existsSync(join(targetRoot, "app-local")), true);
+        assert.equal(existsSync(join(targetRoot, "tool")), true);
+        assert.match(
+          await readFile(
+            join(targetRoot, "app-local", "SKILL.md"),
+            "utf8"
+          ),
+          /name: app-local/u
         );
       } finally {
         registry.close();
