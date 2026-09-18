@@ -106,7 +106,8 @@ export type InvalidExportPackageReason =
   | "undeclared-payload"
   | "missing-payload"
   | "invalid-payload-path"
-  | "managed-content-digest-mismatch";
+  | "managed-content-digest-mismatch"
+  | "user-content-digest-mismatch";
 
 export type InvalidExportPackage = ProductError<
   "InvalidExportPackage",

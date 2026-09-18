@@ -5,6 +5,7 @@ import {
   type Result
 } from "../errors/index.js";
 import { createPackageSnapshot } from "../snapshot/index.js";
+import { verifyUserPayload } from "../user-payload/index.js";
 import {
   parseExactExportManifest,
   writeExactExportManifest
@@ -277,6 +278,42 @@ function verifyPayloadFrames(
     if (!snapshot.ok || snapshot.value.contentDigest !== contentDigest) {
       return invalid(
         "managed-content-digest-mismatch",
+        payloadId
+      );
+    }
+  }
+
+  const userDigests = new Map<string, string>();
+  for (const entry of manifest.detached) {
+    userDigests.set(
+      entry.payloadId,
+      entry.userContentDigest
+    );
+  }
+  for (const entry of manifest.userSkills) {
+    userDigests.set(
+      entry.payloadId,
+      entry.userContentDigest
+    );
+  }
+  for (const [payloadId, contentDigest] of userDigests) {
+    const group = byPayload.get(payloadId);
+    if (group === undefined) {
+      return invalid("missing-payload", payloadId);
+    }
+    const verified = verifyUserPayload(
+      contentDigest,
+      group.map((frame) => ({
+        path: frame.path,
+        executable: frame.executable,
+        content: frame.content
+      }))
+    );
+    if (!verified.ok) {
+      return invalid(
+        verified.error.code === "UserPayloadDigestMismatch"
+          ? "user-content-digest-mismatch"
+          : "invalid-payload-path",
         payloadId
       );
     }

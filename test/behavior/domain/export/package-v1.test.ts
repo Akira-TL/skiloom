@@ -13,6 +13,18 @@ import {
   type ExactExportParseError
 } from "../../../../src/domain/export-package/index.js";
 
+type UserPayloadFixture = Readonly<{
+  fixtureVersion: 1;
+  digest: string;
+  payloadId: string;
+  entries: ReadonlyArray<Readonly<{
+    path: string;
+    executable: boolean;
+    contentBase64: string;
+    fileDigest: string;
+  }>>;
+}>;
+
 type Fixture = Readonly<{
   fixtureVersion: 1;
   valid: Readonly<{
@@ -138,6 +150,86 @@ test("full manifest accepts detached and user-skill records but dependencies mod
       parseExactExportManifest(writeExactExportManifest(parsed.value)),
       parsed
     );
+  }
+});
+
+test("full export container verifies SKILOOM-USER-PAYLOAD-V1 frames before writing", async () => {
+  const fixture = await readFixture();
+  const userFixture = await readUserPayloadFixture();
+  const parsed = parseExactExportPackage(
+    Buffer.from(fixture.valid.containerBase64, "base64")
+  );
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) {
+    return;
+  }
+
+  const userFrames: ExactExportFileFrame[] =
+    userFixture.entries.map((entry) => ({
+      payloadId: userFixture.payloadId,
+      path: entry.path,
+      executable: entry.executable,
+      content: Uint8Array.from(
+        Buffer.from(entry.contentBase64, "base64")
+      )
+    }));
+  const full: ExactExportManifest = {
+    ...parsed.value.manifest,
+    mode: "full",
+    userSkills: [
+      {
+        activationName: "local",
+        skillName: "local",
+        payloadId: userFixture.payloadId,
+        userContentDigest: userFixture.digest
+      }
+    ]
+  };
+
+  const written = writeExactExportPackage({
+    manifest: full,
+    frames: [...parsed.value.frames, ...userFrames].reverse()
+  });
+  assert.equal(written.ok, true);
+  if (written.ok) {
+    const reparsed = parseExactExportPackage(written.value);
+    assert.equal(reparsed.ok, true);
+    if (reparsed.ok) {
+      assert.equal(reparsed.value.manifest.mode, "full");
+      assert.equal(reparsed.value.manifest.userSkills.length, 1);
+    }
+  }
+
+  const corruptUserFrames = userFrames.map((frame, index) =>
+    index === 0
+      ? {
+          ...frame,
+          content: Uint8Array.from(
+            Buffer.from("corrupt\n", "utf8")
+          )
+        }
+      : frame
+  );
+  const corrupted = writeExactExportPackage({
+    manifest: full,
+    frames: [...parsed.value.frames, ...corruptUserFrames]
+  });
+  assert.equal(corrupted.ok, false);
+  if (!corrupted.ok) {
+    assert.equal(
+      corrupted.error.code,
+      "InvalidExportPackage"
+    );
+    if (corrupted.error.code === "InvalidExportPackage") {
+      assert.equal(
+        corrupted.error.facts.reason,
+        "user-content-digest-mismatch"
+      );
+      assert.equal(
+        corrupted.error.facts.path,
+        userFixture.payloadId
+      );
+    }
   }
 });
 
@@ -306,6 +398,19 @@ function assertInvalid(
       assert.equal(result.error.facts.path, path);
     }
   }
+}
+
+async function readUserPayloadFixture(): Promise<UserPayloadFixture> {
+  return JSON.parse(
+    await readFile(
+      resolve(
+        "behavior-fixtures",
+        "export",
+        "user-payload-v1.json"
+      ),
+      "utf8"
+    )
+  ) as UserPayloadFixture;
 }
 
 async function readFixture(): Promise<Fixture> {
