@@ -21,9 +21,9 @@ import type {
   LifecycleCandidatePlan
 } from "../lifecycle-candidate.js";
 import {
-  addAcceptedTargetRoots,
-  type AddAcceptedTargetRootsError
-} from "./add-root.js";
+  applyAcceptedRequirementChange,
+  type AcceptedRequirementChangeError
+} from "./requirement-change.js";
 
 export type ReleaseRetargetFact = Extract<
   SourceAuthorizationDelta,
@@ -50,7 +50,7 @@ export type ReleaseRetargetAuthorizationFailed = ProductError<
 >;
 
 export type UpdateAcceptedTargetError =
-  | AddAcceptedTargetRootsError
+  | AcceptedRequirementChangeError
   | ReleaseRetargetAuthorizationRequired
   | ReleaseRetargetAuthorizationFailed;
 
@@ -101,13 +101,13 @@ export async function updateAcceptedTarget(
     | ReleaseRetargetAuthorizationFailed
     | undefined;
 
-  const result = await addAcceptedTargetRoots({
+  const result = await applyAcceptedRequirementChange({
     home: input.home,
     targetId: input.targetId,
     targetRoot: input.targetRoot,
     lock: input.lock,
     registry: input.registry,
-    additions: [],
+    mutateRequirements: (current) => current,
     repositoryTransport: input.repositoryTransport,
     transport: input.transport,
     ...(input.credential === undefined
