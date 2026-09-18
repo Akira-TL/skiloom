@@ -1,0 +1,19 @@
+{
+  "fixtureVersion": 1,
+  "digest": "sha256:d1e27eb593724bc5bee911f50c09d3214281e8b385232a7fbae0d2e74ec354e8",
+  "payloadId": "user:sha256:d1e27eb593724bc5bee911f50c09d3214281e8b385232a7fbae0d2e74ec354e8",
+  "entries": [
+    {
+      "path": "a.txt",
+      "executable": false,
+      "contentBase64": "QQo=",
+      "fileDigest": "sha256:06f961b802bc46ee168555f066d28f4f0e9afdf3f88174c1ee6f9de004fc30a0"
+    },
+    {
+      "path": "bin/run.sh",
+      "executable": true,
+      "contentBase64": "IyEvYmluL3NoCg==",
+      "fileDigest": "sha256:a8076d3d28d21e02012b20eaf7dbf75409a6277134439025f282e368e3305abf"
+    }
+  ]
+}
