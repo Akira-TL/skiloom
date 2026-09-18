@@ -3,5 +3,6 @@ export { buildManagedProjectionTree } from "./transform.js";
 export { verifyManagedProjection } from "./verify.js";
 export {
   managedProjectionMaterializationCandidates,
-  materializeManagedProjection
+  materializeManagedProjection,
+  prepareManagedProjection
 } from "./materialize.js";

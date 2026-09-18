@@ -1,4 +1,4 @@
-import type { ProductError } from "../../domain/errors/index.js";
+import type { ProductError, Result } from "../../domain/errors/index.js";
 import type { TargetProjection } from "../../domain/target/index.js";
 import type { PackageStoreError } from "../store.js";
 import type { SkiloomHomePaths } from "../home.js";
@@ -34,6 +34,21 @@ export type MaterializedManagedProjection = Readonly<{
   storePayloadPath: string;
   packageCoordinate: string;
   contentDigest: string;
+}>;
+
+export type PreparedManagedProjection = Readonly<{
+  activationName: string;
+  activationPath: string;
+  stagingPath: string;
+  cleanupPath: string;
+  materialization: ManagedProjectionMaterialization;
+  storePayloadPath: string;
+  packageCoordinate: string;
+  contentDigest: string;
+  activate(): Promise<
+    Result<MaterializedManagedProjection, ManagedProjectionRuntimeError>
+  >;
+  discard(): Promise<void>;
 }>;
 
 export type VerifiedManagedProjection = Readonly<{

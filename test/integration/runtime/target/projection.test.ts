@@ -28,6 +28,7 @@ import { publishPackageSnapshot } from "../../../../src/runtime/store.js";
 import {
   managedProjectionMaterializationCandidates,
   materializeManagedProjection,
+  prepareManagedProjection,
   verifyManagedProjection
 } from "../../../../src/runtime/target-projection/index.js";
 
@@ -345,6 +346,61 @@ test("target root must be a real directory and is never followed through a symli
     });
     assertErrorCode(linkedRoot, "InvalidManagedProjectionInput");
     assert.equal(await readFile(join(foreignRoot, "KEEP"), "utf8"), "outside\n");
+  });
+});
+
+test("projection preparation creates verified sibling staging without changing the live activation", async () => {
+  await withRuntime(async ({ home, targetRoot }) => {
+    const currentSnapshot = snapshotFor("demo", "current before DB commit\n");
+    const nextSnapshot = snapshotFor("demo", "next after DB commit\n");
+    await publish(home, currentSnapshot);
+    await publish(home, nextSnapshot);
+
+    const current = directProjection(currentSnapshot);
+    const next = directProjection(nextSnapshot);
+    const initial = await materializeManagedProjection({
+      home,
+      targetRoot,
+      projection: current,
+      materialization: "copy"
+    });
+    assert.equal(initial.ok, true);
+
+    const prepared = await prepareManagedProjection({
+      home,
+      targetRoot,
+      projection: next,
+      materialization: "copy",
+      current: { projection: current, materialization: "copy" }
+    });
+    assert.equal(prepared.ok, true);
+    if (!prepared.ok) {
+      return;
+    }
+
+    assert.equal(
+      await readFile(join(targetRoot, "demo", "SKILL.md"), "utf8"),
+      skillMarkdown("demo", "current before DB commit\n")
+    );
+    assert.equal(
+      await readFile(join(prepared.value.stagingPath, "SKILL.md"), "utf8"),
+      skillMarkdown("demo", "next after DB commit\n")
+    );
+    assert.equal(prepared.value.activationPath, join(targetRoot, "demo"));
+    assert.equal(
+      prepared.value.cleanupPath.startsWith(join(targetRoot, ".skiloom-stage-demo-")),
+      true
+    );
+
+    await prepared.value.discard();
+    assert.equal(
+      await readFile(join(targetRoot, "demo", "SKILL.md"), "utf8"),
+      skillMarkdown("demo", "current before DB commit\n")
+    );
+    assert.deepEqual(
+      (await readdir(targetRoot)).filter((name) => name.startsWith(".skiloom-stage-")),
+      []
+    );
   });
 });
 

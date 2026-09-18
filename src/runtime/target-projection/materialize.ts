@@ -39,6 +39,7 @@ import type {
   ManagedProjectionTree,
   MaterializedManagedProjection,
   MaterializeManagedProjectionInput,
+  PreparedManagedProjection,
   TargetPathOccupied
 } from "./types.js";
 
@@ -57,6 +58,21 @@ export function managedProjectionMaterializationCandidates(
 export async function materializeManagedProjection(
   input: MaterializeManagedProjectionInput
 ): Promise<Result<MaterializedManagedProjection, ManagedProjectionRuntimeError>> {
+  const prepared = await prepareManagedProjection(input);
+  if (!prepared.ok) {
+    return prepared;
+  }
+
+  try {
+    return await prepared.value.activate();
+  } finally {
+    await prepared.value.discard();
+  }
+}
+
+export async function prepareManagedProjection(
+  input: MaterializeManagedProjectionInput
+): Promise<Result<PreparedManagedProjection, ManagedProjectionRuntimeError>> {
   if (!isAbsolute(input.targetRoot)) {
     return invalidProjection("target-root-not-absolute", input.targetRoot);
   }
@@ -105,53 +121,21 @@ export async function materializeManagedProjection(
     );
   }
 
-  const candidates = requestedCandidates(request, transformed);
   const activationPath = join(
     input.targetRoot,
     input.projection.activationName
   );
   const existsInitially = await pathExists(activationPath);
-
-  if (existsInitially) {
-    if (input.current === undefined) {
-      return targetOccupied(input.projection.activationName, activationPath);
-    }
-    if (
-      input.current.projection.activationName !==
-      input.projection.activationName
-    ) {
-      return invalidProjection(
-        "current-activation-mismatch",
-        input.current.projection.activationName
-      );
-    }
-    const currentVerified = await verifyManagedProjection({
-      home: input.home,
-      targetRoot: input.targetRoot,
-      expected: input.current
-    });
-    if (!currentVerified.ok) {
-      return currentVerified;
-    }
-  } else if (input.current !== undefined) {
-    const currentVerified = await verifyManagedProjection({
-      home: input.home,
-      targetRoot: input.targetRoot,
-      expected: input.current
-    });
-    if (!currentVerified.ok && currentVerified.error.code !== "ManagedProjectionMissing") {
-      return currentVerified;
-    }
+  const currentCheck = await verifyCurrentBeforeStaging(
+    input,
+    activationPath,
+    existsInitially
+  );
+  if (!currentCheck.ok) {
+    return currentCheck;
   }
 
-  let staged:
-    | Readonly<{
-        containerPath: string;
-        path: string;
-        materialization: ManagedProjectionMaterialization;
-      }>
-    | undefined;
-
+  const candidates = requestedCandidates(request, transformed);
   for (const candidate of candidates) {
     const stagingContainer = await mkdtemp(
       join(
@@ -160,6 +144,7 @@ export async function materializeManagedProjection(
       )
     );
     const stagingPath = join(stagingContainer, "projection");
+
     try {
       const built = await buildStagingProjection({
         stagingPath,
@@ -191,111 +176,186 @@ export async function materializeManagedProjection(
         return verified;
       }
 
-      staged = {
-        containerPath: stagingContainer,
-        path: stagingPath,
-        materialization: candidate
+      return {
+        ok: true,
+        value: preparedProjectionHandle({
+          input,
+          activationPath,
+          existsInitially,
+          cleanupPath: stagingContainer,
+          stagingPath,
+          materialization: candidate,
+          storePayloadPath: store.value.payloadPath
+        })
       };
-      break;
     } catch (error) {
       await removeOwnedContainer(stagingContainer);
       throw error;
     }
   }
 
-  if (staged === undefined) {
-    return materializationUnsupported(
-      candidates[0] ?? "copy",
-      process.platform
-    );
-  }
+  return materializationUnsupported(
+    candidates[0] ?? "copy",
+    process.platform
+  );
+}
 
-  try {
-    if (existsInitially) {
-      if (input.current === undefined) {
-        return targetOccupied(
-          input.projection.activationName,
-          activationPath
+function preparedProjectionHandle(input: Readonly<{
+  input: MaterializeManagedProjectionInput;
+  activationPath: string;
+  existsInitially: boolean;
+  cleanupPath: string;
+  stagingPath: string;
+  materialization: ManagedProjectionMaterialization;
+  storePayloadPath: string;
+}>): PreparedManagedProjection {
+  let lifecycle: "prepared" | "activated" | "discarded" = "prepared";
+  let cleanupSafe = true;
+
+  return {
+    activationName: input.input.projection.activationName,
+    activationPath: input.activationPath,
+    stagingPath: input.stagingPath,
+    cleanupPath: input.cleanupPath,
+    materialization: input.materialization,
+    storePayloadPath: input.storePayloadPath,
+    packageCoordinate: input.input.projection.packageCoordinate,
+    contentDigest: input.input.projection.contentDigest,
+    async activate() {
+      if (lifecycle !== "prepared") {
+        throw new Error(`prepared projection is already ${lifecycle}`);
+      }
+
+      if (input.existsInitially) {
+        if (input.input.current === undefined) {
+          return targetOccupied(
+            input.input.projection.activationName,
+            input.activationPath
+          );
+        }
+
+        const stillCurrent = await verifyManagedProjection({
+          home: input.input.home,
+          targetRoot: input.input.targetRoot,
+          expected: input.input.current
+        });
+        if (!stillCurrent.ok) {
+          return stillCurrent;
+        }
+
+        const retiredPath = join(input.cleanupPath, "retired");
+        await rename(input.activationPath, retiredPath);
+        try {
+          await rename(input.stagingPath, input.activationPath);
+        } catch (error) {
+          try {
+            if (!(await pathExists(input.activationPath))) {
+              await rename(retiredPath, input.activationPath);
+            } else {
+              cleanupSafe = false;
+            }
+          } catch {
+            cleanupSafe = false;
+          }
+          throw error;
+        }
+
+        lifecycle = "activated";
+        return materializedProjectionResult(
+          "replaced",
+          input.activationPath,
+          input.materialization,
+          input.storePayloadPath,
+          input.input
         );
       }
 
-      const stillCurrent = await verifyManagedProjection({
-        home: input.home,
-        targetRoot: input.targetRoot,
-        expected: input.current
-      });
-      if (!stillCurrent.ok) {
-        return stillCurrent;
+      if (await pathExists(input.activationPath)) {
+        return targetOccupied(
+          input.input.projection.activationName,
+          input.activationPath
+        );
       }
 
-      const retiredContainer = await mkdtemp(
-        join(
-          input.targetRoot,
-          ".skiloom-retired-" + input.projection.activationName + "-"
-        )
+      await rename(input.stagingPath, input.activationPath);
+      lifecycle = "activated";
+      return materializedProjectionResult(
+        "created",
+        input.activationPath,
+        input.materialization,
+        input.storePayloadPath,
+        input.input
       );
-      const retiredPath = join(retiredContainer, "projection");
-      try {
-        await rename(activationPath, retiredPath);
-      } catch (error) {
-        await removeOwnedContainer(retiredContainer);
-        throw error;
+    },
+    async discard() {
+      if (lifecycle === "discarded" || !cleanupSafe) {
+        return;
       }
-
-      try {
-        await rename(staged.path, activationPath);
-      } catch (error) {
-        let restored = false;
-        try {
-          if (!(await pathExists(activationPath))) {
-            await rename(retiredPath, activationPath);
-            restored = true;
-          }
-        } finally {
-          if (restored) {
-            await removeOwnedContainer(retiredContainer);
-          }
-        }
-        // If rollback itself fails, leave the owned retired container for #55 recovery.
-        throw error;
-      }
-      await removeOwnedContainer(retiredContainer);
-
-      return {
-        ok: true,
-        value: {
-          status: "replaced",
-          activationPath,
-          materialization: staged.materialization,
-          storePayloadPath: store.value.payloadPath,
-          packageCoordinate: input.projection.packageCoordinate,
-          contentDigest: input.projection.contentDigest
-        }
-      };
+      await removeOwnedContainer(input.cleanupPath);
+      lifecycle = "discarded";
     }
+  };
+}
 
-    if (await pathExists(activationPath)) {
-      return targetOccupied(
-        input.projection.activationName,
-        activationPath
+async function verifyCurrentBeforeStaging(
+  input: MaterializeManagedProjectionInput,
+  activationPath: string,
+  existsInitially: boolean
+): Promise<Result<true, ManagedProjectionRuntimeError>> {
+  if (existsInitially) {
+    if (input.current === undefined) {
+      return targetOccupied(input.projection.activationName, activationPath);
+    }
+    if (
+      input.current.projection.activationName !==
+      input.projection.activationName
+    ) {
+      return invalidProjection(
+        "current-activation-mismatch",
+        input.current.projection.activationName
       );
     }
-
-    await rename(staged.path, activationPath);
-    return {
-      ok: true,
-      value: {
-        status: "created",
-        activationPath,
-        materialization: staged.materialization,
-        storePayloadPath: store.value.payloadPath,
-        packageCoordinate: input.projection.packageCoordinate,
-        contentDigest: input.projection.contentDigest
-      }
-    };
-  } finally {
-    await removeOwnedContainer(staged.containerPath);
+    const currentVerified = await verifyManagedProjection({
+      home: input.home,
+      targetRoot: input.targetRoot,
+      expected: input.current
+    });
+    return currentVerified.ok
+      ? { ok: true, value: true }
+      : currentVerified;
   }
+
+  if (input.current !== undefined) {
+    const currentVerified = await verifyManagedProjection({
+      home: input.home,
+      targetRoot: input.targetRoot,
+      expected: input.current
+    });
+    if (!currentVerified.ok && currentVerified.error.code !== "ManagedProjectionMissing") {
+      return currentVerified;
+    }
+  }
+  return { ok: true, value: true };
+}
+
+function materializedProjectionResult(
+  status: MaterializedManagedProjection["status"],
+  activationPath: string,
+  materialization: ManagedProjectionMaterialization,
+  storePayloadPath: string,
+  input: MaterializeManagedProjectionInput
+): Result<MaterializedManagedProjection, never> {
+  return {
+    ok: true,
+    value: {
+      status,
+      activationPath,
+      materialization,
+      storePayloadPath,
+      packageCoordinate: input.projection.packageCoordinate,
+      contentDigest: input.projection.contentDigest
+    }
+  };
 }
 
 function requestedCandidates(
