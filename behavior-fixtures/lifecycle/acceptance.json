@@ -1,0 +1,116 @@
+{
+  "fixtureVersion": 1,
+  "cases": [
+    {
+      "id": "ordinary-change-requires-explicit-approval",
+      "noChange": false,
+      "mode": "apply",
+      "ordinaryApproval": false,
+      "releaseRetargetApproval": false,
+      "releaseRetargetRepositories": [],
+      "expected": {
+        "kind": "reject",
+        "error": {
+          "code": "InteractionRequired",
+          "facts": {
+            "reason": "ordinary-approval-required",
+            "repositories": []
+          }
+        }
+      }
+    },
+    {
+      "id": "ordinary-change-with-approval-is-accepted",
+      "noChange": false,
+      "mode": "apply",
+      "ordinaryApproval": true,
+      "releaseRetargetApproval": false,
+      "releaseRetargetRepositories": [],
+      "expected": {
+        "kind": "accept"
+      }
+    },
+    {
+      "id": "plan-never-requires-ordinary-or-retarget-approval",
+      "noChange": false,
+      "mode": "plan",
+      "ordinaryApproval": false,
+      "releaseRetargetApproval": false,
+      "releaseRetargetRepositories": [
+        "z/repo",
+        "a/repo"
+      ],
+      "expected": {
+        "kind": "plan"
+      }
+    },
+    {
+      "id": "identical-candidate-is-no-op-without-approval",
+      "noChange": true,
+      "mode": "apply",
+      "ordinaryApproval": false,
+      "releaseRetargetApproval": false,
+      "releaseRetargetRepositories": [],
+      "expected": {
+        "kind": "no-op"
+      }
+    },
+    {
+      "id": "ordinary-approval-alone-cannot-authorize-release-retarget",
+      "noChange": false,
+      "mode": "apply",
+      "ordinaryApproval": true,
+      "releaseRetargetApproval": false,
+      "releaseRetargetRepositories": [
+        "z/repo",
+        "a/repo"
+      ],
+      "expected": {
+        "kind": "reject",
+        "error": {
+          "code": "InteractionRequired",
+          "facts": {
+            "reason": "release-retarget-authorization-required",
+            "repositories": [
+              "a/repo",
+              "z/repo"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "retarget-approval-without-ordinary-approval-still-requires-ordinary-approval",
+      "noChange": false,
+      "mode": "apply",
+      "ordinaryApproval": false,
+      "releaseRetargetApproval": true,
+      "releaseRetargetRepositories": [
+        "a/repo"
+      ],
+      "expected": {
+        "kind": "reject",
+        "error": {
+          "code": "InteractionRequired",
+          "facts": {
+            "reason": "ordinary-approval-required",
+            "repositories": []
+          }
+        }
+      }
+    },
+    {
+      "id": "ordinary-and-retarget-approval-accept-high-risk-candidate",
+      "noChange": false,
+      "mode": "apply",
+      "ordinaryApproval": true,
+      "releaseRetargetApproval": true,
+      "releaseRetargetRepositories": [
+        "a/repo"
+      ],
+      "expected": {
+        "kind": "accept"
+      }
+    }
+  ]
+}

@@ -3,8 +3,7 @@ import { lstat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import {
-  parsePackageCoordinate,
-  parseRepositoryCoordinate
+  parsePackageCoordinate
 } from "../../../domain/coordinate/index.js";
 import {
   productError,
@@ -28,13 +27,15 @@ import {
 } from "../../../domain/target/preflight.js";
 import type { TargetRecoveryMarkerFacts } from "../../../domain/target/recovery.js";
 import type {
+  InteractionRequired
+} from "../../../domain/lifecycle/index.js";
+import type {
   OperationLockLost,
   OperationLockSession
 } from "../../../native/skiloom-lock.js";
 import type { SkiloomHomePaths } from "../../home.js";
 import type {
   MachineRegistry,
-  RegistryDirectRequirement,
   RegistryProjection,
   RegistryTargetState,
   RegistryTargetStateInput
@@ -69,6 +70,13 @@ import {
   repositoryFromPackageCoordinate,
   type LifecycleCandidateSnapshotError
 } from "./apply.js";
+import {
+  resolveLifecycleCandidateAcceptance,
+  type LifecycleCandidateAcceptanceCallback
+} from "./acceptance.js";
+import {
+  registryRequirementsToDomain
+} from "./requirements.js";
 import type {
   LifecycleInstallAcceptanceFailed,
   LifecycleMarkerSyncFailed
@@ -94,6 +102,7 @@ export type AcceptedRequirementChangeError =
   | OperationLockLost
   | LifecycleInstallAcceptanceFailed
   | LifecycleMarkerSyncFailed
+  | InteractionRequired
   | InvalidAcceptedRequirementChangeState
   | TargetPlanError
   | TargetOwnershipPreflightError
@@ -104,6 +113,11 @@ export type AcceptedRequirementChangeError =
 export type AcceptedRequirementChangeResult =
   | Readonly<{
       status: "no-op";
+      plan: LifecycleCandidatePlan;
+      state: RegistryTargetState;
+    }>
+  | Readonly<{
+      status: "planned";
       plan: LifecycleCandidatePlan;
       state: RegistryTargetState;
     }>
@@ -133,9 +147,7 @@ export type AcceptedRequirementChangeInput = Readonly<{
   sourceCachePath?: string;
   repositoryTransport: GitHubRepositoryTransport;
   transport: GitHubJsonTransport;
-  acceptCandidate: (
-    plan: LifecycleCandidatePlan
-  ) => boolean | Promise<boolean>;
+  acceptCandidate: LifecycleCandidateAcceptanceCallback;
   syncMarker: (
     marker: TargetRecoveryMarkerFacts
   ) => void | Promise<void>;
@@ -213,16 +225,41 @@ export async function applyAcceptedRequirementChange(
     };
   }
 
-  let accepted: boolean;
+  let acceptance;
   try {
-    accepted = await input.acceptCandidate(planned.value);
+    acceptance = resolveLifecycleCandidateAcceptance(
+      await input.acceptCandidate(planned.value)
+    );
   } catch {
     return {
       ok: false,
       error: productError("LifecycleInstallAcceptanceFailed", {})
     };
   }
-  if (!accepted) {
+  if (!acceptance.ok) {
+    return acceptance;
+  }
+  if (acceptance.value === "no-op") {
+    return {
+      ok: true,
+      value: {
+        status: "no-op",
+        plan: planned.value,
+        state: current
+      }
+    };
+  }
+  if (acceptance.value === "plan") {
+    return {
+      ok: true,
+      value: {
+        status: "planned",
+        plan: planned.value,
+        state: current
+      }
+    };
+  }
+  if (acceptance.value === "decline") {
     return {
       ok: true,
       value: {
@@ -360,73 +397,6 @@ export async function applyAcceptedRequirementChange(
       marker
     }
   };
-}
-
-function registryRequirementsToDomain(
-  targetId: string,
-  requirements: ReadonlyArray<RegistryDirectRequirement>
-): Result<
-  ReadonlyArray<DirectInstallRequirement>,
-  InvalidAcceptedRequirementChangeState
-> {
-  const result: DirectInstallRequirement[] = [];
-  for (const requirement of requirements) {
-    if (requirement.kind === "package") {
-      const coordinate = parsePackageCoordinate(requirement.coordinate);
-      if (!coordinate.ok) {
-        return invalidState(targetId, "invalid-direct-requirement");
-      }
-      result.push(
-        requirement.sourceKind === "git"
-          ? {
-              kind: "package",
-              coordinate: coordinate.value,
-              sourceKind: "git",
-              requestedRef: requirement.requestedRef
-            }
-          : {
-              kind: "package",
-              coordinate: coordinate.value,
-              sourceKind: "github-release",
-              ...(requirement.versionRequirement === null
-                ? {}
-                : {
-                    versionRequirement:
-                      requirement.versionRequirement
-                  })
-            }
-      );
-      continue;
-    }
-
-    const coordinate = parseRepositoryCoordinate(
-      requirement.coordinate
-    );
-    if (!coordinate.ok) {
-      return invalidState(targetId, "invalid-direct-requirement");
-    }
-    result.push(
-      requirement.sourceKind === "git"
-        ? {
-            kind: "repository",
-            coordinate: coordinate.value,
-            sourceKind: "git",
-            requestedRef: requirement.requestedRef
-          }
-        : {
-            kind: "repository",
-            coordinate: coordinate.value,
-            sourceKind: "github-release",
-            ...(requirement.versionRequirement === null
-              ? {}
-              : {
-                  versionRequirement:
-                    requirement.versionRequirement
-                })
-          }
-    );
-  }
-  return { ok: true, value: result };
 }
 
 function reconstructCurrentTargetPlan(

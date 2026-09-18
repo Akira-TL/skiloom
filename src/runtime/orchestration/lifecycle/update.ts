@@ -20,6 +20,9 @@ import type {
 import type {
   LifecycleCandidatePlan
 } from "../lifecycle-candidate.js";
+import type {
+  LifecycleCandidateAcceptanceCallback
+} from "./acceptance.js";
 import {
   applyAcceptedRequirementChange,
   type AcceptedRequirementChangeError
@@ -56,6 +59,11 @@ export type UpdateAcceptedTargetError =
 
 export type UpdateAcceptedTargetResult =
   | Readonly<{
+      status: "planned";
+      plan: LifecycleCandidatePlan;
+      state: RegistryTargetState;
+    }>
+  | Readonly<{
       status: "no-op";
       plan: LifecycleCandidatePlan;
       state: RegistryTargetState;
@@ -87,9 +95,7 @@ export type UpdateAcceptedTargetInput = Readonly<{
     retargets: ReadonlyArray<ReleaseRetargetFact>,
     plan: LifecycleCandidatePlan
   ) => boolean | Promise<boolean>;
-  acceptCandidate: (
-    plan: LifecycleCandidatePlan
-  ) => boolean | Promise<boolean>;
+  acceptCandidate: LifecycleCandidateAcceptanceCallback;
   syncMarker: (
     marker: TargetRecoveryMarkerFacts
   ) => void | Promise<void>;
@@ -168,6 +174,16 @@ export async function updateAcceptedTarget(
   }
   if (!result.ok) {
     return result;
+  }
+  if (result.value.status === "planned") {
+    return {
+      ok: true,
+      value: {
+        status: "planned",
+        plan: result.value.plan,
+        state: result.value.state
+      }
+    };
   }
   if (result.value.status === "no-op") {
     return {

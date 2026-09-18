@@ -8,9 +8,6 @@ import {
   type Result
 } from "../../../domain/errors/index.js";
 import type {
-  DirectInstallRequirement
-} from "../../../domain/resolver/index.js";
-import type {
   PackageSnapshotError
 } from "../../../domain/snapshot/index.js";
 import type {
@@ -25,6 +22,9 @@ import {
 import type {
   TargetRecoveryMarkerFacts
 } from "../../../domain/target/recovery.js";
+import type {
+  InteractionRequired
+} from "../../../domain/lifecycle/index.js";
 import type {
   OperationLockLost,
   OperationLockSession
@@ -50,6 +50,10 @@ import {
   prepareTargetReconciliation,
   type TargetReconciliationError
 } from "../target-reconcile.js";
+import {
+  resolveLifecycleCandidateAcceptance,
+  type LifecycleCandidateAcceptanceCallback
+} from "./acceptance.js";
 import {
   acquireLifecycleCandidatePackageSnapshots,
   buildMarkerFacts,
@@ -100,6 +104,7 @@ export type FirstAcceptedInstallError =
   | LifecycleCandidateError
   | OperationLockLost
   | LifecycleInstallAcceptanceFailed
+  | InteractionRequired
   | LifecycleFreshTargetConflict
   | InvalidLifecycleTargetIdentity
   | LifecycleCandidateSnapshotMismatch
@@ -114,6 +119,10 @@ export type FirstAcceptedInstallError =
   | LifecycleMarkerSyncFailed;
 
 export type FirstAcceptedInstallResult =
+  | Readonly<{
+      status: "planned";
+      plan: LifecycleCandidatePlan;
+    }>
   | Readonly<{
       status: "declined";
       plan: LifecycleCandidatePlan;
@@ -132,9 +141,7 @@ export type FirstAcceptedInstallInput =
       targetRoot: string;
       lock: OperationLockSession;
       registry: MachineRegistry;
-      acceptCandidate: (
-        plan: LifecycleCandidatePlan
-      ) => boolean | Promise<boolean>;
+      acceptCandidate: LifecycleCandidateAcceptanceCallback;
       syncMarker: (
         marker: TargetRecoveryMarkerFacts
       ) => void | Promise<void>;
@@ -173,16 +180,33 @@ export async function executeFirstAcceptedInstall(
     return heldAfterPlanning;
   }
 
-  let accepted: boolean;
+  let acceptance;
   try {
-    accepted = await input.acceptCandidate(planned.value);
+    acceptance = resolveLifecycleCandidateAcceptance(
+      await input.acceptCandidate(planned.value)
+    );
   } catch {
     return {
       ok: false,
       error: productError("LifecycleInstallAcceptanceFailed", {})
     };
   }
-  if (!accepted) {
+  if (!acceptance.ok) {
+    return acceptance;
+  }
+  if (
+    acceptance.value === "plan" ||
+    acceptance.value === "no-op"
+  ) {
+    return {
+      ok: true,
+      value: {
+        status: "planned",
+        plan: planned.value
+      }
+    };
+  }
+  if (acceptance.value === "decline") {
     return {
       ok: true,
       value: {
@@ -426,15 +450,5 @@ function isNotFound(
     error instanceof Error &&
     "code" in error &&
     error.code === "ENOENT"
-  );
-}
-
-function compareUtf8(
-  left: string,
-  right: string
-): number {
-  return Buffer.compare(
-    Buffer.from(left, "utf8"),
-    Buffer.from(right, "utf8")
   );
 }
