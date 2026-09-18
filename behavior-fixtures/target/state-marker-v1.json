@@ -1,0 +1,185 @@
+{
+  "fixtureVersion": 1,
+  "valid": [
+    {
+      "id": "complete-mixed-marker",
+      "source": "format = \"SKILOOM-STATE-V1\"\ntarget-id = \"550e8400-e29b-41d4-a716-446655440000\"\ngeneration = 12\n\n[[requirements]]\nkind = \"repository\"\ncoordinate = \"akira-tl/extra-skills\"\nsource = \"git\"\nref = \"main\"\n\n[[requirements]]\nkind = \"package\"\ncoordinate = \"akira-tl/skills/ask-matt\"\nsource = \"github-release\"\nversion = \"^1.4.0\"\n\n[[projection-overrides]]\npackage = \"akira-tl/skills/ask-matt\"\nactivation-name = \"matt\"\n\n[[detached]]\npackage = \"akira-tl/skills/git-helper\"\nbaseline-source = \"git\"\nbaseline-ref = \"main\"\nbaseline-commit = \"0123456789abcdef0123456789abcdef01234567\"\nbaseline-package-root = \"skills/git-helper\"\nbaseline-content-digest = \"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"\n\n[[detached]]\npackage = \"akira-tl/skills/local-helper\"\nbaseline-source = \"github-release\"\nbaseline-version = \"1.2.0\"\nbaseline-tag = \"v1.2.0\"\nbaseline-commit = \"abcdef0123456789abcdef0123456789abcdef01\"\nbaseline-package-root = \"skills/local-helper\"\nbaseline-content-digest = \"sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789\"\n",
+      "expected": {
+        "targetId": "550e8400-e29b-41d4-a716-446655440000",
+        "generation": 12,
+        "requirements": [
+          {
+            "kind": "package",
+            "coordinate": "akira-tl/skills/ask-matt",
+            "sourceKind": "github-release",
+            "versionRequirement": "^1.4.0"
+          },
+          {
+            "kind": "repository",
+            "coordinate": "akira-tl/extra-skills",
+            "sourceKind": "git",
+            "requestedRef": "main"
+          }
+        ],
+        "projectionOverrides": [
+          {
+            "packageCoordinate": "akira-tl/skills/ask-matt",
+            "activationName": "matt"
+          }
+        ],
+        "detached": [
+          {
+            "packageCoordinate": "akira-tl/skills/git-helper",
+            "sourceKind": "git",
+            "requestedRef": "main",
+            "exactCommit": "0123456789abcdef0123456789abcdef01234567",
+            "packageRoot": "skills/git-helper",
+            "contentDigest": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+          },
+          {
+            "packageCoordinate": "akira-tl/skills/local-helper",
+            "sourceKind": "github-release",
+            "version": "1.2.0",
+            "actualTag": "v1.2.0",
+            "exactCommit": "abcdef0123456789abcdef0123456789abcdef01",
+            "packageRoot": "skills/local-helper",
+            "contentDigest": "sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+          }
+        ]
+      },
+      "canonical": "format = \"SKILOOM-STATE-V1\"\ntarget-id = \"550e8400-e29b-41d4-a716-446655440000\"\ngeneration = 12\n\n[[requirements]]\nkind = \"package\"\ncoordinate = \"akira-tl/skills/ask-matt\"\nsource = \"github-release\"\nversion = \"^1.4.0\"\n\n[[requirements]]\nkind = \"repository\"\ncoordinate = \"akira-tl/extra-skills\"\nsource = \"git\"\nref = \"main\"\n\n[[projection-overrides]]\npackage = \"akira-tl/skills/ask-matt\"\nactivation-name = \"matt\"\n\n[[detached]]\npackage = \"akira-tl/skills/git-helper\"\nbaseline-source = \"git\"\nbaseline-ref = \"main\"\nbaseline-commit = \"0123456789abcdef0123456789abcdef01234567\"\nbaseline-package-root = \"skills/git-helper\"\nbaseline-content-digest = \"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"\n\n[[detached]]\npackage = \"akira-tl/skills/local-helper\"\nbaseline-source = \"github-release\"\nbaseline-version = \"1.2.0\"\nbaseline-tag = \"v1.2.0\"\nbaseline-commit = \"abcdef0123456789abcdef0123456789abcdef01\"\nbaseline-package-root = \"skills/local-helper\"\nbaseline-content-digest = \"sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789\"\n"
+    },
+    {
+      "id": "minimal-marker",
+      "source": "generation = 0\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\nformat = \"SKILOOM-STATE-V1\"\n",
+      "expected": {
+        "targetId": "11111111-1111-4111-8111-111111111111",
+        "generation": 0,
+        "requirements": [],
+        "projectionOverrides": [],
+        "detached": []
+      },
+      "canonical": "format = \"SKILOOM-STATE-V1\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 0\n"
+    }
+  ],
+  "invalid": [
+    {
+      "id": "invalid-toml",
+      "source": "format = [",
+      "code": "InvalidTargetState",
+      "reason": "invalid-toml",
+      "path": "$"
+    },
+    {
+      "id": "missing-target-id",
+      "source": "format = \"SKILOOM-STATE-V1\"\ngeneration = 1\n",
+      "code": "InvalidTargetState",
+      "reason": "missing-field",
+      "path": "target-id"
+    },
+    {
+      "id": "unknown-top-level",
+      "source": "format = \"SKILOOM-STATE-V1\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 1\nsecret = \"x\"\n",
+      "code": "InvalidTargetState",
+      "reason": "unknown-field",
+      "path": "secret"
+    },
+    {
+      "id": "future-version",
+      "source": "format = \"SKILOOM-STATE-V2\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 1\n",
+      "code": "UnsupportedTargetStateVersion",
+      "format": "SKILOOM-STATE-V2"
+    },
+    {
+      "id": "noncanonical-uuid",
+      "source": "format = \"SKILOOM-STATE-V1\"\ntarget-id = \"550E8400-E29B-41D4-A716-446655440000\"\ngeneration = 1\n",
+      "code": "InvalidTargetState",
+      "reason": "invalid-field",
+      "path": "target-id"
+    },
+    {
+      "id": "negative-generation",
+      "source": "format = \"SKILOOM-STATE-V1\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = -1\n",
+      "code": "InvalidTargetState",
+      "reason": "invalid-field",
+      "path": "generation"
+    },
+    {
+      "id": "noncanonical-coordinate",
+      "source": "format = \"SKILOOM-STATE-V1\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 1\n[[requirements]]\nkind = \"package\"\ncoordinate = \"Akira-TL/Skills/ask-matt\"\nsource = \"github-release\"\n",
+      "code": "InvalidTargetState",
+      "reason": "invalid-field",
+      "path": "requirements[0].coordinate"
+    },
+    {
+      "id": "mixed-release-ref",
+      "source": "format = \"SKILOOM-STATE-V1\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 1\n[[requirements]]\nkind = \"repository\"\ncoordinate = \"akira-tl/skills\"\nsource = \"github-release\"\nref = \"main\"\n",
+      "code": "InvalidTargetState",
+      "reason": "unknown-field",
+      "path": "requirements[0].ref"
+    },
+    {
+      "id": "duplicate-requirement",
+      "source": "format = \"SKILOOM-STATE-V1\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 1\n[[requirements]]\nkind = \"package\"\ncoordinate = \"akira-tl/skills/a\"\nsource = \"github-release\"\n[[requirements]]\nkind = \"package\"\ncoordinate = \"akira-tl/skills/a\"\nsource = \"git\"\nref = \"main\"\n",
+      "code": "InvalidTargetState",
+      "reason": "duplicate-requirement",
+      "path": "requirements[1]"
+    },
+    {
+      "id": "default-projection-override",
+      "source": "format = \"SKILOOM-STATE-V1\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 1\n[[projection-overrides]]\npackage = \"akira-tl/skills/ask-matt\"\nactivation-name = \"ask-matt\"\n",
+      "code": "InvalidTargetState",
+      "reason": "default-projection-override",
+      "path": "projection-overrides[0]"
+    },
+    {
+      "id": "duplicate-activation-override",
+      "source": "format = \"SKILOOM-STATE-V1\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 1\n[[projection-overrides]]\npackage = \"akira-tl/skills/a\"\nactivation-name = \"same\"\n[[projection-overrides]]\npackage = \"akira-tl/skills/b\"\nactivation-name = \"same\"\n",
+      "code": "InvalidTargetState",
+      "reason": "contradictory-sparse-metadata",
+      "path": "projection-overrides[1].activation-name"
+    },
+    {
+      "id": "git-detached-mixed-release-fields",
+      "source": "format = \"SKILOOM-STATE-V1\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 1\n[[detached]]\npackage = \"akira-tl/skills/a\"\nbaseline-source = \"git\"\nbaseline-ref = \"main\"\nbaseline-version = \"1.0.0\"\nbaseline-commit = \"0123456789abcdef0123456789abcdef01234567\"\nbaseline-package-root = \"skills/a\"\nbaseline-content-digest = \"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"\n",
+      "code": "InvalidTargetState",
+      "reason": "unknown-field",
+      "path": "detached[0].baseline-version"
+    },
+    {
+      "id": "noncanonical-version-requirement",
+      "source": "format = \"SKILOOM-STATE-V1\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 1\n[[requirements]]\nkind = \"package\"\ncoordinate = \"akira-tl/skills/a\"\nsource = \"github-release\"\nversion = \" ^1.0.0 \"\n",
+      "code": "InvalidTargetState",
+      "reason": "invalid-field",
+      "path": "requirements[0].version"
+    },
+    {
+      "id": "duplicate-projection-package",
+      "source": "format = \"SKILOOM-STATE-V1\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 1\n[[projection-overrides]]\npackage = \"akira-tl/skills/a\"\nactivation-name = \"x\"\n[[projection-overrides]]\npackage = \"akira-tl/skills/a\"\nactivation-name = \"y\"\n",
+      "code": "InvalidTargetState",
+      "reason": "duplicate-projection-override",
+      "path": "projection-overrides[1]"
+    },
+    {
+      "id": "duplicate-detached-package",
+      "source": "format = \"SKILOOM-STATE-V1\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 1\n[[detached]]\npackage = \"akira-tl/skills/a\"\nbaseline-source = \"git\"\nbaseline-ref = \"main\"\nbaseline-commit = \"0123456789abcdef0123456789abcdef01234567\"\nbaseline-package-root = \"skills/a\"\nbaseline-content-digest = \"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"\n[[detached]]\npackage = \"akira-tl/skills/a\"\nbaseline-source = \"git\"\nbaseline-ref = \"dev\"\nbaseline-commit = \"abcdef0123456789abcdef0123456789abcdef01\"\nbaseline-package-root = \"skills/a\"\nbaseline-content-digest = \"sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789\"\n",
+      "code": "InvalidTargetState",
+      "reason": "duplicate-detached",
+      "path": "detached[1]"
+    },
+    {
+      "id": "invalid-detached-package-root",
+      "source": "format = \"SKILOOM-STATE-V1\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 1\n[[detached]]\npackage = \"akira-tl/skills/a\"\nbaseline-source = \"git\"\nbaseline-ref = \"main\"\nbaseline-commit = \"0123456789abcdef0123456789abcdef01234567\"\nbaseline-package-root = \"../a\"\nbaseline-content-digest = \"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\"\n",
+      "code": "InvalidTargetState",
+      "reason": "invalid-field",
+      "path": "detached[0].baseline-package-root"
+    },
+    {
+      "id": "invalid-detached-digest",
+      "source": "format = \"SKILOOM-STATE-V1\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 1\n[[detached]]\npackage = \"akira-tl/skills/a\"\nbaseline-source = \"git\"\nbaseline-ref = \"main\"\nbaseline-commit = \"0123456789abcdef0123456789abcdef01234567\"\nbaseline-package-root = \"skills/a\"\nbaseline-content-digest = \"sha256:BAD\"\n",
+      "code": "InvalidTargetState",
+      "reason": "invalid-field",
+      "path": "detached[0].baseline-content-digest"
+    }
+  ]
+}
