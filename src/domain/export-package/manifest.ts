@@ -22,11 +22,6 @@ import {
   type PublicFormatIssue
 } from "../public-format/common.js";
 import { isValidSkillName } from "../coordinate/index.js";
-import {
-  matchesReleaseRequirement,
-  parseReleaseRequirement,
-  parseReleaseVersion
-} from "../requirement/index.js";
 import type {
   ExactExportDependency,
   ExactExportDetached,
@@ -39,6 +34,9 @@ import type {
   InvalidExportPackage,
   InvalidExportPackageReason
 } from "./types.js";
+import {
+  validateExactExportManifestCrossRecords
+} from "./validate.js";
 
 const FORMAT = "SKILOOM-EXPORT-V1";
 const FUTURE_FORMAT_PATTERN = /^SKILOOM-EXPORT-V[0-9]+$/u;
@@ -139,8 +137,12 @@ export function parseExactExportManifest(
     detached: detached.value,
     userSkills: userSkills.value
   };
-  const cross = validateCrossRecords(manifest);
-  return cross.ok ? { ok: true, value: manifest } : cross;
+  const cross = validateExactExportManifestCrossRecords(
+    manifest
+  );
+  return cross.ok
+    ? { ok: true, value: manifest }
+    : cross;
 }
 
 export function writeExactExportManifest(
@@ -538,102 +540,6 @@ function parseUserSkills(
     });
   }
   return { ok: true, value: result.sort(compareUserSkills) };
-}
-
-function validateCrossRecords(
-  manifest: ExactExportManifest
-): Result<void, InvalidExportPackage> {
-  const sourceByRepository = new Map(
-    manifest.sources.map((entry) => [
-      entry.repositoryCoordinate,
-      entry
-    ])
-  );
-  const sources = new Set(sourceByRepository.keys());
-  const packages = new Map(
-    manifest.packages.map((entry) => [entry.packageCoordinate, entry])
-  );
-  const projections = new Map(
-    manifest.projections.map((entry) => [entry.packageCoordinate, entry])
-  );
-
-  for (let index = 0; index < manifest.packages.length; index += 1) {
-    const packageFact = manifest.packages[index]!;
-    const repository = packageFact.packageCoordinate.split("/").slice(0, 2).join("/");
-    if (!sources.has(repository)) return invalid("dangling-reference", `packages[${index}].coordinate`);
-    if (!projections.has(packageFact.packageCoordinate)) return invalid("projection-missing", `packages[${index}].coordinate`);
-  }
-  for (let index = 0; index < manifest.projections.length; index += 1) {
-    if (!packages.has(manifest.projections[index]!.packageCoordinate)) return invalid("dangling-reference", `projections[${index}].package`);
-  }
-  for (let index = 0; index < manifest.dependencies.length; index += 1) {
-    const edge = manifest.dependencies[index]!;
-    if (!packages.has(edge.fromPackageCoordinate)) return invalid("dangling-reference", `dependencies[${index}].from`);
-    if (!packages.has(edge.toPackageCoordinate)) return invalid("dangling-reference", `dependencies[${index}].to`);
-  }
-  for (let index = 0; index < manifest.requirements.length; index += 1) {
-    const requirement = manifest.requirements[index]!;
-    if (
-      requirement.kind === "package" &&
-      !packages.has(requirement.coordinate)
-    ) {
-      return invalid("dangling-reference", `requirements[${index}].coordinate`);
-    }
-    const repository =
-      requirement.kind === "package"
-        ? requirement.coordinate.split("/").slice(0, 2).join("/")
-        : requirement.coordinate;
-    const source = sourceByRepository.get(repository);
-    if (source === undefined) {
-      return invalid("dangling-reference", `requirements[${index}].coordinate`);
-    }
-    if (source.sourceKind !== requirement.sourceKind) {
-      return invalid("source-conflict", `requirements[${index}].source`);
-    }
-    if (
-      requirement.sourceKind === "github-release" &&
-      requirement.versionRequirement !== null
-    ) {
-      const parsedRequirement = parseReleaseRequirement(
-        requirement.versionRequirement
-      );
-      const parsedVersion =
-        source.sourceKind === "github-release"
-          ? parseReleaseVersion(source.version)
-          : null;
-      if (
-        !parsedRequirement.ok ||
-        parsedVersion === null ||
-        !parsedVersion.ok ||
-        !matchesReleaseRequirement(
-          parsedRequirement.value,
-          parsedVersion.value
-        )
-      ) {
-        return invalid(
-          "requirement-mismatch",
-          `requirements[${index}].version`
-        );
-      }
-    }
-  }
-
-  const projectionActivations = new Set(
-    manifest.projections.map((entry) => entry.activationName)
-  );
-  for (let index = 0; index < manifest.detached.length; index += 1) {
-    const detached = manifest.detached[index]!;
-    if (!packages.has(detached.packageCoordinate)) return invalid("dangling-reference", `detached[${index}].package`);
-    const projection = projections.get(detached.packageCoordinate);
-    if (projection?.activationName !== detached.activationName) return invalid("dangling-reference", `detached[${index}].activation-name`);
-  }
-  for (let index = 0; index < manifest.userSkills.length; index += 1) {
-    const userSkill = manifest.userSkills[index]!;
-    if (projectionActivations.has(userSkill.activationName)) {
-      return invalid("activation-conflict", `user-skills[${index}].activation-name`);
-    }
-  }
-  return { ok: true, value: undefined };
 }
 
 function writeSource(source: ExactExportSource): ReadonlyArray<string> {

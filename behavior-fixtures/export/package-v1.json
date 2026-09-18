@@ -62,6 +62,20 @@
       "code": "InvalidExportPackage",
       "reason": "requirement-mismatch",
       "path": "requirements[0].version"
+    },
+    {
+      "id": "unused-source",
+      "source": "format = \"SKILOOM-EXPORT-V1\"\nmode = \"dependencies\"\n\n[[requirements]]\nkind = \"package\"\ncoordinate = \"acme/demo/demo\"\nsource = \"github-release\"\nversion = \"^1.0.0\"\n\n[[sources]]\nrepository = \"acme/demo\"\nkind = \"github-release\"\nversion = \"1.0.0\"\ntag = \"v1.0.0\"\ncommit = \"0123456789abcdef0123456789abcdef01234567\"\nimmutable = true\n\n[[packages]]\ncoordinate = \"acme/demo/demo\"\npackage-root = \".\"\ncontent-digest = \"sha256:9fb27d8c29f7e2dce0630bed77971698b62914f258e6e9a6a57334618e8278f5\"\npayload = \"package:sha256:9fb27d8c29f7e2dce0630bed77971698b62914f258e6e9a6a57334618e8278f5\"\n\n[[projections]]\npackage = \"acme/demo/demo\"\nactivation-name = \"demo\"\n\n[[sources]]\nrepository = \"acme/unused\"\nkind = \"git\"\ncommit = \"abcdef0123456789abcdef0123456789abcdef01\"\n",
+      "code": "InvalidExportPackage",
+      "reason": "unused-source",
+      "path": "sources[1].repository"
+    },
+    {
+      "id": "unreachable-package",
+      "source": "format = \"SKILOOM-EXPORT-V1\"\nmode = \"dependencies\"\n\n[[requirements]]\nkind = \"package\"\ncoordinate = \"acme/demo/demo\"\nsource = \"github-release\"\nversion = \"^1.0.0\"\n\n[[sources]]\nrepository = \"acme/demo\"\nkind = \"github-release\"\nversion = \"1.0.0\"\ntag = \"v1.0.0\"\ncommit = \"0123456789abcdef0123456789abcdef01234567\"\nimmutable = true\n\n[[packages]]\ncoordinate = \"acme/demo/demo\"\npackage-root = \".\"\ncontent-digest = \"sha256:9fb27d8c29f7e2dce0630bed77971698b62914f258e6e9a6a57334618e8278f5\"\npayload = \"package:sha256:9fb27d8c29f7e2dce0630bed77971698b62914f258e6e9a6a57334618e8278f5\"\n\n[[projections]]\npackage = \"acme/demo/demo\"\nactivation-name = \"demo\"\n\n[[packages]]\ncoordinate = \"acme/demo/orphan\"\npackage-root = \"orphan\"\ncontent-digest = \"sha256:9fb27d8c29f7e2dce0630bed77971698b62914f258e6e9a6a57334618e8278f5\"\npayload = \"package:sha256:9fb27d8c29f7e2dce0630bed77971698b62914f258e6e9a6a57334618e8278f5\"\n\n[[projections]]\npackage = \"acme/demo/orphan\"\nactivation-name = \"orphan\"\n",
+      "code": "InvalidExportPackage",
+      "reason": "unreachable-package",
+      "path": "packages[1].coordinate"
     }
   ]
 }

@@ -92,6 +92,8 @@ export type InvalidExportPackageReason =
   | "dangling-reference"
   | "source-conflict"
   | "requirement-mismatch"
+  | "unreachable-package"
+  | "unused-source"
   | "projection-missing"
   | "activation-conflict"
   | "payload-id-mismatch"
