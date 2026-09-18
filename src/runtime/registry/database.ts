@@ -21,6 +21,7 @@ import {
 } from "./schema.js";
 import {
   beginPendingOperationRows,
+  beginPendingReconciliationRows,
   completePendingOperationRows,
   RegistryPendingOperationConflictError,
   replaceTargetRows
@@ -104,6 +105,36 @@ export class MachineRegistry {
       return {
         ok: true,
         value: beginPendingOperationRows(this.#database, targetId, pending)
+      };
+    } catch (error) {
+      if (
+        error instanceof RegistryPendingOperationConflictError ||
+        isConstraintError(error)
+      ) {
+        return {
+          ok: false,
+          error: productError("RegistryPendingOperationRejected", {
+            targetId,
+            reason: "conflict"
+          })
+        };
+      }
+      throw error;
+    }
+  }
+
+  beginPendingReconciliation(
+    targetId: string,
+    pending: RegistryPendingOperationInput
+  ): Result<RegistryPendingOperation, RegistryPendingOperationRejected> {
+    try {
+      return {
+        ok: true,
+        value: beginPendingReconciliationRows(
+          this.#database,
+          targetId,
+          pending
+        )
       };
     } catch (error) {
       if (

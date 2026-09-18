@@ -62,6 +62,52 @@ export function beginPendingOperationRows(
   }
 }
 
+export function beginPendingReconciliationRows(
+  database: DatabaseSync,
+  targetId: string,
+  pending: RegistryPendingOperationInput
+): RegistryPendingOperation {
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const generation = readGeneration(database, targetId);
+    if (generation < 1) {
+      throw new RegistryPendingOperationConflictError(
+        "registry target has no accepted generation to reconcile"
+      );
+    }
+
+    const existingPending = database
+      .prepare("SELECT COUNT(*) AS pending_count FROM pending_operations WHERE target_id = ?")
+      .get(targetId);
+    const count = existingPending?.pending_count;
+    if (typeof count !== "number" || !Number.isSafeInteger(count)) {
+      throw new Error("invalid pending operation count");
+    }
+    if (count !== 0) {
+      throw new RegistryPendingOperationConflictError(
+        "registry target already has a pending operation"
+      );
+    }
+
+    const operation = insertPendingOperation(
+      database,
+      targetId,
+      generation - 1,
+      generation,
+      pending
+    );
+    database.exec("COMMIT");
+    return operation;
+  } catch (error) {
+    try {
+      database.exec("ROLLBACK");
+    } catch {
+      // Preserve the original transaction failure.
+    }
+    throw error;
+  }
+}
+
 export function completePendingOperationRows(
   database: DatabaseSync,
   operationId: string

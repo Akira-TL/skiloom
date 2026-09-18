@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { join, resolve } from "node:path";
+import {
+  join,
+  resolve
+} from "node:path";
 
 import {
   productError,
@@ -28,7 +31,13 @@ import type {
 } from "../registry/index.js";
 import { verifyPackageStoreEntry } from "../store.js";
 import {
+  isSafePendingStagingPath,
+  removePendingStagingPath,
+  sameAcceptedState
+} from "./target-reconcile-state.js";
+import {
   prepareManagedProjection,
+  removeManagedProjection,
   type ManagedProjectionRuntimeError,
   type PreparedManagedProjection
 } from "../target-projection/index.js";
@@ -44,7 +53,9 @@ export type InvalidTargetReconciliationInput = ProductError<
       | "missing-registry-package"
       | "missing-registry-projection"
       | "registry-projection-mismatch"
-      | "unsupported-preflight-action";
+      | "unsupported-preflight-action"
+      | "unsafe-pending-staging-path"
+      | "accepted-state-mismatch";
     subject: string;
   }>
 >;
@@ -55,6 +66,25 @@ export type TargetReconciliationError =
   | RegistryPendingLockedError
   | RegistryReplaceLockedError
   | OperationLockLost;
+
+export type CleanupPendingTargetStagingInput = Readonly<{
+  targetId: string;
+  targetRoot: string;
+  lock: OperationLockSession;
+  registry: MachineRegistry;
+}>;
+
+export type ReconcileAcceptedTargetStateInput = Readonly<{
+  home: SkiloomHomePaths;
+  targetRoot: string;
+  operationId: string;
+  lock: OperationLockSession;
+  registry: MachineRegistry;
+  desiredPlan: TargetPlan;
+  preflight: TargetOwnershipPreflight;
+  currentProjections: ReadonlyArray<TargetOwnedProjection>;
+  acceptedState: RegistryTargetStateInput;
+}>;
 
 export type PrepareTargetReconciliationInput = Readonly<{
   home: SkiloomHomePaths;
@@ -96,6 +126,191 @@ type StageRequest = Readonly<{
   current: TargetOwnedProjection | undefined;
 }>;
 
+type RemovalRequest = Readonly<{
+  activationName: string;
+  current: TargetOwnedProjection;
+}>;
+
+type ReconciliationRequests = Readonly<{
+  stages: ReadonlyArray<StageRequest>;
+  removals: ReadonlyArray<RemovalRequest>;
+}>;
+
+export async function cleanupPendingTargetStaging(
+  input: CleanupPendingTargetStagingInput
+): Promise<Result<void, TargetReconciliationError>> {
+  const held = input.lock.checkHeld();
+  if (!held.ok) {
+    return held;
+  }
+
+  const pending = input.registry.readPendingOperations();
+  if (!pending.ok) {
+    return pending;
+  }
+  const operations = pending.value.filter(
+    (operation) => operation.targetId === input.targetId
+  );
+
+  for (const operation of operations) {
+    for (const action of operation.actions) {
+      if (!isSafePendingStagingPath(input.targetRoot, action)) {
+        return invalidInput(
+          "unsafe-pending-staging-path",
+          action.stagingPath
+        );
+      }
+    }
+  }
+
+  for (const operation of operations) {
+    for (const action of operation.actions) {
+      const stillHeld = input.lock.checkHeld();
+      if (!stillHeld.ok) {
+        return stillHeld;
+      }
+      await removePendingStagingPath(action.stagingPath);
+    }
+
+    const completed = input.registry.completePendingOperation(
+      operation.operationId
+    );
+    if (!completed.ok) {
+      return completed;
+    }
+  }
+
+  return { ok: true, value: undefined };
+}
+
+export async function reconcileAcceptedTargetState(
+  input: ReconcileAcceptedTargetStateInput
+): Promise<Result<RegistryTargetState, TargetReconciliationError>> {
+  const held = input.lock.checkHeld();
+  if (!held.ok) {
+    return held;
+  }
+
+  const accepted = input.registry.readTargetState(input.acceptedState.targetId);
+  if (!accepted.ok) {
+    return accepted;
+  }
+  if (
+    accepted.value === undefined ||
+    !sameAcceptedState(accepted.value, input.acceptedState)
+  ) {
+    return invalidInput(
+      "accepted-state-mismatch",
+      input.acceptedState.targetId
+    );
+  }
+
+  const cleaned = await cleanupPendingTargetStaging({
+    targetId: input.acceptedState.targetId,
+    targetRoot: input.targetRoot,
+    lock: input.lock,
+    registry: input.registry
+  });
+  if (!cleaned.ok) {
+    return cleaned;
+  }
+
+  const orchestrationInput: PrepareTargetReconciliationInput = {
+    home: input.home,
+    targetRoot: input.targetRoot,
+    operationId: input.operationId,
+    lock: input.lock,
+    registry: input.registry,
+    desiredPlan: input.desiredPlan,
+    preflight: input.preflight,
+    currentProjections: input.currentProjections,
+    nextState: input.acceptedState
+  };
+
+  const requests = validateAndBuildReconciliationRequests(orchestrationInput);
+  if (!requests.ok) {
+    return requests;
+  }
+
+  for (const packageFact of [...input.acceptedState.resolvedPackages].sort(
+    (left, right) =>
+      compareStrings(left.packageCoordinate, right.packageCoordinate)
+  )) {
+    const stillHeld = input.lock.checkHeld();
+    if (!stillHeld.ok) {
+      return stillHeld;
+    }
+    const verified = await verifyPackageStoreEntry(
+      input.home,
+      packageFact.contentDigest
+    );
+    if (!verified.ok) {
+      return verified;
+    }
+  }
+
+  const pending =
+    requests.value.stages.length === 0
+      ? null
+      : input.registry.beginPendingReconciliation(
+          input.acceptedState.targetId,
+          {
+            operationId: input.operationId,
+            actions: requests.value.stages.map((request) => ({
+              stagingPath: request.cleanupPath,
+              activationName: request.activationName
+            }))
+          }
+        );
+  if (pending !== null && !pending.ok) {
+    return pending;
+  }
+
+  const staged: StagedProjection[] = [];
+  for (const request of requests.value.stages) {
+    const stillHeld = input.lock.checkHeld();
+    if (!stillHeld.ok) {
+      return stillHeld;
+    }
+    const prepared = await prepareManagedProjection({
+      home: input.home,
+      targetRoot: input.targetRoot,
+      projection: request.projection,
+      materialization: request.materialization,
+      cleanupPath: request.cleanupPath,
+      ...(request.current === undefined
+        ? {}
+        : {
+            current: {
+              projection: request.current.projection,
+              materialization: request.current.materialization
+            }
+          })
+    });
+    if (!prepared.ok) {
+      await cleanupBeforeCommit(
+        orchestrationInput,
+        staged,
+        pending?.ok === true
+      );
+      return prepared;
+    }
+    staged.push({
+      activationName: request.activationName,
+      cleanupPath: request.cleanupPath,
+      prepared: prepared.value
+    });
+  }
+
+  return committedHandle(
+    orchestrationInput,
+    accepted.value,
+    staged,
+    requests.value.removals,
+    pending?.ok === true
+  ).reconcileLiveTarget();
+}
+
 export async function prepareTargetReconciliation(
   input: PrepareTargetReconciliationInput
 ): Promise<Result<PreparedTargetReconciliation, TargetReconciliationError>> {
@@ -104,7 +319,7 @@ export async function prepareTargetReconciliation(
     return held;
   }
 
-  const requests = validateAndBuildStageRequests(input);
+  const requests = validateAndBuildReconciliationRequests(input);
   if (!requests.ok) {
     return requests;
   }
@@ -126,11 +341,11 @@ export async function prepareTargetReconciliation(
   }
 
   const pending =
-    requests.value.length === 0
+    requests.value.stages.length === 0
       ? null
       : input.registry.beginPendingOperation(input.nextState.targetId, {
           operationId: input.operationId,
-          actions: requests.value.map((request) => ({
+          actions: requests.value.stages.map((request) => ({
             stagingPath: request.cleanupPath,
             activationName: request.activationName
           }))
@@ -140,7 +355,7 @@ export async function prepareTargetReconciliation(
   }
 
   const staged: StagedProjection[] = [];
-  for (const request of requests.value) {
+  for (const request of requests.value.stages) {
     const stillHeld = input.lock.checkHeld();
     if (!stillHeld.ok) {
       return stillHeld;
@@ -205,6 +420,7 @@ export async function prepareTargetReconciliation(
             input,
             replaced.value,
             staged,
+            requests.value.removals,
             pending?.ok === true
           )
         };
@@ -217,6 +433,7 @@ function committedHandle(
   input: PrepareTargetReconciliationInput,
   state: RegistryTargetState,
   staged: ReadonlyArray<StagedProjection>,
+  removals: ReadonlyArray<RemovalRequest>,
   hasPending: boolean
 ): CommittedTargetReconciliation {
   let reconciled = false;
@@ -226,6 +443,24 @@ function committedHandle(
     async reconcileLiveTarget() {
       if (reconciled) {
         throw new Error("target reconciliation already completed");
+      }
+
+      for (const removal of removals) {
+        const held = input.lock.checkHeld();
+        if (!held.ok) {
+          return held;
+        }
+        const removed = await removeManagedProjection({
+          home: input.home,
+          targetRoot: input.targetRoot,
+          expected: {
+            projection: removal.current.projection,
+            materialization: removal.current.materialization
+          }
+        });
+        if (!removed.ok) {
+          return removed;
+        }
       }
 
       for (const projection of staged) {
@@ -285,9 +520,9 @@ async function cleanupBeforeCommit(
   }
 }
 
-function validateAndBuildStageRequests(
+function validateAndBuildReconciliationRequests(
   input: PrepareTargetReconciliationInput
-): Result<ReadonlyArray<StageRequest>, InvalidTargetReconciliationInput> {
+): Result<ReconciliationRequests, InvalidTargetReconciliationInput> {
   if (input.operationId.length === 0) {
     return invalidInput("empty-operation-id", input.operationId);
   }
@@ -325,18 +560,66 @@ function validateAndBuildStageRequests(
       projection
     ])
   );
+  const registryProjectionByActivation = new Map(
+    input.nextState.projections.map((projection) => [
+      projection.activationName,
+      projection
+    ])
+  );
 
-  const requests: StageRequest[] = [];
+  const stages: StageRequest[] = [];
+  const removals: RemovalRequest[] = [];
+  const expectedManagedPackages = new Set<string>();
+
   for (const action of input.preflight.actions) {
-    if (action.action !== "materialize" && action.action !== "replace") {
+    if (action.action === "remove") {
+      const current = currentByActivation.get(action.activationName);
       if (
-        action.action === "keep" ||
-        action.action === "drop-missing" ||
-        action.action === "preserve-user" ||
-        action.action === "preserve-broken-binding"
+        current === undefined ||
+        current.ownership !== "managed" ||
+        action.currentPackageCoordinate === null ||
+        current.projection.packageCoordinate !== action.currentPackageCoordinate
       ) {
-        continue;
+        return invalidInput(
+          "missing-current-projection",
+          action.activationName
+        );
       }
+      if (registryProjectionByActivation.has(action.activationName)) {
+        return invalidInput(
+          "registry-projection-mismatch",
+          action.activationName
+        );
+      }
+      removals.push({
+        activationName: action.activationName,
+        current
+      });
+      continue;
+    }
+
+    if (action.action === "drop-missing") {
+      if (registryProjectionByActivation.has(action.activationName)) {
+        return invalidInput(
+          "registry-projection-mismatch",
+          action.activationName
+        );
+      }
+      continue;
+    }
+
+    if (
+      action.action === "preserve-user" ||
+      action.action === "preserve-broken-binding"
+    ) {
+      continue;
+    }
+
+    if (
+      action.action !== "keep" &&
+      action.action !== "materialize" &&
+      action.action !== "replace"
+    ) {
       return invalidInput(
         "unsupported-preflight-action",
         `${action.activationName}:${action.action}`
@@ -382,6 +665,8 @@ function validateAndBuildStageRequests(
       );
     }
 
+    expectedManagedPackages.add(desired.packageCoordinate);
+
     let current: TargetOwnedProjection | undefined;
     if (action.currentPackageCoordinate !== null) {
       current = currentByActivation.get(action.activationName);
@@ -397,7 +682,11 @@ function validateAndBuildStageRequests(
       }
     }
 
-    requests.push({
+    if (action.action === "keep") {
+      continue;
+    }
+
+    stages.push({
       activationName: action.activationName,
       cleanupPath: join(
         input.targetRoot,
@@ -409,10 +698,31 @@ function validateAndBuildStageRequests(
     });
   }
 
-  requests.sort((left, right) =>
+  for (const projection of input.nextState.projections) {
+    if (
+      projection.ownership === "managed" &&
+      !expectedManagedPackages.has(projection.packageCoordinate)
+    ) {
+      return invalidInput(
+        "registry-projection-mismatch",
+        projection.packageCoordinate
+      );
+    }
+  }
+
+  stages.sort((left, right) =>
     compareStrings(left.activationName, right.activationName)
   );
-  return { ok: true, value: requests };
+  removals.sort((left, right) =>
+    compareStrings(left.activationName, right.activationName)
+  );
+  return {
+    ok: true,
+    value: {
+      stages,
+      removals
+    }
+  };
 }
 
 function transformJson(projection: TargetProjection): string | null {

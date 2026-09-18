@@ -64,6 +64,12 @@ export type VerifiedManagedProjection = Readonly<{
   contentDigest: string;
 }>;
 
+export type RemovedManagedProjection = Readonly<{
+  status: "removed" | "missing";
+  activationPath: string;
+  packageCoordinate: string;
+}>;
+
 export type ManagedProjectionTreeEntry = Readonly<{
   path: string;
   executable: boolean;

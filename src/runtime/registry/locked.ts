@@ -43,6 +43,10 @@ export interface MachineRegistry {
     targetId: string,
     pending: RegistryPendingOperationInput
   ): Result<RegistryPendingOperation, RegistryPendingLockedError>;
+  beginPendingReconciliation(
+    targetId: string,
+    pending: RegistryPendingOperationInput
+  ): Result<RegistryPendingOperation, RegistryPendingLockedError>;
   completePendingOperation(
     operationId: string
   ): Result<void, OperationLockLost>;
@@ -103,6 +107,17 @@ class LockedMachineRegistry implements MachineRegistry {
       return held;
     }
     return this.#registry.beginPendingOperation(targetId, pending);
+  }
+
+  beginPendingReconciliation(
+    targetId: string,
+    pending: RegistryPendingOperationInput
+  ): Result<RegistryPendingOperation, RegistryPendingLockedError> {
+    const held = this.#lock.checkHeld();
+    if (!held.ok) {
+      return held;
+    }
+    return this.#registry.beginPendingReconciliation(targetId, pending);
   }
 
   completePendingOperation(
