@@ -332,23 +332,6 @@ function repositoryFromPackageCoordinate(
   return coordinate.split("/").slice(0, 2).join("/");
 }
 
-function dependencyRepositoriesForSource(
-  repositoryCoordinate: string,
-  state: SourceState
-): ReadonlyArray<RepositoryCoordinate> {
-  const release = state.releaseSources.get(
-    repositoryCoordinate
-  );
-  const git = state.gitBindings.get(repositoryCoordinate);
-  return dependencyRepositories(
-    release === undefined
-      ? git === undefined
-        ? []
-        : [git.snapshot]
-      : release.releases.map((entry) => entry.snapshot)
-  );
-}
-
 function allKnownDependencyRepositories(
   state: SourceState
 ): ReadonlyArray<RepositoryCoordinate> {
@@ -428,21 +411,9 @@ function deferredCoordinatesForSubject(
   repositoryCoordinate: string,
   state: SourceState
 ): ReadonlyArray<string> {
-  const coordinates = new Set<string>();
-
-  if (state.deferredSourceErrors.has(repositoryCoordinate)) {
-    coordinates.add(repositoryCoordinate);
-  }
-  for (const dependency of dependencyRepositoriesForSource(
-    repositoryCoordinate,
-    state
-  )) {
-    if (state.deferredSourceErrors.has(dependency.canonical)) {
-      coordinates.add(dependency.canonical);
-    }
-  }
-
-  return [...coordinates].sort(compareUtf8);
+  return state.deferredSourceErrors.has(repositoryCoordinate)
+    ? [repositoryCoordinate]
+    : [];
 }
 
 function registryStateToCandidateGraph(
