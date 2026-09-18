@@ -233,6 +233,76 @@ test("full export container verifies SKILOOM-USER-PAYLOAD-V1 frames before writi
   }
 });
 
+test("container accepts a declared empty user payload only when its digest is the canonical empty-tree digest", async () => {
+  const fixture = await readFixture();
+  const parsed = parseExactExportPackage(
+    Buffer.from(fixture.valid.containerBase64, "base64")
+  );
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) {
+    return;
+  }
+
+  const emptyDigest =
+    "sha256:722162f94859056505db46525d097b4ce367dd255339d5eb6e8a48cadfd73967";
+  const full: ExactExportManifest = {
+    ...parsed.value.manifest,
+    mode: "full",
+    userSkills: [
+      {
+        activationName: "empty-local",
+        skillName: "empty-local",
+        payloadId: `user:${emptyDigest}`,
+        userContentDigest: emptyDigest
+      }
+    ]
+  };
+
+  const written = writeExactExportPackage({
+    manifest: full,
+    frames: parsed.value.frames
+  });
+  assert.equal(written.ok, true);
+  if (written.ok) {
+    const reparsed = parseExactExportPackage(written.value);
+    assert.equal(reparsed.ok, true);
+    if (reparsed.ok) {
+      assert.equal(
+        reparsed.value.frames.some(
+          (frame) => frame.payloadId === `user:${emptyDigest}`
+        ),
+        false
+      );
+    }
+  }
+
+  const wrongDigest = "sha256:" + "0".repeat(64);
+  const missing = writeExactExportPackage({
+    manifest: {
+      ...full,
+      userSkills: [
+        {
+          activationName: "empty-local",
+          skillName: "empty-local",
+          payloadId: `user:${wrongDigest}`,
+          userContentDigest: wrongDigest
+        }
+      ]
+    },
+    frames: parsed.value.frames
+  });
+  assert.equal(missing.ok, false);
+  if (!missing.ok) {
+    assert.equal(missing.error.code, "InvalidExportPackage");
+    if (missing.error.code === "InvalidExportPackage") {
+      assert.equal(
+        missing.error.facts.reason,
+        "missing-payload"
+      );
+    }
+  }
+});
+
 test("container framing rejects future magic truncation illegal frames extra payloads duplicates and managed corruption", async () => {
   const fixture = await readFixture();
   const valid = Buffer.from(fixture.valid.containerBase64, "base64");

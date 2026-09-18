@@ -46,6 +46,20 @@ test("SKILOOM-USER-PAYLOAD-V1 matches the independent big-endian digest fixture"
   );
 });
 
+test("empty user payload uses the canonical zero-entry digest", () => {
+  const payload = createUserPayload([]);
+  assert.deepEqual(payload, {
+    ok: true,
+    value: {
+      entries: [],
+      contentDigest:
+        "sha256:722162f94859056505db46525d097b4ce367dd255339d5eb6e8a48cadfd73967",
+      payloadId:
+        "user:sha256:722162f94859056505db46525d097b4ce367dd255339d5eb6e8a48cadfd73967"
+    }
+  });
+});
+
 test("user payload domain is distinct from SKILOOM-PACKAGE-V1 and detects byte/executable drift", async () => {
   const fixture = await readFixture();
   const entries = fixture.entries.map(toEntry);

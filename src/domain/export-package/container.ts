@@ -1,4 +1,4 @@
-import { TextDecoder, TextEncoder } from "node:util";
+import { TextDecoder } from "node:util";
 
 import {
   productError,
@@ -21,7 +21,6 @@ import type {
 const MAGIC = Buffer.from("SKILOOM-EXPORT-V1\0", "ascii");
 const FUTURE_MAGIC_PATTERN = /^SKILOOM-EXPORT-V[0-9]+$/u;
 const UTF8_DECODER = new TextDecoder("utf-8", { fatal: true });
-const UTF8_ENCODER = new TextEncoder();
 
 export function parseExactExportPackage(
   input: Uint8Array
@@ -70,7 +69,6 @@ export function parseExactExportPackage(
   const declared = declaredPayloads(manifest.value);
   const frames: ExactExportFileFrame[] = [];
   const seenFrames = new Set<string>();
-  const seenPayloads = new Set<string>();
 
   while (offset < bytes.length) {
     const payloadLength = readLength(
@@ -148,19 +146,12 @@ export function parseExactExportPackage(
       );
     }
     seenFrames.add(frameKey);
-    seenPayloads.add(payloadId.value);
     frames.push({
       payloadId: payloadId.value,
       path: path.value,
       executable: executableByte === 1,
       content
     });
-  }
-
-  for (const payloadId of [...declared].sort(compareUtf8)) {
-    if (!seenPayloads.has(payloadId)) {
-      return invalid("missing-payload", payloadId);
-    }
   }
 
   const verified = verifyPayloadFrames(
@@ -266,7 +257,14 @@ function verifyPayloadFrames(
   for (const [payloadId, contentDigest] of managedDigests) {
     const group = byPayload.get(payloadId);
     if (group === undefined) {
-      return invalid("missing-payload", payloadId);
+      const empty = createPackageSnapshot([]);
+      if (
+        !empty.ok ||
+        empty.value.contentDigest !== contentDigest
+      ) {
+        return invalid("missing-payload", payloadId);
+      }
+      continue;
     }
     const snapshot = createPackageSnapshot(
       group.map((frame) => ({
@@ -299,7 +297,11 @@ function verifyPayloadFrames(
   for (const [payloadId, contentDigest] of userDigests) {
     const group = byPayload.get(payloadId);
     if (group === undefined) {
-      return invalid("missing-payload", payloadId);
+      const empty = verifyUserPayload(contentDigest, []);
+      if (!empty.ok) {
+        return invalid("missing-payload", payloadId);
+      }
+      continue;
     }
     const verified = verifyUserPayload(
       contentDigest,
