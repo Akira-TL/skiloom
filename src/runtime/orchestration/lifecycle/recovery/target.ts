@@ -506,14 +506,17 @@ async function activatePendingProjection(
 
   const afterRetire = input.lock.checkHeld();
   if (!afterRetire.ok) {
-    await rename(retiredPath, activationPath);
     return afterRetire;
   }
 
   try {
     await rename(projectionPath, activationPath);
   } catch (error) {
-    if (!(await pathExists(activationPath))) {
+    const rollbackHeld = input.lock.checkHeld();
+    if (
+      rollbackHeld.ok &&
+      !(await pathExists(activationPath))
+    ) {
       await rename(retiredPath, activationPath);
     }
     throw error;
