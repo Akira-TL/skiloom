@@ -13,7 +13,7 @@
     "test:unit": "npm run test:compile --silent && node scripts/run-tests.mjs unit",
     "test:behavior": "npm run test:compile --silent && node scripts/run-tests.mjs behavior",
     "test:lock-bridge": "npm run test:compile --silent && node --test .test-dist/test/integration/native/operation-lock.test.js",
-    "test:machine-state": "npm run test:compile --silent && node --test .test-dist/test/integration/runtime/machine-state.test.js .test-dist/test/integration/runtime/target/reconciliation.test.js .test-dist/test/integration/runtime/target/local-lifecycle.test.js",
+    "test:machine-state": "npm run test:compile --silent && node --test .test-dist/test/integration/runtime/machine-state.test.js .test-dist/test/integration/runtime/target/reconciliation.test.js .test-dist/test/integration/runtime/target/local-lifecycle.test.js .test-dist/test/integration/runtime/target/detached-binding.test.js",
     "test:target-projection": "npm run test:compile --silent && node --test .test-dist/test/integration/runtime/target/projection.test.js",
     "test": "npm run test:compile --silent && node scripts/run-tests.mjs all",
     "check": "npm run typecheck && npm run build && npm test"
