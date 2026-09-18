@@ -37,7 +37,9 @@ import {
 } from "../../../../src/runtime/registry/index.js";
 import {
   detachTargetProjection,
-  rebindDetachedProjection,
+  rebindDetachedProjection
+} from "../../../../src/runtime/orchestration/detached-lifecycle.js";
+import {
   repairAcceptedTargetState,
   syncAcceptedTargetState
 } from "../../../../src/runtime/orchestration/local-lifecycle.js";

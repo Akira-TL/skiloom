@@ -25,7 +25,9 @@ import {
   type OperationLockSession
 } from "../../../../src/native/skiloom-lock.js";
 import {
-  detachTargetProjection,
+  detachTargetProjection
+} from "../../../../src/runtime/orchestration/detached-lifecycle.js";
+import {
   syncAcceptedTargetState
 } from "../../../../src/runtime/orchestration/local-lifecycle.js";
 import {
