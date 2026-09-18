@@ -29,7 +29,10 @@ export type ResolvedLifecycleAcceptance =
 
 export type NonInteractiveLifecycleAcceptanceAdapter = Readonly<{
   acceptCandidate: LifecycleCandidateAcceptanceCallback;
-  authorizeReleaseRetarget: () => true;
+  authorizeReleaseRetarget: (
+    retargets: ReadonlyArray<unknown>,
+    plan: LifecycleCandidatePlan
+  ) => LifecycleAcceptanceDecision;
 }>;
 
 export function resolveLifecycleCandidateAcceptance(
@@ -50,19 +53,19 @@ export function resolveLifecycleCandidateAcceptance(
 export function createNonInteractiveLifecycleAcceptance(
   authorization: NonInteractiveLifecycleAuthorization
 ): NonInteractiveLifecycleAcceptanceAdapter {
+  const decide = (
+    plan: LifecycleCandidatePlan
+  ): LifecycleAcceptanceDecision =>
+    decideNonInteractiveLifecycleAcceptance({
+      noChange: plan.noChange,
+      comparison: plan.comparison,
+      authorization
+    });
+
   return {
-    acceptCandidate(plan) {
-      return decideNonInteractiveLifecycleAcceptance({
-        noChange: plan.noChange,
-        comparison: plan.comparison,
-        authorization
-      });
-    },
-    authorizeReleaseRetarget() {
-      // The unified non-interactive decision above owns both approval facts.
-      // Returning true here only bypasses the legacy interactive two-callback
-      // bridge; it never bypasses the policy decision that gates the commit.
-      return true;
+    acceptCandidate: decide,
+    authorizeReleaseRetarget(_retargets, plan) {
+      return decide(plan);
     }
   };
 }

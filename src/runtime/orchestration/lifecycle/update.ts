@@ -21,7 +21,8 @@ import type {
   LifecycleCandidatePlan
 } from "../lifecycle-candidate.js";
 import type {
-  LifecycleCandidateAcceptanceCallback
+  LifecycleCandidateAcceptanceCallback,
+  LifecycleCandidateAcceptanceResponse
 } from "./acceptance.js";
 import {
   applyAcceptedRequirementChange,
@@ -94,7 +95,9 @@ export type UpdateAcceptedTargetInput = Readonly<{
   authorizeReleaseRetarget?: (
     retargets: ReadonlyArray<ReleaseRetargetFact>,
     plan: LifecycleCandidatePlan
-  ) => boolean | Promise<boolean>;
+  ) =>
+    | LifecycleCandidateAcceptanceResponse
+    | Promise<LifecycleCandidateAcceptanceResponse>;
   acceptCandidate: LifecycleCandidateAcceptanceCallback;
   syncMarker: (
     marker: TargetRecoveryMarkerFacts
@@ -138,12 +141,14 @@ export async function updateAcceptedTarget(
           return false;
         }
 
-        let authorized: boolean;
+        let authorization:
+          LifecycleCandidateAcceptanceResponse;
         try {
-          authorized = await input.authorizeReleaseRetarget(
-            retargets,
-            plan
-          );
+          authorization =
+            await input.authorizeReleaseRetarget(
+              retargets,
+              plan
+            );
         } catch {
           retargetFailure = productError(
             "ReleaseRetargetAuthorizationFailed",
@@ -155,9 +160,13 @@ export async function updateAcceptedTarget(
           );
           return false;
         }
-        if (!authorized) {
-          retargetFailure = retargetRequired(retargets);
-          return false;
+        if (typeof authorization === "boolean") {
+          if (!authorization) {
+            retargetFailure = retargetRequired(retargets);
+            return false;
+          }
+        } else if (authorization.kind !== "accept") {
+          return authorization;
         }
       }
 
