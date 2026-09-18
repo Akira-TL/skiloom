@@ -1,0 +1,271 @@
+{
+  "format": "SKILOOM-GITHUB-SOURCE-BENCH-RESULT-V1",
+  "corpusFormat": "SKILOOM-GITHUB-SOURCE-BENCH-V1",
+  "corpusVersion": 1,
+  "measuredAt": "2026-09-18T12:16:07.819Z",
+  "environment": {
+    "node": "v24.16.0",
+    "platform": "linux",
+    "osRelease": "6.6.87.2-microsoft-standard-WSL2",
+    "arch": "x64",
+    "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+    "logicalCpuCount": 32,
+    "totalMemoryBytes": 33651015680,
+    "freeMemoryBytesAtStart": 25283153920,
+    "gcExposed": true
+  },
+  "settings": {
+    "warmupIterations": 1,
+    "measureIterations": 5,
+    "networkIncluded": false,
+    "transportModel": "prebuilt parsed GitHub JSON facts"
+  },
+  "cases": [
+    {
+      "id": "small-32x1k",
+      "corpus": {
+        "fileCount": 32,
+        "bytesPerFile": 1024,
+        "directoryCount": 4,
+        "executableEvery": 8,
+        "payloadBytes": 32768,
+        "expectedRequests": 34
+      },
+      "wallMs": {
+        "min": 0.572,
+        "median": 0.713,
+        "p95": 0.962,
+        "max": 0.962
+      },
+      "cpuMs": {
+        "min": 1.125,
+        "median": 1.675,
+        "p95": 3.074,
+        "max": 3.074
+      },
+      "transportCallbackMs": {
+        "min": 0.042,
+        "median": 0.055,
+        "p95": 0.093,
+        "max": 0.093
+      },
+      "memory": {
+        "peakRssDeltaBytes": 0,
+        "peakHeapUsedDeltaBytes": 222360,
+        "peakArrayBuffersDeltaBytes": 82752
+      },
+      "resultDigest": "sha256:86d4ea85627316bf8d7d5255140e1d3164bcd33c1a2ed41fb7f8ca0bfb7be37e",
+      "iterations": [
+        {
+          "wallMs": 0.71325,
+          "cpuMs": 1.125,
+          "transportCallbackMs": 0.059334,
+          "requestCount": 34,
+          "peakRssDeltaBytes": 0,
+          "peakHeapUsedDeltaBytes": 222360,
+          "peakArrayBuffersDeltaBytes": 82752
+        },
+        {
+          "wallMs": 0.96224,
+          "cpuMs": 3.074,
+          "transportCallbackMs": 0.093048,
+          "requestCount": 34,
+          "peakRssDeltaBytes": 0,
+          "peakHeapUsedDeltaBytes": 218408,
+          "peakArrayBuffersDeltaBytes": 74560
+        },
+        {
+          "wallMs": 0.67641,
+          "cpuMs": 1.675,
+          "transportCallbackMs": 0.042201,
+          "requestCount": 34,
+          "peakRssDeltaBytes": 0,
+          "peakHeapUsedDeltaBytes": 205480,
+          "peakArrayBuffersDeltaBytes": 74560
+        },
+        {
+          "wallMs": 0.755219,
+          "cpuMs": 2.238,
+          "transportCallbackMs": 0.055092,
+          "requestCount": 34,
+          "peakRssDeltaBytes": 0,
+          "peakHeapUsedDeltaBytes": 214280,
+          "peakArrayBuffersDeltaBytes": 74560
+        },
+        {
+          "wallMs": 0.571912,
+          "cpuMs": 1.597,
+          "transportCallbackMs": 0.048053,
+          "requestCount": 34,
+          "peakRssDeltaBytes": 0,
+          "peakHeapUsedDeltaBytes": 205712,
+          "peakArrayBuffersDeltaBytes": 82752
+        }
+      ]
+    },
+    {
+      "id": "wide-4096x512",
+      "corpus": {
+        "fileCount": 4096,
+        "bytesPerFile": 512,
+        "directoryCount": 256,
+        "executableEvery": 16,
+        "payloadBytes": 2097152,
+        "expectedRequests": 4098
+      },
+      "wallMs": {
+        "min": 35.88,
+        "median": 36.499,
+        "p95": 41.74,
+        "max": 41.74
+      },
+      "cpuMs": {
+        "min": 42.011,
+        "median": 44.458,
+        "p95": 68.016,
+        "max": 68.016
+      },
+      "transportCallbackMs": {
+        "min": 3.335,
+        "median": 4.173,
+        "p95": 5.039,
+        "max": 5.039
+      },
+      "memory": {
+        "peakRssDeltaBytes": 10219520,
+        "peakHeapUsedDeltaBytes": 16911232,
+        "peakArrayBuffersDeltaBytes": 2139272
+      },
+      "resultDigest": "sha256:52cc041f2014d0dcc490778afaba6a78b27e671975310ef29243f21f22a38cc8",
+      "iterations": [
+        {
+          "wallMs": 35.880203,
+          "cpuMs": 45.096,
+          "transportCallbackMs": 4.181646,
+          "requestCount": 4098,
+          "peakRssDeltaBytes": 524288,
+          "peakHeapUsedDeltaBytes": 8392960,
+          "peakArrayBuffersDeltaBytes": 0
+        },
+        {
+          "wallMs": 41.740269,
+          "cpuMs": 68.016,
+          "transportCallbackMs": 5.039197,
+          "requestCount": 4098,
+          "peakRssDeltaBytes": 10219520,
+          "peakHeapUsedDeltaBytes": 16882160,
+          "peakArrayBuffersDeltaBytes": 2139272
+        },
+        {
+          "wallMs": 36.797883,
+          "cpuMs": 43.48,
+          "transportCallbackMs": 4.173228,
+          "requestCount": 4098,
+          "peakRssDeltaBytes": 262144,
+          "peakHeapUsedDeltaBytes": 16840104,
+          "peakArrayBuffersDeltaBytes": 0
+        },
+        {
+          "wallMs": 36.498813,
+          "cpuMs": 42.011,
+          "transportCallbackMs": 3.976779,
+          "requestCount": 4098,
+          "peakRssDeltaBytes": 262144,
+          "peakHeapUsedDeltaBytes": 16821432,
+          "peakArrayBuffersDeltaBytes": 0
+        },
+        {
+          "wallMs": 36.257358,
+          "cpuMs": 44.458,
+          "transportCallbackMs": 3.335381,
+          "requestCount": 4098,
+          "peakRssDeltaBytes": 0,
+          "peakHeapUsedDeltaBytes": 16911232,
+          "peakArrayBuffersDeltaBytes": 0
+        }
+      ]
+    },
+    {
+      "id": "payload-256x64k",
+      "corpus": {
+        "fileCount": 256,
+        "bytesPerFile": 65536,
+        "directoryCount": 32,
+        "executableEvery": 16,
+        "payloadBytes": 16777216,
+        "expectedRequests": 258
+      },
+      "wallMs": {
+        "min": 50.313,
+        "median": 53.955,
+        "p95": 55.829,
+        "max": 55.829
+      },
+      "cpuMs": {
+        "min": 52.813,
+        "median": 56.195,
+        "p95": 59.633,
+        "max": 59.633
+      },
+      "transportCallbackMs": {
+        "min": 0.672,
+        "median": 0.762,
+        "p95": 0.876,
+        "max": 0.876
+      },
+      "memory": {
+        "peakRssDeltaBytes": 0,
+        "peakHeapUsedDeltaBytes": 33388576,
+        "peakArrayBuffersDeltaBytes": 27783752
+      },
+      "resultDigest": "sha256:e32e9d7cbda4f72228ced5713a7f4bafe7afed7cbc2afcd344c7092749042ae6",
+      "iterations": [
+        {
+          "wallMs": 55.829305,
+          "cpuMs": 59.633,
+          "transportCallbackMs": 0.876184,
+          "requestCount": 258,
+          "peakRssDeltaBytes": 0,
+          "peakHeapUsedDeltaBytes": 33388576,
+          "peakArrayBuffersDeltaBytes": 27783752
+        },
+        {
+          "wallMs": 53.954974,
+          "cpuMs": 56.341,
+          "transportCallbackMs": 0.767167,
+          "requestCount": 258,
+          "peakRssDeltaBytes": 0,
+          "peakHeapUsedDeltaBytes": 33379912,
+          "peakArrayBuffersDeltaBytes": 8170752
+        },
+        {
+          "wallMs": 51.463295,
+          "cpuMs": 53.094,
+          "transportCallbackMs": 0.752097,
+          "requestCount": 258,
+          "peakRssDeltaBytes": 0,
+          "peakHeapUsedDeltaBytes": 33379048,
+          "peakArrayBuffersDeltaBytes": 6990636
+        },
+        {
+          "wallMs": 50.313308,
+          "cpuMs": 52.813,
+          "transportCallbackMs": 0.67154,
+          "requestCount": 258,
+          "peakRssDeltaBytes": 0,
+          "peakHeapUsedDeltaBytes": 33380288,
+          "peakArrayBuffersDeltaBytes": 368874
+        },
+        {
+          "wallMs": 54.576796,
+          "cpuMs": 56.195,
+          "transportCallbackMs": 0.761579,
+          "requestCount": 258,
+          "peakRssDeltaBytes": 0,
+          "peakHeapUsedDeltaBytes": 33379048,
+          "peakArrayBuffersDeltaBytes": 13809110
+        }
+      ]
+    }
+  ]
+}

@@ -18,6 +18,7 @@
     "test:machine-state": "npm run test:compile --silent && node --test .test-dist/test/integration/runtime/machine-state.test.js .test-dist/test/integration/runtime/target/reconciliation.test.js .test-dist/test/integration/runtime/target/local-lifecycle.test.js .test-dist/test/integration/runtime/target/detached-binding.test.js .test-dist/test/integration/runtime/target/local-lifecycle-safety.test.js",
     "test:target-projection": "npm run test:compile --silent && node --test .test-dist/test/integration/runtime/target/projection.test.js",
     "test": "npm run test:compile --silent && node scripts/run-tests.mjs all && node --test .test-dist/test/integration/runtime/source/github-repository.test.js .test-dist/test/integration/runtime/source/github-transport.test.js .test-dist/test/integration/runtime/source/github-release.test.js .test-dist/test/integration/runtime/source/github-git-ref.test.js .test-dist/test/integration/runtime/source/github-snapshot.test.js .test-dist/test/integration/runtime/source/github-pipeline.test.js",
+    "benchmark:github-source": "npm run build --silent && node --expose-gc benchmarks/github-source/run.mjs",
     "check": "npm run typecheck && npm run build && npm test"
   },
   "devDependencies": {
