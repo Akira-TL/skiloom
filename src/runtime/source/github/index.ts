@@ -37,6 +37,20 @@ export {
 } from "./release.js";
 
 export {
+  acquireExactGitHubRepositorySnapshot,
+  type AcquiredGitHubRepositorySnapshot,
+  type AcquireExactGitHubRepositorySnapshotError,
+  type AcquireExactGitHubRepositorySnapshotInput,
+  type GitHubSnapshotTransportUnavailable,
+  type GitHubTreeTruncated,
+  type InvalidExactGitHubCommit,
+  type InvalidGitHubBlobResponse,
+  type InvalidGitHubGitCommitResponse,
+  type InvalidGitHubTreeResponse,
+  type UnsupportedGitTreeEntry
+} from "./snapshot.js";
+
+export {
   createGitHubJsonFetchTransport,
   createGitHubRepositoryFetchTransport,
   type GitHubFetchTransportOptions,

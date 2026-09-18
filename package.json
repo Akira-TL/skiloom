@@ -13,11 +13,11 @@
     "test:unit": "npm run test:compile --silent && node scripts/run-tests.mjs unit",
     "test:behavior": "npm run test:compile --silent && node scripts/run-tests.mjs behavior",
     "test:lock-bridge": "npm run test:compile --silent && node --test .test-dist/test/integration/native/operation-lock.test.js",
-    "test:github-source": "npm run test:compile --silent && node --test .test-dist/test/integration/runtime/source/github-repository.test.js .test-dist/test/integration/runtime/source/github-transport.test.js .test-dist/test/integration/runtime/source/github-release.test.js .test-dist/test/integration/runtime/source/github-git-ref.test.js",
+    "test:github-source": "npm run test:compile --silent && node --test .test-dist/test/integration/runtime/source/github-repository.test.js .test-dist/test/integration/runtime/source/github-transport.test.js .test-dist/test/integration/runtime/source/github-release.test.js .test-dist/test/integration/runtime/source/github-git-ref.test.js .test-dist/test/integration/runtime/source/github-snapshot.test.js",
     "test:github-source-live": "npm run test:compile --silent && node --test --test-concurrency=1 .test-dist/test/integration/runtime/source/github-live.test.js .test-dist/test/integration/runtime/source/github-git-ref-live.test.js",
     "test:machine-state": "npm run test:compile --silent && node --test .test-dist/test/integration/runtime/machine-state.test.js .test-dist/test/integration/runtime/target/reconciliation.test.js .test-dist/test/integration/runtime/target/local-lifecycle.test.js .test-dist/test/integration/runtime/target/detached-binding.test.js .test-dist/test/integration/runtime/target/local-lifecycle-safety.test.js",
     "test:target-projection": "npm run test:compile --silent && node --test .test-dist/test/integration/runtime/target/projection.test.js",
-    "test": "npm run test:compile --silent && node scripts/run-tests.mjs all && node --test .test-dist/test/integration/runtime/source/github-repository.test.js .test-dist/test/integration/runtime/source/github-transport.test.js .test-dist/test/integration/runtime/source/github-release.test.js .test-dist/test/integration/runtime/source/github-git-ref.test.js",
+    "test": "npm run test:compile --silent && node scripts/run-tests.mjs all && node --test .test-dist/test/integration/runtime/source/github-repository.test.js .test-dist/test/integration/runtime/source/github-transport.test.js .test-dist/test/integration/runtime/source/github-release.test.js .test-dist/test/integration/runtime/source/github-git-ref.test.js .test-dist/test/integration/runtime/source/github-snapshot.test.js",
     "check": "npm run typecheck && npm run build && npm test"
   },
   "devDependencies": {
