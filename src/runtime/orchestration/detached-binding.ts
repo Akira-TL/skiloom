@@ -38,6 +38,13 @@ export type ForgetDetachedProjectionInput = Readonly<{
   packageCoordinate: string;
 }>;
 
+export type PruneUnreachableDetachedBindingsInput = Readonly<{
+  lock: OperationLockSession;
+  registry: MachineRegistry;
+  acceptedState: RegistryTargetStateInput;
+  unreachablePackageCoordinates: ReadonlyArray<string>;
+}>;
+
 export async function forgetDetachedProjection(
   input: ForgetDetachedProjectionInput
 ): Promise<Result<RegistryTargetState, DetachedBindingError>> {
@@ -55,6 +62,44 @@ export async function forgetDetachedProjection(
     detachedBaselines: input.acceptedState.detachedBaselines.filter(
       (baseline) =>
         baseline.packageCoordinate !== input.packageCoordinate
+    )
+  };
+
+  return input.registry.replaceTargetState(nextState);
+}
+
+export async function pruneUnreachableDetachedBindings(
+  input: PruneUnreachableDetachedBindingsInput
+): Promise<Result<RegistryTargetState, DetachedBindingError>> {
+  const accepted = validateAcceptedState(input);
+  if (!accepted.ok) {
+    return accepted;
+  }
+
+  const directRoots = directRootPackages(input.acceptedState);
+  const unreachable = new Set(input.unreachablePackageCoordinates);
+  const removable = new Set(
+    input.acceptedState.projections
+      .filter(
+        (projection) =>
+          projection.ownership === "detached" &&
+          unreachable.has(projection.packageCoordinate) &&
+          !directRoots.has(projection.packageCoordinate)
+      )
+      .map((projection) => projection.packageCoordinate)
+  );
+
+  if (removable.size === 0) {
+    return { ok: true, value: accepted.value };
+  }
+
+  const nextState: RegistryTargetStateInput = {
+    ...input.acceptedState,
+    projections: input.acceptedState.projections.filter(
+      (projection) => !removable.has(projection.packageCoordinate)
+    ),
+    detachedBaselines: input.acceptedState.detachedBaselines.filter(
+      (baseline) => !removable.has(baseline.packageCoordinate)
     )
   };
 
@@ -123,6 +168,29 @@ function validateAcceptedState(input: Readonly<{
     return invalidDetached("", "accepted-state-mismatch");
   }
   return { ok: true, value: accepted.value };
+}
+
+function directRootPackages(
+  state: RegistryTargetStateInput
+): ReadonlySet<string> {
+  const direct = new Set<string>();
+
+  for (const requirement of state.directRequirements) {
+    if (requirement.kind === "package") {
+      direct.add(requirement.coordinate);
+      continue;
+    }
+
+    for (const packageFact of state.resolvedPackages) {
+      if (
+        packageFact.repositoryCoordinate === requirement.coordinate
+      ) {
+        direct.add(packageFact.packageCoordinate);
+      }
+    }
+  }
+
+  return direct;
 }
 
 function invalidDetached(

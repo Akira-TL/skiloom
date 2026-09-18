@@ -9,7 +9,8 @@ import {
   type OperationLockSession
 } from "../../../../src/native/skiloom-lock.js";
 import {
-  forgetDetachedProjection
+  forgetDetachedProjection,
+  pruneUnreachableDetachedBindings
 } from "../../../../src/runtime/orchestration/detached-binding.js";
 import {
   resolveSkiloomHomePaths,
@@ -76,6 +77,64 @@ test("forget removes only the detached logical binding and baseline while preser
   });
 });
 
+test("unreachable detached cleanup removes only non-root bindings and never deletes user directories", async () => {
+  await withRuntime(async ({ paths, targetRoot }) => {
+    const rootPath = join(targetRoot, "root-skill");
+    const orphanPath = join(targetRoot, "orphan-skill");
+    await mkdir(rootPath);
+    await mkdir(orphanPath);
+    await writeFile(join(rootPath, "KEEP"), "direct root bytes\n");
+    await writeFile(join(orphanPath, "KEEP"), "orphan user bytes\n");
+
+    const acceptedState = detachedStateWithOrphan(targetRoot);
+    seedRawState(paths, acceptedState);
+
+    await withRealLock(paths, async (lock) => {
+      const registry = await requireLockedRegistry(paths, lock);
+      try {
+        const pruned = await pruneUnreachableDetachedBindings({
+          lock,
+          registry,
+          acceptedState,
+          unreachablePackageCoordinates: [
+            "acme/root/root-skill",
+            "vendor/orphan/orphan-skill"
+          ]
+        });
+        assert.equal(pruned.ok, true);
+        if (!pruned.ok) {
+          return;
+        }
+
+        assert.equal(pruned.value.generation, 2);
+        assert.deepEqual(
+          pruned.value.projections.map((projection) =>
+            projection.packageCoordinate
+          ),
+          ["acme/root/root-skill"]
+        );
+        assert.deepEqual(
+          pruned.value.detachedBaselines.map((baseline) =>
+            baseline.packageCoordinate
+          ),
+          ["acme/root/root-skill"]
+        );
+      } finally {
+        registry.close();
+      }
+    });
+
+    assert.equal(
+      await readFile(join(rootPath, "KEEP"), "utf8"),
+      "direct root bytes\n"
+    );
+    assert.equal(
+      await readFile(join(orphanPath, "KEEP"), "utf8"),
+      "orphan user bytes\n"
+    );
+  });
+});
+
 function detachedState(targetRoot: string): RegistryTargetStateInput {
   return {
     targetId: "target-detached-binding",
@@ -126,6 +185,100 @@ function detachedState(targetRoot: string): RegistryTargetStateInput {
         exactCommit: "1111111111111111111111111111111111111111",
         packageRoot: ".",
         contentDigest: digest
+      }
+    ],
+    dependencyObservations: []
+  };
+}
+
+function detachedStateWithOrphan(
+  targetRoot: string
+): RegistryTargetStateInput {
+  const rootPackage = "acme/root/root-skill";
+  const orphanPackage = "vendor/orphan/orphan-skill";
+  const rootDigest = `sha256:${"b".repeat(64)}`;
+  const orphanDigest = `sha256:${"c".repeat(64)}`;
+
+  return {
+    targetId: "target-detached-prune",
+    locations: [{ path: targetRoot, observedGeneration: 1 }],
+    directRequirements: [
+      {
+        kind: "package",
+        coordinate: rootPackage,
+        sourceKind: "github-release",
+        versionRequirement: "^1"
+      }
+    ],
+    resolvedSources: [
+      {
+        repositoryCoordinate: "acme/root",
+        sourceKind: "github-release",
+        version: "1.0.0",
+        actualTag: "v1.0.0",
+        exactCommit: "2222222222222222222222222222222222222222",
+        immutable: true
+      },
+      {
+        repositoryCoordinate: "vendor/orphan",
+        sourceKind: "github-release",
+        version: "1.0.0",
+        actualTag: "v1.0.0",
+        exactCommit: "3333333333333333333333333333333333333333",
+        immutable: true
+      }
+    ],
+    resolvedPackages: [
+      {
+        packageCoordinate: rootPackage,
+        repositoryCoordinate: "acme/root",
+        packageRoot: ".",
+        contentDigest: rootDigest
+      },
+      {
+        packageCoordinate: orphanPackage,
+        repositoryCoordinate: "vendor/orphan",
+        packageRoot: ".",
+        contentDigest: orphanDigest
+      }
+    ],
+    dependencyEdges: [],
+    projections: [
+      {
+        packageCoordinate: rootPackage,
+        activationName: "root-skill",
+        ownership: "detached",
+        materialization: "copy",
+        transformJson: null
+      },
+      {
+        packageCoordinate: orphanPackage,
+        activationName: "orphan-skill",
+        ownership: "detached",
+        materialization: "copy",
+        transformJson: null
+      }
+    ],
+    detachedBaselines: [
+      {
+        packageCoordinate: rootPackage,
+        repositoryCoordinate: "acme/root",
+        sourceKind: "github-release",
+        version: "1.0.0",
+        actualTag: "v1.0.0",
+        exactCommit: "2222222222222222222222222222222222222222",
+        packageRoot: ".",
+        contentDigest: rootDigest
+      },
+      {
+        packageCoordinate: orphanPackage,
+        repositoryCoordinate: "vendor/orphan",
+        sourceKind: "github-release",
+        version: "1.0.0",
+        actualTag: "v1.0.0",
+        exactCommit: "3333333333333333333333333333333333333333",
+        packageRoot: ".",
+        contentDigest: orphanDigest
       }
     ],
     dependencyObservations: []
