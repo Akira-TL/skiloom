@@ -20,6 +20,9 @@ import {
   targetStateMarkerFactsFromRegistryState
 } from "../../../src/runtime/target-state-recovery.js";
 import {
+  syncLifecycleMarker
+} from "../../../src/runtime/orchestration/lifecycle/marker/index.js";
+import {
   TARGET_STATE_MARKER_FILENAME,
   writeTargetStateMarkerFile
 } from "../../../src/runtime/target-state-marker.js";
@@ -85,6 +88,33 @@ test("runtime Target recovery inspection delegates current stale ahead and ident
         registryGeneration: 5,
         choices: ["sync", "fork"]
       });
+    }
+
+    const forkChoice = await inspectTargetRecovery({
+      targetRoot,
+      registryState: state,
+      target: {
+        pathPresent: true,
+        projectionsVerifiedExact: true
+      },
+      staleChoice: {
+        kind: "fork",
+        newTargetId: "33333333-3333-4333-8333-333333333333"
+      }
+    });
+    assert.equal(forkChoice.ok, true);
+    if (forkChoice.ok) {
+      assert.equal(forkChoice.value.decision.kind, "fork-candidate");
+      if (forkChoice.value.decision.kind === "fork-candidate") {
+        assert.equal(
+          forkChoice.value.decision.targetId,
+          "33333333-3333-4333-8333-333333333333"
+        );
+        assert.equal(
+          forkChoice.value.decision.requiresSourceConfirmation,
+          true
+        );
+      }
     }
 
     const syncChoice = await inspectTargetRecovery({
@@ -259,6 +289,34 @@ test("missing or invalid marker is repairable only when Registry projections wer
         "TargetStateMarkerRepairNotAllowed"
       );
     }
+  });
+});
+
+test("lifecycle marker handoff rejects non-canonical facts before callback or filesystem persistence", async () => {
+  await withTarget(async (targetRoot) => {
+    let callbackCalls = 0;
+    const result = await syncLifecycleMarker({
+      targetRoot,
+      marker: {
+        ...marker,
+        targetId: "not-a-valid-target-id"
+      },
+      override: () => {
+        callbackCalls += 1;
+      }
+    });
+
+    assert.deepEqual(result, {
+      ok: false,
+      error: {
+        code: "LifecycleMarkerSyncFailed",
+        facts: {
+          targetId: "not-a-valid-target-id",
+          generation: marker.generation
+        }
+      }
+    });
+    assert.equal(callbackCalls, 0);
   });
 });
 

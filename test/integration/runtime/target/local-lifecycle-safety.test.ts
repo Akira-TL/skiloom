@@ -382,14 +382,14 @@ function registryState(
   materialization: "symlink" | "junction" | "copy" = "copy"
 ): RegistryTargetStateInput {
   return {
-    targetId: "target-lifecycle-safety",
+    targetId: "88888888-8888-4888-8888-888888888888",
     locations: [{ path: targetRoot, observedGeneration: 1 }],
     directRequirements: [
       {
         kind: "package",
         coordinate: packageCoordinate,
         sourceKind: "github-release",
-        versionRequirement: "^1"
+        versionRequirement: "^1.0.0"
       }
     ],
     resolvedSources: [

@@ -7,6 +7,10 @@ import type {
   TargetRecoveryMarkerFacts
 } from "../../../../domain/target/recovery.js";
 import {
+  parseTargetStateMarker,
+  writeTargetStateMarker
+} from "../../../../domain/target/state-marker.js";
+import {
   writeTargetStateMarkerFile
 } from "../../../target-state-marker.js";
 
@@ -29,9 +33,16 @@ export async function syncLifecycleMarker(
     override?: LifecycleMarkerSyncCallback;
   }>
 ): Promise<Result<void, LifecycleMarkerSyncFailed>> {
+  const canonical = parseTargetStateMarker(
+    writeTargetStateMarker(input.marker)
+  );
+  if (!canonical.ok) {
+    return failed(input.marker);
+  }
+
   if (input.override !== undefined) {
     try {
-      await input.override(input.marker);
+      await input.override(canonical.value);
       return { ok: true, value: undefined };
     } catch {
       return failed(input.marker);
@@ -40,7 +51,7 @@ export async function syncLifecycleMarker(
 
   const written = await writeTargetStateMarkerFile(
     input.targetRoot,
-    input.marker
+    canonical.value
   );
   return written.ok
     ? { ok: true, value: undefined }
