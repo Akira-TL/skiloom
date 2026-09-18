@@ -98,29 +98,12 @@ export async function publishPackageSnapshot(
   paths: SkiloomHomePaths,
   snapshot: PackageSnapshot
 ): Promise<Result<PublishedPackageStoreEntry, PackageStoreError>> {
-  const digestValidation = validateContentDigest(snapshot.contentDigest);
-  if (!digestValidation.ok) {
-    return digestValidation;
-  }
-
-  const rebuilt = createPackageSnapshot(
-    snapshot.entries.map((entry) => ({
-      path: entry.path,
-      executable: entry.executable,
-      content: entry.content
-    }))
+  const rebuilt = rebuildSnapshotForDigest(
+    snapshot,
+    snapshot.contentDigest
   );
   if (!rebuilt.ok) {
     return rebuilt;
-  }
-  if (rebuilt.value.contentDigest !== snapshot.contentDigest) {
-    return {
-      ok: false,
-      error: productError("PackageContentDigestMismatch", {
-        expectedDigest: snapshot.contentDigest,
-        actualDigest: rebuilt.value.contentDigest
-      })
-    };
   }
 
   const entryPath = storeEntryPath(paths, snapshot.contentDigest);
@@ -184,6 +167,37 @@ export async function publishPackageSnapshot(
   }
 }
 
+export async function repairPackageStoreEntry(
+  paths: SkiloomHomePaths,
+  contentDigest: string,
+  snapshot: PackageSnapshot
+): Promise<Result<PublishedPackageStoreEntry, PackageStoreError>> {
+  const rebuilt = rebuildSnapshotForDigest(snapshot, contentDigest);
+  if (!rebuilt.ok) {
+    return rebuilt;
+  }
+
+  const existing = await verifyPackageStoreEntry(paths, contentDigest);
+  if (existing.ok) {
+    return {
+      ok: true,
+      value: {
+        ...existing.value,
+        status: "existing"
+      }
+    };
+  }
+  if (
+    existing.error.code !== "StoreEntryNotFound" &&
+    existing.error.code !== "CorruptStoreEntry"
+  ) {
+    return existing;
+  }
+
+  await removeStoreEntryPath(storeEntryPath(paths, contentDigest));
+  return publishPackageSnapshot(paths, rebuilt.value);
+}
+
 export async function verifyPackageStoreEntry(
   paths: SkiloomHomePaths,
   contentDigest: string
@@ -202,6 +216,54 @@ export async function verifyPackageStoreEntry(
   }
 
   return verifyEntryDirectory(entryPath, contentDigest);
+}
+
+function rebuildSnapshotForDigest(
+  snapshot: PackageSnapshot,
+  expectedDigest: string
+): Result<PackageSnapshot, PackageStoreError> {
+  const digestValidation = validateContentDigest(expectedDigest);
+  if (!digestValidation.ok) {
+    return digestValidation;
+  }
+
+  const rebuilt = createPackageSnapshot(
+    snapshot.entries.map((entry) => ({
+      path: entry.path,
+      executable: entry.executable,
+      content: entry.content
+    }))
+  );
+  if (!rebuilt.ok) {
+    return rebuilt;
+  }
+  if (rebuilt.value.contentDigest !== expectedDigest) {
+    return {
+      ok: false,
+      error: productError("PackageContentDigestMismatch", {
+        expectedDigest,
+        actualDigest: rebuilt.value.contentDigest
+      })
+    };
+  }
+  return rebuilt;
+}
+
+async function removeStoreEntryPath(entryPath: string): Promise<void> {
+  let stat;
+  try {
+    stat = await lstat(entryPath);
+  } catch (error) {
+    if (isNotFound(error)) {
+      return;
+    }
+    throw error;
+  }
+
+  await rm(entryPath, {
+    recursive: stat.isDirectory() && !stat.isSymbolicLink(),
+    force: true
+  });
 }
 
 function validateContentDigest(
