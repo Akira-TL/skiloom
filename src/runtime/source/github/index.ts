@@ -51,6 +51,20 @@ export {
 } from "./snapshot.js";
 
 export {
+  acquireGitHubGitBinding,
+  acquireGitHubReleaseRepositorySource,
+  buildGitHubResolverRepositorySnapshot,
+  type AcquireGitHubGitBindingError,
+  type AcquireGitHubGitBindingInput,
+  type AcquireGitHubReleaseRepositorySourceError,
+  type AcquireGitHubReleaseRepositorySourceInput,
+  type BuildGitHubResolverRepositorySnapshotError,
+  type GitHubSourceRuntimeInput,
+  type InvalidGitHubSourceTextEncoding,
+  type UnsupportedGitHubSourceTextFileType
+} from "./pipeline.js";
+
+export {
   createGitHubJsonFetchTransport,
   createGitHubRepositoryFetchTransport,
   type GitHubFetchTransportOptions,
