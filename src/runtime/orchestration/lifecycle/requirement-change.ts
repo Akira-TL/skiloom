@@ -55,6 +55,7 @@ import {
   type LifecycleCandidatePlan
 } from "../lifecycle-candidate.js";
 import {
+  cleanupPendingTargetStaging,
   prepareTargetReconciliation,
   type TargetReconciliationError
 } from "../target-reconcile.js";
@@ -344,16 +345,18 @@ export async function applyAcceptedRequirementChange(
     planned.value,
     desiredPlan.value
   );
+  const operationId = (input.createOperationId ?? randomUUID)();
   const prepared = await prepareTargetReconciliation({
     home: input.home,
     targetRoot,
-    operationId: (input.createOperationId ?? randomUUID)(),
+    operationId,
     lock: input.lock,
     registry: input.registry,
     desiredPlan: desiredPlan.value,
     preflight: preflight.value,
     currentProjections: currentOwned.value,
-    nextState
+    nextState,
+    deferPendingCompletion: true
   });
   if (!prepared.ok) {
     return prepared;
@@ -386,6 +389,16 @@ export async function applyAcceptedRequirementChange(
         generation: reconciled.value.generation
       })
     };
+  }
+
+  const completed = await cleanupPendingTargetStaging({
+    targetId: reconciled.value.targetId,
+    targetRoot,
+    lock: input.lock,
+    registry: input.registry
+  });
+  if (!completed.ok) {
+    return completed;
   }
 
   return {

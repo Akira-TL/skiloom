@@ -47,6 +47,7 @@ import {
   type LifecycleCandidatePlan
 } from "../lifecycle-candidate.js";
 import {
+  cleanupPendingTargetStaging,
   prepareTargetReconciliation,
   type TargetReconciliationError
 } from "../target-reconcile.js";
@@ -309,7 +310,8 @@ export async function executeFirstAcceptedInstall(
     desiredPlan: desiredPlan.value,
     preflight: preflight.value,
     currentProjections: [],
-    nextState
+    nextState,
+    deferPendingCompletion: true
   });
   if (!prepared.ok) {
     return prepared;
@@ -344,6 +346,16 @@ export async function executeFirstAcceptedInstall(
         generation: reconciled.value.generation
       })
     };
+  }
+
+  const completed = await cleanupPendingTargetStaging({
+    targetId: reconciled.value.targetId,
+    targetRoot: resolve(input.targetRoot),
+    lock: input.lock,
+    registry: input.registry
+  });
+  if (!completed.ok) {
+    return completed;
   }
 
   return {

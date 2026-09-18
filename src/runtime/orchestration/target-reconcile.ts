@@ -32,10 +32,16 @@ import type {
 } from "../registry/index.js";
 import { verifyPackageStoreEntry } from "../store.js";
 import {
-  isSafePendingStagingPath,
   removePendingStagingPath,
   sameAcceptedState
 } from "./target-reconcile-state.js";
+import {
+  writeTargetReconciliationRecoveryManifest,
+  type InvalidTargetReconciliationRecoveryManifest
+} from "./target-reconcile/recovery.js";
+import {
+  cleanupPendingTargetStaging
+} from "./target-reconcile/pending.js";
 import {
   prepareManagedProjection,
   removeManagedProjection,
@@ -66,14 +72,13 @@ export type TargetReconciliationError =
   | ManagedProjectionRuntimeError
   | RegistryPendingLockedError
   | RegistryReplaceLockedError
-  | OperationLockLost;
+  | OperationLockLost
+  | InvalidTargetReconciliationRecoveryManifest;
 
-export type CleanupPendingTargetStagingInput = Readonly<{
-  targetId: string;
-  targetRoot: string;
-  lock: OperationLockSession;
-  registry: MachineRegistry;
-}>;
+export {
+  cleanupPendingTargetStaging,
+  type CleanupPendingTargetStagingInput
+} from "./target-reconcile/pending.js";
 
 export type ReconcileAcceptedTargetStateInput = Readonly<{
   home: SkiloomHomePaths;
@@ -97,6 +102,7 @@ export type PrepareTargetReconciliationInput = Readonly<{
   preflight: TargetOwnershipPreflight;
   currentProjections: ReadonlyArray<TargetOwnedProjection>;
   nextState: RegistryTargetStateInput;
+  deferPendingCompletion?: boolean;
 }>;
 
 export type PreparedTargetReconciliation = Readonly<{
@@ -129,6 +135,7 @@ type StageRequest = Readonly<{
 
 type RemovalRequest = Readonly<{
   activationName: string;
+  cleanupPath: string;
   current: TargetOwnedProjection;
 }>;
 
@@ -144,55 +151,9 @@ type PendingStarter = (
 
 type PreparedReconciliationStaging = Readonly<{
   staged: ReadonlyArray<StagedProjection>;
+  recoveryContainers: ReadonlyArray<string>;
   hasPending: boolean;
 }>;
-
-export async function cleanupPendingTargetStaging(
-  input: CleanupPendingTargetStagingInput
-): Promise<Result<void, TargetReconciliationError>> {
-  const held = input.lock.checkHeld();
-  if (!held.ok) {
-    return held;
-  }
-
-  const pending = input.registry.readPendingOperations();
-  if (!pending.ok) {
-    return pending;
-  }
-  const operations = pending.value.filter(
-    (operation) => operation.targetId === input.targetId
-  );
-
-  for (const operation of operations) {
-    for (const action of operation.actions) {
-      if (!isSafePendingStagingPath(input.targetRoot, action)) {
-        return invalidInput(
-          "unsafe-pending-staging-path",
-          action.stagingPath
-        );
-      }
-    }
-  }
-
-  for (const operation of operations) {
-    for (const action of operation.actions) {
-      const stillHeld = input.lock.checkHeld();
-      if (!stillHeld.ok) {
-        return stillHeld;
-      }
-      await removePendingStagingPath(action.stagingPath);
-    }
-
-    const completed = input.registry.completePendingOperation(
-      operation.operationId
-    );
-    if (!completed.ok) {
-      return completed;
-    }
-  }
-
-  return { ok: true, value: undefined };
-}
 
 export async function reconcileAcceptedTargetState(
   input: ReconcileAcceptedTargetStateInput
@@ -247,7 +208,8 @@ export async function reconcileAcceptedTargetState(
     orchestrationInput,
     requests.value,
     (targetId, pending) =>
-      input.registry.beginPendingReconciliation(targetId, pending)
+      input.registry.beginPendingReconciliation(targetId, pending),
+    "when-actions"
   );
   if (!staging.ok) {
     return staging;
@@ -258,6 +220,7 @@ export async function reconcileAcceptedTargetState(
     accepted.value,
     staging.value.staged,
     requests.value.removals,
+    staging.value.recoveryContainers,
     staging.value.hasPending
   ).reconcileLiveTarget();
 }
@@ -279,7 +242,8 @@ export async function prepareTargetReconciliation(
     input,
     requests.value,
     (targetId, pending) =>
-      input.registry.beginPendingOperation(targetId, pending)
+      input.registry.beginPendingOperation(targetId, pending),
+    "always"
   );
   if (!staging.ok) {
     return staging;
@@ -309,6 +273,7 @@ export async function prepareTargetReconciliation(
             await cleanupBeforeCommit(
               input,
               staging.value.staged,
+              staging.value.recoveryContainers,
               staging.value.hasPending
             );
           }
@@ -323,6 +288,7 @@ export async function prepareTargetReconciliation(
             replaced.value,
             staging.value.staged,
             requests.value.removals,
+            staging.value.recoveryContainers,
             staging.value.hasPending
           )
         };
@@ -334,7 +300,8 @@ export async function prepareTargetReconciliation(
 async function prepareReconciliationStaging(
   input: PrepareTargetReconciliationInput,
   requests: ReconciliationRequests,
-  beginPending: PendingStarter
+  beginPending: PendingStarter,
+  pendingMode: "always" | "when-actions"
 ): Promise<
   Result<PreparedReconciliationStaging, TargetReconciliationError>
 > {
@@ -355,21 +322,29 @@ async function prepareReconciliationStaging(
     }
   }
 
+  const recoveryActions = [
+    ...requests.stages.map((request) => ({
+      stagingPath: request.cleanupPath,
+      activationName: request.activationName
+    })),
+    ...requests.removals.map((request) => ({
+      stagingPath: request.cleanupPath,
+      activationName: request.activationName
+    }))
+  ];
   const pending =
-    requests.stages.length === 0
+    pendingMode === "when-actions" && recoveryActions.length === 0
       ? null
       : beginPending(input.nextState.targetId, {
           operationId: input.operationId,
-          actions: requests.stages.map((request) => ({
-            stagingPath: request.cleanupPath,
-            activationName: request.activationName
-          }))
+          actions: recoveryActions
         });
   if (pending !== null && !pending.ok) {
     return pending;
   }
 
   const staged: StagedProjection[] = [];
+  const recoveryContainers: string[] = [];
   for (const request of requests.stages) {
     const stillHeld = input.lock.checkHeld();
     if (!stillHeld.ok) {
@@ -395,10 +370,27 @@ async function prepareReconciliationStaging(
       await cleanupBeforeCommit(
         input,
         staged,
+        recoveryContainers,
         pending?.ok === true
       );
       return prepared;
     }
+    await writeTargetReconciliationRecoveryManifest(
+      request.cleanupPath,
+      {
+        operationId: input.operationId,
+        targetId: input.nextState.targetId,
+        activationName: request.activationName,
+        action: "stage",
+        previous:
+          request.current === undefined
+            ? null
+            : {
+                projection: request.current.projection,
+                materialization: request.current.materialization
+              }
+      }
+    );
     staged.push({
       activationName: request.activationName,
       cleanupPath: request.cleanupPath,
@@ -406,10 +398,32 @@ async function prepareReconciliationStaging(
     });
   }
 
+  for (const request of requests.removals) {
+    const held = input.lock.checkHeld();
+    if (!held.ok) {
+      return held;
+    }
+    await writeTargetReconciliationRecoveryManifest(
+      request.cleanupPath,
+      {
+        operationId: input.operationId,
+        targetId: input.nextState.targetId,
+        activationName: request.activationName,
+        action: "remove",
+        previous: {
+          projection: request.current.projection,
+          materialization: request.current.materialization
+        }
+      }
+    );
+    recoveryContainers.push(request.cleanupPath);
+  }
+
   return {
     ok: true,
     value: {
       staged,
+      recoveryContainers,
       hasPending: pending?.ok === true
     }
   };
@@ -420,6 +434,7 @@ function committedHandle(
   state: RegistryTargetState,
   staged: ReadonlyArray<StagedProjection>,
   removals: ReadonlyArray<RemovalRequest>,
+  recoveryContainers: ReadonlyArray<string>,
   hasPending: boolean
 ): CommittedTargetReconciliation {
   let reconciled = false;
@@ -460,15 +475,25 @@ function committedHandle(
         }
       }
 
-      for (const projection of staged) {
-        const held = input.lock.checkHeld();
-        if (!held.ok) {
-          return held;
+      if (!input.deferPendingCompletion) {
+        for (const projection of staged) {
+          const held = input.lock.checkHeld();
+          if (!held.ok) {
+            return held;
+          }
+          await projection.prepared.discard();
         }
-        await projection.prepared.discard();
+
+        for (const path of recoveryContainers) {
+          const held = input.lock.checkHeld();
+          if (!held.ok) {
+            return held;
+          }
+          await removePendingStagingPath(path);
+        }
       }
 
-      if (hasPending) {
+      if (hasPending && !input.deferPendingCompletion) {
         const completed = input.registry.completePendingOperation(
           input.operationId
         );
@@ -486,6 +511,7 @@ function committedHandle(
 async function cleanupBeforeCommit(
   input: PrepareTargetReconciliationInput,
   staged: ReadonlyArray<StagedProjection>,
+  recoveryContainers: ReadonlyArray<string>,
   hasPending: boolean
 ): Promise<void> {
   const held = input.lock.checkHeld();
@@ -499,6 +525,14 @@ async function cleanupBeforeCommit(
       return;
     }
     await projection.prepared.discard();
+  }
+
+  for (const path of recoveryContainers) {
+    const stillHeld = input.lock.checkHeld();
+    if (!stillHeld.ok) {
+      return;
+    }
+    await removePendingStagingPath(path);
   }
 
   if (hasPending) {
@@ -579,6 +613,10 @@ function validateAndBuildReconciliationRequests(
       }
       removals.push({
         activationName: action.activationName,
+        cleanupPath: join(
+          input.targetRoot,
+          `.skiloom-stage-${action.activationName}-${randomUUID()}`
+        ),
         current
       });
       continue;

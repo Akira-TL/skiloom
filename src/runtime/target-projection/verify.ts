@@ -98,6 +98,38 @@ export async function verifyManagedProjection(
   };
 }
 
+export async function verifyManagedProjectionAtPath(
+  input: Readonly<{
+    home: VerifyManagedProjectionInput["home"];
+    activationPath: string;
+    activationName: string;
+    projection: VerifyManagedProjectionInput["expected"]["projection"];
+    materialization: VerifyManagedProjectionInput["expected"]["materialization"];
+  }>
+): Promise<Result<true, ManagedProjectionVerificationError>> {
+  const store = await verifyPackageStoreEntry(
+    input.home,
+    input.projection.contentDigest
+  );
+  if (!store.ok) {
+    return store;
+  }
+  const tree = buildManagedProjectionTree(
+    store.value.snapshot,
+    input.projection
+  );
+  if (!tree.ok) {
+    return tree;
+  }
+  return verifyProjectionAtPath({
+    activationPath: input.activationPath,
+    activationName: input.activationName,
+    expectedMaterialization: input.materialization,
+    expectedLinkTarget: store.value.payloadPath,
+    tree: tree.value
+  });
+}
+
 export async function verifyProjectionAtPath(input: Readonly<{
   activationPath: string;
   activationName: string;
