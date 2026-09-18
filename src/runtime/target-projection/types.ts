@@ -21,6 +21,11 @@ export type MaterializeManagedProjectionInput = Readonly<{
   current?: ManagedProjectionExpectation;
 }>;
 
+export type PrepareManagedProjectionInput = MaterializeManagedProjectionInput &
+  Readonly<{
+    cleanupPath?: string;
+  }>;
+
 export type VerifyManagedProjectionInput = Readonly<{
   home: SkiloomHomePaths;
   targetRoot: string;
@@ -78,7 +83,8 @@ export type InvalidManagedProjectionInputReason =
   | "activation-name-transform-mismatch"
   | "snapshot-digest-mismatch"
   | "current-activation-mismatch"
-  | "transformed-copy-requires-copy";
+  | "transformed-copy-requires-copy"
+  | "invalid-staging-path";
 
 export type InvalidManagedProjectionInput = ProductError<
   "InvalidManagedProjectionInput",

@@ -9,9 +9,11 @@ import {
   writeFile
 } from "node:fs/promises";
 import {
+  basename,
   dirname,
   isAbsolute,
-  join
+  join,
+  resolve
 } from "node:path";
 
 import {
@@ -40,6 +42,7 @@ import type {
   MaterializedManagedProjection,
   MaterializeManagedProjectionInput,
   PreparedManagedProjection,
+  PrepareManagedProjectionInput,
   TargetPathOccupied
 } from "./types.js";
 
@@ -71,7 +74,7 @@ export async function materializeManagedProjection(
 }
 
 export async function prepareManagedProjection(
-  input: MaterializeManagedProjectionInput
+  input: PrepareManagedProjectionInput
 ): Promise<Result<PreparedManagedProjection, ManagedProjectionRuntimeError>> {
   if (!isAbsolute(input.targetRoot)) {
     return invalidProjection("target-root-not-absolute", input.targetRoot);
@@ -137,13 +140,11 @@ export async function prepareManagedProjection(
 
   const candidates = requestedCandidates(request, transformed);
   for (const candidate of candidates) {
-    const stagingContainer = await mkdtemp(
-      join(
-        input.targetRoot,
-        ".skiloom-stage-" + input.projection.activationName + "-"
-      )
-    );
-    const stagingPath = join(stagingContainer, "projection");
+    const stagingContainer = await createStagingContainer(input);
+    if (!stagingContainer.ok) {
+      return stagingContainer;
+    }
+    const stagingPath = join(stagingContainer.value, "projection");
 
     try {
       const built = await buildStagingProjection({
@@ -153,7 +154,7 @@ export async function prepareManagedProjection(
         tree: tree.value
       });
       if (!built.ok) {
-        await removeOwnedContainer(stagingContainer);
+        await removeOwnedContainer(stagingContainer.value);
         if (
           request === "auto" &&
           candidate !== "copy" &&
@@ -172,7 +173,7 @@ export async function prepareManagedProjection(
         tree: tree.value
       });
       if (!verified.ok) {
-        await removeOwnedContainer(stagingContainer);
+        await removeOwnedContainer(stagingContainer.value);
         return verified;
       }
 
@@ -182,14 +183,14 @@ export async function prepareManagedProjection(
           input,
           activationPath,
           existsInitially,
-          cleanupPath: stagingContainer,
+          cleanupPath: stagingContainer.value,
           stagingPath,
           materialization: candidate,
           storePayloadPath: store.value.payloadPath
         })
       };
     } catch (error) {
-      await removeOwnedContainer(stagingContainer);
+      await removeOwnedContainer(stagingContainer.value);
       throw error;
     }
   }
@@ -198,6 +199,41 @@ export async function prepareManagedProjection(
     candidates[0] ?? "copy",
     process.platform
   );
+}
+
+async function createStagingContainer(
+  input: PrepareManagedProjectionInput
+): Promise<Result<string, InvalidManagedProjectionInput>> {
+  if (input.cleanupPath === undefined) {
+    return {
+      ok: true,
+      value: await mkdtemp(
+        join(
+          input.targetRoot,
+          ".skiloom-stage-" + input.projection.activationName + "-"
+        )
+      )
+    };
+  }
+
+  const expectedPrefix = ".skiloom-stage-" + input.projection.activationName + "-";
+  if (
+    !isAbsolute(input.cleanupPath) ||
+    resolve(dirname(input.cleanupPath)) !== resolve(input.targetRoot) ||
+    !basename(input.cleanupPath).startsWith(expectedPrefix)
+  ) {
+    return invalidProjection("invalid-staging-path", input.cleanupPath);
+  }
+
+  try {
+    await mkdir(input.cleanupPath, { recursive: false });
+  } catch (error) {
+    if (isNodeError(error) && error.code === "EEXIST") {
+      return invalidProjection("invalid-staging-path", input.cleanupPath);
+    }
+    throw error;
+  }
+  return { ok: true, value: input.cleanupPath };
 }
 
 function preparedProjectionHandle(input: Readonly<{
