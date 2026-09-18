@@ -83,7 +83,8 @@ export type InvalidAddRootLifecycleState = ProductError<
       | "target-location-mismatch"
       | "invalid-direct-requirement"
       | "missing-registry-projection"
-      | "missing-current-projection";
+      | "missing-current-projection"
+      | "projection-mismatch";
   }>
 >;
 
@@ -162,6 +163,7 @@ export async function addAcceptedTargetRoots(
   }
 
   const currentRequirements = registryRequirementsToDomain(
+    current.targetId,
     current.directRequirements
   );
   if (!currentRequirements.ok) {
@@ -251,7 +253,8 @@ export async function addAcceptedTargetRoots(
   const observed = await observeAcceptedTarget(
     input.home,
     targetRoot,
-    currentOwned.value
+    currentOwned.value,
+    desiredPlan.value
   );
   if (!observed.ok) {
     return observed;
@@ -344,6 +347,7 @@ export async function addAcceptedTargetRoots(
 }
 
 function registryRequirementsToDomain(
+  targetId: string,
   requirements: ReadonlyArray<RegistryDirectRequirement>
 ): Result<
   ReadonlyArray<DirectInstallRequirement>,
@@ -354,7 +358,7 @@ function registryRequirementsToDomain(
     if (requirement.kind === "package") {
       const coordinate = parsePackageCoordinate(requirement.coordinate);
       if (!coordinate.ok) {
-        return invalidState("", "invalid-direct-requirement");
+        return invalidState(targetId, "invalid-direct-requirement");
       }
       result.push(
         requirement.sourceKind === "git"
@@ -383,7 +387,7 @@ function registryRequirementsToDomain(
       requirement.coordinate
     );
     if (!coordinate.ok) {
-      return invalidState("", "invalid-direct-requirement");
+      return invalidState(targetId, "invalid-direct-requirement");
     }
     result.push(
       requirement.sourceKind === "git"
@@ -450,7 +454,22 @@ function currentOwnedProjections(
       projection
     ])
   );
+  const registryByPackage = new Map(
+    state.projections.map((projection) => [
+      projection.packageCoordinate,
+      projection
+    ])
+  );
   const result: TargetOwnedProjection[] = [];
+
+  for (const projection of plan.projections) {
+    if (!registryByPackage.has(projection.packageCoordinate)) {
+      return invalidState(
+        state.targetId,
+        "missing-registry-projection"
+      );
+    }
+  }
 
   for (const registryProjection of state.projections) {
     const projection = projectionByPackage.get(
@@ -461,6 +480,14 @@ function currentOwnedProjections(
         state.targetId,
         "missing-current-projection"
       );
+    }
+    if (
+      registryProjection.activationName !==
+        projection.activationName ||
+      registryProjection.transformJson !==
+        projectionTransformJson(projection)
+    ) {
+      return invalidState(state.targetId, "projection-mismatch");
     }
     result.push({
       projection,
@@ -519,7 +546,8 @@ function projectionRenames(
 async function observeAcceptedTarget(
   home: SkiloomHomePaths,
   targetRoot: string,
-  current: ReadonlyArray<TargetOwnedProjection>
+  current: ReadonlyArray<TargetOwnedProjection>,
+  desiredPlan: TargetPlan
 ): Promise<
   Result<
     ReadonlyArray<TargetPathObservation>,
@@ -527,6 +555,7 @@ async function observeAcceptedTarget(
   >
 > {
   const observations: TargetPathObservation[] = [];
+  const observedActivations = new Set<string>();
 
   for (const owned of current) {
     const activationPath = join(
@@ -540,6 +569,7 @@ async function observeAcceptedTarget(
           activationName: owned.projection.activationName,
           kind: "existing"
         });
+        observedActivations.add(owned.projection.activationName);
       }
       continue;
     }
@@ -561,6 +591,7 @@ async function observeAcceptedTarget(
         materialization: owned.materialization,
         expectedViewMatches: true
       });
+      observedActivations.add(owned.projection.activationName);
       continue;
     }
     if (verified.error.code === "ManagedProjectionMissing") {
@@ -578,9 +609,32 @@ async function observeAcceptedTarget(
       materialization: owned.materialization,
       expectedViewMatches: false
     });
+    observedActivations.add(owned.projection.activationName);
   }
 
-  return { ok: true, value: observations };
+  for (const projection of desiredPlan.projections) {
+    if (observedActivations.has(projection.activationName)) {
+      continue;
+    }
+    if (
+      await pathExists(
+        join(targetRoot, projection.activationName)
+      )
+    ) {
+      observations.push({
+        activationName: projection.activationName,
+        kind: "existing"
+      });
+      observedActivations.add(projection.activationName);
+    }
+  }
+
+  return {
+    ok: true,
+    value: observations.sort((left, right) =>
+      compareUtf8(left.activationName, right.activationName)
+    )
+  };
 }
 
 function buildNextRegistryState(

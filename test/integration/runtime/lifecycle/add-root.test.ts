@@ -293,6 +293,73 @@ test("declined add-root leaves accepted generation Store and live Target unchang
   });
 });
 
+test("foreign path for a newly added root fails ownership preflight before Store or Registry changes", async () => {
+  await withRuntime(async ({ paths, targetRoot }) => {
+    await withRealLock(paths, async (lock) => {
+      const registry = await requireRegistry(paths, lock);
+      const fixture = sharedFixture();
+      try {
+        const initial = await installApp({
+          paths,
+          targetRoot,
+          lock,
+          registry,
+          fixture
+        });
+        const storeBefore = [...readdirSync(paths.storePath)].sort();
+        const foreign = join(targetRoot, "tool");
+        await mkdir(foreign);
+        await writeFile(
+          join(foreign, "KEEP"),
+          "foreign tool bytes\n"
+        );
+
+        const result = await addAcceptedTargetRoots({
+          home: paths,
+          targetId,
+          targetRoot,
+          lock,
+          registry,
+          additions: [
+            releasePackageRequirement("acme/tool/tool")
+          ],
+          repositoryTransport: fixture.repositoryTransport,
+          transport: fixture.transport,
+          acceptCandidate: () => true,
+          createOperationId: () => "foreign-add-root",
+          syncMarker: () => {}
+        });
+
+        assert.equal(result.ok, false);
+        if (!result.ok) {
+          assert.deepEqual(result.error, {
+            code: "ForeignTargetPathConflict",
+            facts: {
+              activationName: "tool",
+              desiredPackageCoordinate: "acme/tool/tool"
+            }
+          });
+        }
+        const accepted = registry.readTargetState(targetId);
+        assert.equal(accepted.ok, true);
+        if (accepted.ok) {
+          assert.deepEqual(accepted.value, initial);
+        }
+        assert.deepEqual(
+          [...readdirSync(paths.storePath)].sort(),
+          storeBefore
+        );
+        assert.equal(
+          await readFile(join(foreign, "KEEP"), "utf8"),
+          "foreign tool bytes\n"
+        );
+      } finally {
+        registry.close();
+      }
+    });
+  });
+});
+
 test("adding a root preserves detached user bytes ownership and baseline for a still-bound Package", async () => {
   await withRuntime(async ({ paths, targetRoot }) => {
     await withRealLock(paths, async (lock) => {
