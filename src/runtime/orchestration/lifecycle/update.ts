@@ -56,6 +56,11 @@ export type UpdateAcceptedTargetError =
 
 export type UpdateAcceptedTargetResult =
   | Readonly<{
+      status: "no-op";
+      plan: LifecycleCandidatePlan;
+      state: RegistryTargetState;
+    }>
+  | Readonly<{
       status: "declined";
       plan: LifecycleCandidatePlan;
       state: RegistryTargetState;
@@ -163,6 +168,16 @@ export async function updateAcceptedTarget(
   }
   if (!result.ok) {
     return result;
+  }
+  if (result.value.status === "no-op") {
+    return {
+      ok: true,
+      value: {
+        status: "no-op",
+        plan: result.value.plan,
+        state: result.value.state
+      }
+    };
   }
   if (result.value.status === "declined") {
     return {

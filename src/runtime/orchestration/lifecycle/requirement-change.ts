@@ -103,6 +103,11 @@ export type AcceptedRequirementChangeError =
 
 export type AcceptedRequirementChangeResult =
   | Readonly<{
+      status: "no-op";
+      plan: LifecycleCandidatePlan;
+      state: RegistryTargetState;
+    }>
+  | Readonly<{
       status: "declined";
       plan: LifecycleCandidatePlan;
       state: RegistryTargetState;
@@ -196,6 +201,16 @@ export async function applyAcceptedRequirementChange(
   const heldAfterPlanning = input.lock.checkHeld();
   if (!heldAfterPlanning.ok) {
     return heldAfterPlanning;
+  }
+  if (planned.value.noChange) {
+    return {
+      ok: true,
+      value: {
+        status: "no-op",
+        plan: planned.value,
+        state: current
+      }
+    };
   }
 
   let accepted: boolean;

@@ -47,6 +47,11 @@ export type RemoveAcceptedTargetRequirementError =
 
 export type RemoveAcceptedTargetRequirementResult =
   | Readonly<{
+      status: "no-op";
+      plan: LifecycleCandidatePlan;
+      state: RegistryTargetState;
+    }>
+  | Readonly<{
       status: "declined";
       plan: LifecycleCandidatePlan;
       state: RegistryTargetState;
@@ -157,24 +162,35 @@ export async function removeAcceptedTargetRequirement(
     return result;
   }
 
-  return result.value.status === "declined"
-    ? {
-        ok: true,
-        value: {
-          status: "declined",
-          plan: result.value.plan,
-          state: result.value.state
-        }
+  if (result.value.status === "no-op") {
+    return {
+      ok: true,
+      value: {
+        status: "no-op",
+        plan: result.value.plan,
+        state: result.value.state
       }
-    : {
-        ok: true,
-        value: {
-          status: "removed",
-          plan: result.value.plan,
-          state: result.value.state,
-          marker: result.value.marker
-        }
-      };
+    };
+  }
+  if (result.value.status === "declined") {
+    return {
+      ok: true,
+      value: {
+        status: "declined",
+        plan: result.value.plan,
+        state: result.value.state
+      }
+    };
+  }
+  return {
+    ok: true,
+    value: {
+      status: "removed",
+      plan: result.value.plan,
+      state: result.value.state,
+      marker: result.value.marker
+    }
+  };
 }
 
 function canonicalSelector(
