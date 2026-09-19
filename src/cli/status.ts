@@ -15,8 +15,9 @@ import {
   readTargetStateMarkerFile,
   type ReadTargetStateMarkerFileError
 } from "../runtime/target-state-marker.js";
-import type {
-  ResolvedCliTarget
+import {
+  resolveCliTarget,
+  type ResolvedCliTarget
 } from "./target-selector.js";
 
 export type StatusRegistryReadFailed = ProductError<
@@ -55,6 +56,72 @@ export type CliStatusResult = Readonly<{
   marker: TargetRecoveryMarkerFacts | null;
   registry: CliRegistryStatus | null;
 }>;
+
+export function parseCliStatusArguments(
+  argv: ReadonlyArray<string>,
+  cwd: string
+):
+  | Readonly<{ ok: true; value: ResolvedCliTarget }>
+  | Readonly<{ ok: false; reason: string }> {
+  let target: string | undefined;
+  let host: string | undefined;
+  let scope: string | undefined;
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const option = argv[index]!;
+    if (
+      option !== "--target" &&
+      option !== "--host" &&
+      option !== "--scope"
+    ) {
+      return {
+        ok: false,
+        reason: "unknown option: " + option
+      };
+    }
+    const value = argv[index + 1];
+    if (value === undefined || value.startsWith("--")) {
+      return {
+        ok: false,
+        reason: "missing value for " + option
+      };
+    }
+    index += 1;
+
+    if (option === "--target") {
+      if (target !== undefined) {
+        return {
+          ok: false,
+          reason: "duplicate --target"
+        };
+      }
+      target = value;
+    } else if (option === "--host") {
+      if (host !== undefined) {
+        return {
+          ok: false,
+          reason: "duplicate --host"
+        };
+      }
+      host = value;
+    } else {
+      if (scope !== undefined) {
+        return {
+          ok: false,
+          reason: "duplicate --scope"
+        };
+      }
+      scope = value;
+    }
+  }
+
+  return resolveCliTarget({
+    cwd,
+    ...(target === undefined ? {} : { target }),
+    ...(host === undefined ? {} : { host }),
+    ...(scope === undefined ? {} : { scope })
+  });
+}
 
 export async function readCliStatus(
   target: ResolvedCliTarget,

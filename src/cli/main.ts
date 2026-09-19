@@ -15,6 +15,7 @@ import {
   type CliInstallResult
 } from "./install.js";
 import {
+  parseCliStatusArguments,
   readCliStatus,
   type CliStatusResult
 } from "./status.js";
@@ -571,61 +572,18 @@ function parseStatus(
 ):
   | Readonly<{ ok: true; value: ParsedStatus }>
   | Readonly<{ ok: false; value: UsageFailure }> {
-  let targetOptions: CliTargetOptions = {};
-
-  for (let index = 0; index < argv.length; index += 1) {
-    const option = argv[index]!;
-    if (!isCliTargetOption(option)) {
-      return usage(
-        "status",
-        json,
-        `unknown option: ${option}`
-      );
-    }
-    const value = argv[index + 1];
-    if (
-      value === undefined ||
-      value.startsWith("--")
-    ) {
-      return usage(
-        "status",
-        json,
-        `missing value for ${option}`
-      );
-    }
-    index += 1;
-
-    const updated = addCliTargetOption(
-      targetOptions,
-      option,
-      value
-    );
-    if (!updated.ok) {
-      return usage(
-        "status",
-        json,
-        updated.reason
-      );
-    }
-    targetOptions = updated.value;
-  }
-
-  const resolved = resolveCliTargetOptions(
-    targetOptions
+  const parsed = parseCliStatusArguments(
+    argv,
+    process.cwd()
   );
-  if (!resolved.ok) {
-    return usage(
-      "status",
-      json,
-      resolved.reason
-    );
+  if (!parsed.ok) {
+    return usage("status", json, parsed.reason);
   }
-
   return {
     ok: true,
     value: {
       command: "status",
-      target: resolved.value,
+      target: parsed.value,
       json
     }
   };
