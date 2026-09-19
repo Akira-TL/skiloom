@@ -41,6 +41,12 @@ export async function addAcceptedTargetRoots(
     mutateRequirements: (current) =>
       upsertDirectRequirements(current, input.additions),
     acceptCandidate: input.acceptCandidate,
+    ...(input.requestedProjectionRename === undefined
+      ? {}
+      : {
+          requestedProjectionRename:
+            input.requestedProjectionRename
+        }),
     ...(input.syncMarker === undefined
       ? {}
       : { syncMarker: input.syncMarker }),

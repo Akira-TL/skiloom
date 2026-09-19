@@ -12,7 +12,8 @@ import type {
 } from "../../../domain/snapshot/index.js";
 import type {
   TargetPlan,
-  TargetPlanError
+  TargetPlanError,
+  TargetProjectionRename
 } from "../../../domain/target/index.js";
 import {
   preflightTargetOwnership,
@@ -141,6 +142,7 @@ export type FirstAcceptedInstallInput =
       lock: OperationLockSession;
       registry: MachineRegistry;
       acceptCandidate: LifecycleCandidateAcceptanceCallback;
+      requestedProjectionRename?: TargetProjectionRename;
       syncMarker?: LifecycleMarkerSyncCallback;
       createTargetId?: () => string;
       createOperationId?: () => string;
@@ -243,7 +245,10 @@ export async function executeFirstAcceptedInstall(
 
   const desiredPlan = planLifecycleTarget(
     planned.value.directRequirements,
-    planned.value.candidate
+    planned.value.candidate,
+    input.requestedProjectionRename === undefined
+      ? []
+      : [input.requestedProjectionRename]
   );
   if (!desiredPlan.ok) {
     return desiredPlan;

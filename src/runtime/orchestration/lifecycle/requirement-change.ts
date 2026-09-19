@@ -147,6 +147,7 @@ export type AcceptedRequirementChangeInput = Readonly<{
   mutateRequirements: (
     current: ReadonlyArray<DirectInstallRequirement>
   ) => ReadonlyArray<DirectInstallRequirement>;
+  requestedProjectionRename?: TargetProjectionRename;
   credential?: string;
   signal?: AbortSignal;
   sourceCachePath?: string;
@@ -217,12 +218,17 @@ export async function applyAcceptedRequirementChange(
   if (!heldAfterPlanning.ok) {
     return heldAfterPlanning;
   }
-  if (planned.value.noChange) {
+  const candidatePlan = applyRequestedRenameChange(
+    planned.value,
+    current,
+    input.requestedProjectionRename
+  );
+  if (candidatePlan.noChange) {
     return {
       ok: true,
       value: {
         status: "no-op",
-        plan: planned.value,
+        plan: candidatePlan,
         state: current
       }
     };
@@ -231,7 +237,7 @@ export async function applyAcceptedRequirementChange(
   let acceptance;
   try {
     acceptance = resolveLifecycleCandidateAcceptance(
-      await input.acceptCandidate(planned.value)
+      await input.acceptCandidate(candidatePlan)
     );
   } catch {
     return {
@@ -247,7 +253,7 @@ export async function applyAcceptedRequirementChange(
       ok: true,
       value: {
         status: "no-op",
-        plan: planned.value,
+        plan: candidatePlan,
         state: current
       }
     };
@@ -257,7 +263,7 @@ export async function applyAcceptedRequirementChange(
       ok: true,
       value: {
         status: "planned",
-        plan: planned.value,
+        plan: candidatePlan,
         state: current
       }
     };
@@ -267,7 +273,7 @@ export async function applyAcceptedRequirementChange(
       ok: true,
       value: {
         status: "declined",
-        plan: planned.value,
+        plan: candidatePlan,
         state: current
       }
     };
@@ -293,13 +299,14 @@ export async function applyAcceptedRequirementChange(
     return currentOwned;
   }
 
-  const renames = preservedRenames(
+  const renames = requestedRenames(
     current,
-    planned.value.candidate
+    candidatePlan.candidate,
+    input.requestedProjectionRename
   );
   const desiredPlan = planLifecycleTarget(
-    planned.value.directRequirements,
-    planned.value.candidate,
+    candidatePlan.directRequirements,
+    candidatePlan.candidate,
     renames
   );
   if (!desiredPlan.ok) {
@@ -327,7 +334,7 @@ export async function applyAcceptedRequirementChange(
 
   const snapshots = await acquireLifecycleCandidatePackageSnapshots(
     input,
-    planned.value.candidate
+    candidatePlan.candidate
   );
   if (!snapshots.ok) {
     return snapshots;
@@ -344,7 +351,7 @@ export async function applyAcceptedRequirementChange(
   const nextState = buildNextRegistryState(
     current,
     targetRoot,
-    planned.value,
+    candidatePlan,
     desiredPlan.value
   );
   const operationId = (input.createOperationId ?? randomUUID)();
@@ -406,7 +413,7 @@ export async function applyAcceptedRequirementChange(
     ok: true,
     value: {
       status: "applied",
-      plan: planned.value,
+      plan: candidatePlan,
       state: reconciled.value,
       marker
     }
@@ -507,6 +514,23 @@ function currentOwnedProjections(
   };
 }
 
+function requestedRenames(
+  state: RegistryTargetState,
+  candidate: ResolverCandidateGraph,
+  requested: TargetProjectionRename | undefined
+): ReadonlyArray<TargetProjectionRename> {
+  const preserved = preservedRenames(state, candidate);
+  if (requested === undefined) {
+    return preserved;
+  }
+  return [
+    ...preserved.filter((rename) =>
+      rename.packageCoordinate !== requested.packageCoordinate
+    ),
+    requested
+  ];
+}
+
 function preservedRenames(
   state: RegistryTargetState,
   candidate: ResolverCandidateGraph
@@ -519,6 +543,22 @@ function preservedRenames(
       candidatePackages.has(projection.packageCoordinate)
     )
   );
+}
+
+function applyRequestedRenameChange(
+  plan: LifecycleCandidatePlan,
+  state: RegistryTargetState,
+  requested: TargetProjectionRename | undefined
+): LifecycleCandidatePlan {
+  if (requested === undefined || !plan.noChange) {
+    return plan;
+  }
+  const current = state.projections.find((projection) =>
+    projection.packageCoordinate === requested.packageCoordinate
+  );
+  return current?.activationName === requested.activationName
+    ? plan
+    : { ...plan, noChange: false };
 }
 
 function projectionRenames(

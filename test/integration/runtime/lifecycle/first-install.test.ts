@@ -24,6 +24,9 @@ import {
   type SkiloomHomePaths
 } from "../../../../src/runtime/home.js";
 import {
+  addAcceptedTargetRoots
+} from "../../../../src/runtime/orchestration/lifecycle/add-root.js";
+import {
   executeFirstAcceptedInstall
 } from "../../../../src/runtime/orchestration/lifecycle/first-install.js";
 import {
@@ -222,6 +225,181 @@ test("first install persists the canonical public marker by default", async () =
             }
           }
         );
+      } finally {
+        opened.value.close();
+      }
+    });
+  });
+});
+
+test("first install applies an explicit requested activation rename without changing Package identity", async () => {
+  await withRuntime(async ({ paths, targetRoot }) => {
+    await withRealLock(paths, async (lock) => {
+      const opened = await openMachineRegistry(paths, lock);
+      assert.equal(opened.ok, true);
+      if (!opened.ok) {
+        return;
+      }
+      const fixture = sourceFixture([
+        releaseRepository("acme/app", [
+          release("v1.0.0", "a", [
+            skillPackage(".", "app", "Renamed application.")
+          ])
+        ])
+      ]);
+      const renameInput = {
+        requestedProjectionRename: {
+          packageCoordinate: "acme/app/app",
+          activationName: "app-local"
+        }
+      };
+
+      try {
+        const result = await executeFirstAcceptedInstall({
+          home: paths,
+          targetRoot,
+          lock,
+          registry: opened.value,
+          directRequirements: [
+            releasePackageRequirement("acme/app/app")
+          ],
+          repositoryTransport: fixture.repositoryTransport,
+          transport: fixture.transport,
+          acceptCandidate: () => true,
+          createTargetId: () => targetId,
+          createOperationId: () => "install-requested-rename",
+          syncMarker: () => {},
+          ...renameInput
+        });
+
+        assert.equal(result.ok, true);
+        if (!result.ok || result.value.status !== "installed") {
+          return;
+        }
+        assert.equal(existsSync(join(targetRoot, "app")), false);
+        assert.equal(existsSync(join(targetRoot, "app-local")), true);
+        assert.match(
+          await readFile(join(targetRoot, "app-local", "SKILL.md"), "utf8"),
+          /name: app-local/u
+        );
+        assert.deepEqual(result.value.state.projections, [
+          {
+            packageCoordinate: "acme/app/app",
+            activationName: "app-local",
+            ownership: "managed",
+            materialization: "copy",
+            transformJson: JSON.stringify({
+              rename: {
+                fromActivationName: "app",
+                toActivationName: "app-local"
+              },
+              dependencyRoutes: []
+            })
+          }
+        ]);
+        assert.deepEqual(result.value.marker.projectionOverrides, [
+          {
+            packageCoordinate: "acme/app/app",
+            activationName: "app-local"
+          }
+        ]);
+        assert.equal(
+          result.value.state.resolvedPackages[0]?.packageCoordinate,
+          "acme/app/app"
+        );
+      } finally {
+        opened.value.close();
+      }
+    });
+  });
+});
+
+test("reinstall applies a requested activation rename even when resolver state is otherwise unchanged", async () => {
+  await withRuntime(async ({ paths, targetRoot }) => {
+    await withRealLock(paths, async (lock) => {
+      const opened = await openMachineRegistry(paths, lock);
+      assert.equal(opened.ok, true);
+      if (!opened.ok) {
+        return;
+      }
+      const fixture = sourceFixture([
+        releaseRepository("acme/app", [
+          release("v1.0.0", "b", [
+            skillPackage(".", "app", "Reinstall rename application.")
+          ])
+        ])
+      ]);
+
+      try {
+        const installed = await executeFirstAcceptedInstall({
+          home: paths,
+          targetRoot,
+          lock,
+          registry: opened.value,
+          directRequirements: [releasePackageRequirement("acme/app/app")],
+          repositoryTransport: fixture.repositoryTransport,
+          transport: fixture.transport,
+          acceptCandidate: () => true,
+          createTargetId: () => targetId,
+          createOperationId: () => "install-before-reinstall-rename",
+          syncMarker: () => {}
+        });
+        assert.equal(installed.ok, true);
+        if (!installed.ok || installed.value.status !== "installed") {
+          return;
+        }
+
+        let acceptanceCalls = 0;
+        const renameInput = {
+          requestedProjectionRename: {
+            packageCoordinate: "acme/app/app",
+            activationName: "app-local"
+          }
+        };
+        const result = await addAcceptedTargetRoots({
+          home: paths,
+          targetId,
+          targetRoot,
+          lock,
+          registry: opened.value,
+          additions: [releasePackageRequirement("acme/app/app")],
+          repositoryTransport: fixture.repositoryTransport,
+          transport: fixture.transport,
+          acceptCandidate: () => {
+            acceptanceCalls += 1;
+            return true;
+          },
+          createOperationId: () => "reinstall-requested-rename",
+          syncMarker: () => {},
+          ...renameInput
+        });
+
+        assert.equal(result.ok, true);
+        if (!result.ok) {
+          return;
+        }
+        assert.equal(result.value.status, "applied");
+        if (result.value.status !== "applied") {
+          return;
+        }
+        assert.equal(acceptanceCalls, 1);
+        assert.equal(result.value.state.generation, 2);
+        assert.equal(existsSync(join(targetRoot, "app")), false);
+        assert.equal(existsSync(join(targetRoot, "app-local")), true);
+        assert.equal(
+          result.value.state.projections[0]?.packageCoordinate,
+          "acme/app/app"
+        );
+        assert.equal(
+          result.value.state.projections[0]?.activationName,
+          "app-local"
+        );
+        assert.deepEqual(result.value.marker.projectionOverrides, [
+          {
+            packageCoordinate: "acme/app/app",
+            activationName: "app-local"
+          }
+        ]);
       } finally {
         opened.value.close();
       }
