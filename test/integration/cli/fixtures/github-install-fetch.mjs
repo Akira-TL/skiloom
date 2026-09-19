@@ -28,6 +28,22 @@ function skill(root, name, description) {
   };
 }
 
+function packageManifest(root, dependencies) {
+  const prefix = root === "." ? "" : root + "/";
+  const lines = ["schema = 1", "", "[dependencies]"];
+  for (const [coordinate, requirement] of Object.entries(dependencies)) {
+    lines.push(
+      JSON.stringify(coordinate) + " = " +
+      JSON.stringify(requirement)
+    );
+  }
+  return {
+    path: prefix + "skiloom-package.toml",
+    mode: "100644",
+    content: lines.join("\n") + "\n"
+  };
+}
+
 function snapshot(entries) {
   return { entries };
 }
@@ -46,7 +62,14 @@ function appRepository() {
           retarget
             ? "Retargeted application."
             : "Baseline application."
-        )
+        ),
+        ...(mode === "shared-remove"
+          ? [
+              packageManifest(".", {
+                "acme/shared/shared": "^1.0.0"
+              })
+            ]
+          : [])
       ])
     }
   ];
@@ -99,6 +122,37 @@ const repositories = new Map(
       snapshot: snapshot([
         skill(".", "gitapp", "Git application.")
       ])
+    },
+    {
+      repository: "acme/tool",
+      sourceKind: "github-release",
+      releases: [
+        {
+          tag: "v1.0.0",
+          commit: commit("6"),
+          immutable: true,
+          snapshot: snapshot([
+            skill(".", "tool", "Tool package."),
+            packageManifest(".", {
+              "acme/shared/shared": "^1.0.0"
+            })
+          ])
+        }
+      ]
+    },
+    {
+      repository: "acme/shared",
+      sourceKind: "github-release",
+      releases: [
+        {
+          tag: "v1.0.0",
+          commit: commit("7"),
+          immutable: true,
+          snapshot: snapshot([
+            skill(".", "shared", "Shared package.")
+          ])
+        }
+      ]
     }
   ].map((entry) => [entry.repository.toLowerCase(), entry])
 );

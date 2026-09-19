@@ -24,6 +24,9 @@ import type {
 import type {
   LifecycleCandidateAcceptanceCallback
 } from "./acceptance.js";
+import type {
+  LifecycleCandidateProjection
+} from "./projection/plan.js";
 import {
   applyAcceptedRequirementChange,
   type AcceptedRequirementChangeError
@@ -52,21 +55,25 @@ export type RemoveAcceptedTargetRequirementResult =
   | Readonly<{
       status: "planned";
       plan: LifecycleCandidatePlan;
+      projections: ReadonlyArray<LifecycleCandidateProjection>;
       state: RegistryTargetState;
     }>
   | Readonly<{
       status: "no-op";
       plan: LifecycleCandidatePlan;
+      projections: ReadonlyArray<LifecycleCandidateProjection>;
       state: RegistryTargetState;
     }>
   | Readonly<{
       status: "declined";
       plan: LifecycleCandidatePlan;
+      projections: ReadonlyArray<LifecycleCandidateProjection>;
       state: RegistryTargetState;
     }>
   | Readonly<{
       status: "removed";
       plan: LifecycleCandidatePlan;
+      projections: ReadonlyArray<LifecycleCandidateProjection>;
       state: RegistryTargetState;
       marker: TargetRecoveryMarkerFacts;
     }>;
@@ -176,6 +183,7 @@ export async function removeAcceptedTargetRequirement(
       value: {
         status: "planned",
         plan: result.value.plan,
+        projections: result.value.projections,
         state: result.value.state
       }
     };
@@ -186,6 +194,7 @@ export async function removeAcceptedTargetRequirement(
       value: {
         status: "no-op",
         plan: result.value.plan,
+        projections: result.value.projections,
         state: result.value.state
       }
     };
@@ -196,6 +205,7 @@ export async function removeAcceptedTargetRequirement(
       value: {
         status: "declined",
         plan: result.value.plan,
+        projections: result.value.projections,
         state: result.value.state
       }
     };
@@ -205,6 +215,7 @@ export async function removeAcceptedTargetRequirement(
     value: {
       status: "removed",
       plan: result.value.plan,
+      projections: result.value.projections,
       state: result.value.state,
       marker: result.value.marker
     }

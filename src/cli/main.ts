@@ -15,6 +15,13 @@ import {
   type CliInstallResult
 } from "./install.js";
 import {
+  executeCliRemove,
+  formatCliRemoveResult,
+  parseCliRemoveArguments,
+  type CliRemoveInvocation,
+  type CliRemoveResult
+} from "./remove/index.js";
+import {
   parseCliStatusArguments,
   readCliStatus,
   type CliStatusResult
@@ -87,16 +94,20 @@ type ParsedInstall = Readonly<{
 type ParsedUpdate = CliUpdateInvocation &
   Readonly<{ command: "update" }>;
 
+type ParsedRemove = CliRemoveInvocation & Readonly<{ command: "remove" }>;
+
 type ParsedCommand =
   | ParsedValidate
   | ParsedStatus
   | ParsedSearch
   | ParsedInstall
-  | ParsedUpdate;
+  | ParsedUpdate
+  | ParsedRemove;
 
 type CandidateCliResult =
   | CliInstallResult
-  | CliUpdateResult;
+  | CliUpdateResult
+  | CliRemoveResult;
 
 type CandidateCliExecution = Readonly<{
   result: CandidateCliResult;
@@ -146,6 +157,8 @@ async function main(): Promise<number> {
       return runInstall(parsed.value);
     case "update":
       return runUpdate(parsed.value);
+    case "remove":
+      return runRemove(parsed.value);
   }
 }
 
@@ -204,6 +217,21 @@ async function runUpdate(command: ParsedUpdate): Promise<number> {
         command.command,
         command.json,
         updated.error
+      );
+}
+
+async function runRemove(command: ParsedRemove): Promise<number> {
+  const removed = await executeCliRemove(command);
+  return removed.ok
+    ? renderCandidateSuccess(
+        command.command,
+        command.json,
+        removed.value
+      )
+    : renderCandidateFailure(
+        command.command,
+        command.json,
+        removed.error
       );
 }
 
@@ -302,6 +330,8 @@ function parseArguments(
       );
     case "update":
       return parseUpdate(withoutJson.slice(1), json);
+    case "remove":
+      return parseRemove(withoutJson.slice(1), json);
     default:
       return usage(
         command,
@@ -566,6 +596,22 @@ function parseUpdate(
   };
 }
 
+function parseRemove(argv: ReadonlyArray<string>, json: boolean):
+  | Readonly<{ ok: true; value: ParsedRemove }>
+  | Readonly<{ ok: false; value: UsageFailure }> {
+  const parsed = parseCliRemoveArguments(argv, json);
+  if (!parsed.ok) {
+    return usage("remove", json, parsed.reason);
+  }
+  return {
+    ok: true,
+    value: {
+      command: "remove",
+      ...parsed.value
+    }
+  };
+}
+
 function parseStatus(
   argv: ReadonlyArray<string>,
   json: boolean
@@ -661,7 +707,8 @@ function renderSuccess(
     | CliStatusResult
     | SkillsMpSearchResult
     | CliInstallResult
-    | CliUpdateResult,
+    | CliUpdateResult
+    | CliRemoveResult,
   json: boolean
 ): void {
   if (json) {
@@ -687,6 +734,12 @@ function renderSuccess(
   if (command === "install") {
     process.stdout.write(
       formatCliInstallResult(result as CliInstallResult)
+    );
+    return;
+  }
+  if (command === "remove") {
+    process.stdout.write(
+      formatCliRemoveResult(result as CliRemoveResult)
     );
     return;
   }
