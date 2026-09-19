@@ -74,11 +74,6 @@ export type RecoveryCandidateNotAllowed = ProductError<
   }>
 >;
 
-export type RecoveryTargetObservationFailed = ProductError<
-  "RecoveryTargetObservationFailed",
-  Readonly<{ activationName: string }>
->;
-
 export type RecoveryCandidateResult =
   | Readonly<{
       status: "planned" | "declined";
@@ -415,10 +410,7 @@ function selectRecoveryIntent(
     (location) =>
       resolve(location.path) === targetRoot
   );
-  if (
-    input.marker.generation === current.generation &&
-    registeredHere
-  ) {
+  if (registeredHere) {
     return notAllowed(
       input.mode,
       input.marker.targetId,

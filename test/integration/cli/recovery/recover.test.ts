@@ -178,6 +178,62 @@ test("fork plans and commits a stale copied Target under a new identity without 
   });
 });
 
+test("fork refuses a stale marker on a path still registered to the old Target identity", async () => {
+  await withCliRuntime(async ({ home, cwd, target }) => {
+    const installed = await runCli(
+      ["install", "acme/app/app", "--yes", "--json"],
+      { home, cwd, mode: "base" }
+    );
+    assert.equal(installed.code, 0);
+    const staleMarker = await readFile(
+      join(target, ".skiloom-state"),
+      "utf8"
+    );
+
+    const updated = await runCli(
+      ["update", "--yes", "--json"],
+      { home, cwd, mode: "versions" }
+    );
+    assert.equal(updated.code, 0);
+    await writeFile(
+      join(target, ".skiloom-state"),
+      staleMarker,
+      "utf8"
+    );
+
+    const forked = await runCli(
+      ["fork", "--yes", "--json"],
+      { home, cwd, mode: "base" }
+    );
+
+    assert.equal(forked.code, 1);
+    const output = parseRecoveryOutput(forked.stdout);
+    assert.equal(
+      output.error?.code,
+      "RecoveryCandidateNotAllowed"
+    );
+    assert.equal(
+      output.error?.facts.reason,
+      "target-current"
+    );
+
+    const status = await runCli(
+      ["status", "--json"],
+      { home, cwd, mode: "base" }
+    );
+    assert.equal(status.code, 0);
+    const statusOutput = JSON.parse(status.stdout) as {
+      result: {
+        registry: { generation: number };
+      };
+    };
+    assert.equal(
+      statusOutput.result.registry.generation,
+      2
+    );
+  });
+});
+
 test("fork keeps release-retarget authorization independent from ordinary --yes", async () => {
   await withCliRuntime(async ({ home, cwd, target }) => {
     const installed = await runCli(
