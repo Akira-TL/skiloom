@@ -148,47 +148,31 @@ async function main(): Promise<number> {
   }
 }
 
-async function runValidate(
-  command: ParsedValidate
-): Promise<number> {
+async function runValidate(command: ParsedValidate): Promise<number> {
   const validated = await validateLocalPath(command.path);
   if (!validated.ok) {
-    renderFailure(
+    return renderOperationFailure(
       command.command,
-      validated.error,
       command.json,
+      validated.error,
       1
     );
-    return 1;
   }
-
-  renderSuccess(
-    command.command,
-    validated.value,
-    command.json
-  );
+  renderSuccess(command.command, validated.value, command.json);
   return 0;
 }
 
-async function runSearch(
-  command: ParsedSearch
-): Promise<number> {
+async function runSearch(command: ParsedSearch): Promise<number> {
   const searched = await searchSkillsMp(command.query);
   if (!searched.ok) {
-    renderFailure(
+    return renderOperationFailure(
       command.command,
-      searched.error,
       command.json,
+      searched.error,
       1
     );
-    return 1;
   }
-
-  renderSuccess(
-    command.command,
-    searched.value,
-    command.json
-  );
+  renderSuccess(command.command, searched.value, command.json);
   return 0;
 }
 
@@ -244,31 +228,35 @@ function renderCandidateFailure(
   json: boolean,
   error: ProductError
 ): number {
-  const exitCode =
-    error.code === "InteractionRequired" ? 3 : 1;
+  return renderOperationFailure(
+    command,
+    json,
+    error,
+    error.code === "InteractionRequired" ? 3 : 1
+  );
+}
+
+function renderOperationFailure(
+  command: string,
+  json: boolean,
+  error: ProductError,
+  exitCode: number
+): number {
   renderFailure(command, error, json, exitCode);
   return exitCode;
 }
 
-async function runStatus(
-  command: ParsedStatus
-): Promise<number> {
+async function runStatus(command: ParsedStatus): Promise<number> {
   const status = await readCliStatus(command.target);
   if (!status.ok) {
-    renderFailure(
+    return renderOperationFailure(
       command.command,
-      status.error,
       command.json,
+      status.error,
       1
     );
-    return 1;
   }
-
-  renderSuccess(
-    command.command,
-    status.value,
-    command.json
-  );
+  renderSuccess(command.command, status.value, command.json);
   return 0;
 }
 
