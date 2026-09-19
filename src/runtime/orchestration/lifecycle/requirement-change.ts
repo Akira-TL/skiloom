@@ -3,9 +3,6 @@ import { lstat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import {
-  parsePackageCoordinate
-} from "../../../domain/coordinate/index.js";
-import {
   productError,
   type ProductError,
   type Result
@@ -36,7 +33,6 @@ import type {
 import type { SkiloomHomePaths } from "../../home.js";
 import type {
   MachineRegistry,
-  RegistryProjection,
   RegistryTargetState,
   RegistryTargetStateInput
 } from "../../registry/index.js";
@@ -75,6 +71,13 @@ import {
   resolveLifecycleCandidateAcceptance,
   type LifecycleCandidateAcceptanceCallback
 } from "./acceptance.js";
+import {
+  applyRequestedRenameChange,
+  lifecycleCandidateProjections,
+  projectionRenames,
+  requestedRenames,
+  type LifecycleCandidateProjection
+} from "./projection/plan.js";
 import {
   registryRequirementsToDomain
 } from "./requirements.js";
@@ -119,21 +122,25 @@ export type AcceptedRequirementChangeResult =
   | Readonly<{
       status: "no-op";
       plan: LifecycleCandidatePlan;
+      projections: ReadonlyArray<LifecycleCandidateProjection>;
       state: RegistryTargetState;
     }>
   | Readonly<{
       status: "planned";
       plan: LifecycleCandidatePlan;
+      projections: ReadonlyArray<LifecycleCandidateProjection>;
       state: RegistryTargetState;
     }>
   | Readonly<{
       status: "declined";
       plan: LifecycleCandidatePlan;
+      projections: ReadonlyArray<LifecycleCandidateProjection>;
       state: RegistryTargetState;
     }>
   | Readonly<{
       status: "applied";
       plan: LifecycleCandidatePlan;
+      projections: ReadonlyArray<LifecycleCandidateProjection>;
       state: RegistryTargetState;
       marker: TargetRecoveryMarkerFacts;
     }>;
@@ -236,12 +243,17 @@ export async function applyAcceptedRequirementChange(
   if (!desiredPlan.ok) {
     return desiredPlan;
   }
+  const candidateProjections = lifecycleCandidateProjections(
+    current,
+    desiredPlan.value
+  );
   if (candidatePlan.noChange) {
     return {
       ok: true,
       value: {
         status: "no-op",
         plan: candidatePlan,
+        projections: candidateProjections,
         state: current
       }
     };
@@ -267,6 +279,7 @@ export async function applyAcceptedRequirementChange(
       value: {
         status: "no-op",
         plan: candidatePlan,
+        projections: candidateProjections,
         state: current
       }
     };
@@ -277,6 +290,7 @@ export async function applyAcceptedRequirementChange(
       value: {
         status: "planned",
         plan: candidatePlan,
+        projections: candidateProjections,
         state: current
       }
     };
@@ -287,6 +301,7 @@ export async function applyAcceptedRequirementChange(
       value: {
         status: "declined",
         plan: candidatePlan,
+        projections: candidateProjections,
         state: current
       }
     };
@@ -413,6 +428,7 @@ export async function applyAcceptedRequirementChange(
     value: {
       status: "applied",
       plan: candidatePlan,
+      projections: candidateProjections,
       state: reconciled.value,
       marker
     }
@@ -511,75 +527,6 @@ function currentOwnedProjections(
       )
     )
   };
-}
-
-function requestedRenames(
-  state: RegistryTargetState,
-  candidate: ResolverCandidateGraph,
-  requested: TargetProjectionRename | undefined
-): ReadonlyArray<TargetProjectionRename> {
-  const preserved = preservedRenames(state, candidate);
-  if (requested === undefined) {
-    return preserved;
-  }
-  return [
-    ...preserved.filter((rename) =>
-      rename.packageCoordinate !== requested.packageCoordinate
-    ),
-    requested
-  ];
-}
-
-function preservedRenames(
-  state: RegistryTargetState,
-  candidate: ResolverCandidateGraph
-): ReadonlyArray<TargetProjectionRename> {
-  const candidatePackages = new Set(
-    candidate.packages.map((entry) => entry.packageCoordinate)
-  );
-  return projectionRenames(
-    state.projections.filter((projection) =>
-      candidatePackages.has(projection.packageCoordinate)
-    )
-  );
-}
-
-function applyRequestedRenameChange(
-  plan: LifecycleCandidatePlan,
-  state: RegistryTargetState,
-  requested: TargetProjectionRename | undefined
-): LifecycleCandidatePlan {
-  if (requested === undefined || !plan.noChange) {
-    return plan;
-  }
-  const current = state.projections.find((projection) =>
-    projection.packageCoordinate === requested.packageCoordinate
-  );
-  return current?.activationName === requested.activationName
-    ? plan
-    : { ...plan, noChange: false };
-}
-
-function projectionRenames(
-  projections: ReadonlyArray<RegistryProjection>
-): ReadonlyArray<TargetProjectionRename> {
-  return projections.flatMap((projection) => {
-    const coordinate = parsePackageCoordinate(
-      projection.packageCoordinate
-    );
-    if (
-      !coordinate.ok ||
-      coordinate.value.packageName === projection.activationName
-    ) {
-      return [];
-    }
-    return [
-      {
-        packageCoordinate: projection.packageCoordinate,
-        activationName: projection.activationName
-      }
-    ];
-  });
 }
 
 async function observeAcceptedTarget(

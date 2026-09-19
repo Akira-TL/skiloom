@@ -30,11 +30,49 @@ type ParsedUpdateOutput = Readonly<{
       sourceKind: string;
       version?: string;
     }>>;
+    projections: ReadonlyArray<Readonly<{
+      packageCoordinate: string;
+      activationName: string;
+      ownership: string;
+    }>>;
     acceptedState: Readonly<{
       generation: number;
     }>;
   }>;
 }>;
+
+test("update --plan returns candidate projection ownership without mutating accepted state", async () => {
+  await withCliRuntime(async ({ home, cwd, target }) => {
+    const installed = await runCli(
+      ["install", "acme/app/app", "--yes", "--json"],
+      { home, cwd, mode: "base" }
+    );
+    assert.equal(installed.code, 0);
+
+    const planned = await runCli(
+      ["update", "--plan", "--json"],
+      { home, cwd, mode: "versions" }
+    );
+
+    assert.equal(planned.code, 0);
+    assert.equal(planned.stderr, "");
+    const output = parseUpdateOutput(planned.stdout);
+    assert.equal(output.result.status, "planned");
+    assert.equal(output.result.sources[0]?.version, "2.0.0");
+    assert.deepEqual(output.result.projections, [
+      {
+        packageCoordinate: "acme/app/app",
+        activationName: "app",
+        ownership: "managed"
+      }
+    ]);
+    assert.equal(output.result.acceptedState.generation, 1);
+    assert.match(
+      await readFile(join(target, "app", "SKILL.md"), "utf8"),
+      /Baseline application\./u
+    );
+  });
+});
 
 test("update re-resolves the whole accepted Target and commits the new candidate", async () => {
   await withCliRuntime(async ({ home, cwd, target }) => {

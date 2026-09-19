@@ -28,6 +28,9 @@ import {
   applyAcceptedRequirementChange,
   type AcceptedRequirementChangeError
 } from "./requirement-change.js";
+import type {
+  LifecycleCandidateProjection
+} from "./projection/plan.js";
 
 export type ReleaseRetargetFact = Extract<
   SourceAuthorizationDelta,
@@ -62,21 +65,25 @@ export type UpdateAcceptedTargetResult =
   | Readonly<{
       status: "planned";
       plan: LifecycleCandidatePlan;
+      projections: ReadonlyArray<LifecycleCandidateProjection>;
       state: RegistryTargetState;
     }>
   | Readonly<{
       status: "no-op";
       plan: LifecycleCandidatePlan;
+      projections: ReadonlyArray<LifecycleCandidateProjection>;
       state: RegistryTargetState;
     }>
   | Readonly<{
       status: "declined";
       plan: LifecycleCandidatePlan;
+      projections: ReadonlyArray<LifecycleCandidateProjection>;
       state: RegistryTargetState;
     }>
   | Readonly<{
       status: "updated";
       plan: LifecycleCandidatePlan;
+      projections: ReadonlyArray<LifecycleCandidateProjection>;
       state: RegistryTargetState;
       marker: TargetRecoveryMarkerFacts;
     }>;
@@ -192,6 +199,7 @@ export async function updateAcceptedTarget(
       value: {
         status: "planned",
         plan: result.value.plan,
+        projections: result.value.projections,
         state: result.value.state
       }
     };
@@ -202,6 +210,7 @@ export async function updateAcceptedTarget(
       value: {
         status: "no-op",
         plan: result.value.plan,
+        projections: result.value.projections,
         state: result.value.state
       }
     };
@@ -212,6 +221,7 @@ export async function updateAcceptedTarget(
       value: {
         status: "declined",
         plan: result.value.plan,
+        projections: result.value.projections,
         state: result.value.state
       }
     };
@@ -221,6 +231,7 @@ export async function updateAcceptedTarget(
     value: {
       status: "updated",
       plan: result.value.plan,
+      projections: result.value.projections,
       state: result.value.state,
       marker: result.value.marker
     }

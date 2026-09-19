@@ -69,6 +69,11 @@ export type CliUpdateResult = Readonly<{
   packages: LifecycleCandidatePlan["candidate"]["packages"];
   dependencyEdges: LifecycleCandidatePlan["candidate"]["dependencyEdges"];
   comparison: LifecycleCandidatePlan["comparison"];
+  projections: ReadonlyArray<Readonly<{
+    packageCoordinate: string;
+    activationName: string;
+    ownership: "managed" | "detached";
+  }>>;
   acceptedState: Readonly<{
     targetId: string;
     generation: number;
@@ -291,6 +296,7 @@ async function executeWhileLocked(
         input.target,
         lifecycle.value.status,
         lifecycle.value.plan,
+        lifecycle.value.projections,
         lifecycle.value.state
       )
     };
@@ -303,6 +309,7 @@ function lifecycleResult(
   target: ResolvedCliTarget,
   status: CliUpdateResult["status"],
   plan: LifecycleCandidatePlan,
+  projections: CliUpdateResult["projections"],
   state: RegistryTargetState
 ): CliUpdateResult {
   return {
@@ -314,6 +321,7 @@ function lifecycleResult(
     packages: plan.candidate.packages,
     dependencyEdges: plan.candidate.dependencyEdges,
     comparison: plan.comparison,
+    projections,
     acceptedState: {
       targetId: state.targetId,
       generation: state.generation,
