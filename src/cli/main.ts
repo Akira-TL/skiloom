@@ -8,6 +8,13 @@ import {
   type SkillsMpSearchResult
 } from "../runtime/catalog/skillsmp.js";
 import {
+  buildCliInstallIntent,
+  executeCliInstall,
+  formatCliInstallResult,
+  type CliInstallIntent,
+  type CliInstallResult
+} from "./install.js";
+import {
   readCliStatus,
   type CliStatusResult
 } from "./status.js";
@@ -58,10 +65,22 @@ type ParsedSearch = Readonly<{
   json: boolean;
 }>;
 
+type ParsedInstall = Readonly<{
+  command: "install";
+  intent: CliInstallIntent;
+  target: ResolvedCliTarget;
+  plan: boolean;
+  yes: boolean;
+  allowReleaseRetarget: boolean;
+  nonInteractive: boolean;
+  json: boolean;
+}>;
+
 type ParsedCommand =
   | ParsedValidate
   | ParsedStatus
-  | ParsedSearch;
+  | ParsedSearch
+  | ParsedInstall;
 
 type UsageFailure = Readonly<{
   command: string;
@@ -91,6 +110,8 @@ async function main(): Promise<number> {
       return runStatus(parsed.value);
     case "search":
       return runSearch(parsed.value);
+    case "install":
+      return runInstall(parsed.value);
   }
 }
 
@@ -136,6 +157,45 @@ async function runSearch(
     command.json
   );
   return 0;
+}
+
+async function runInstall(
+  command: ParsedInstall
+): Promise<number> {
+  const installed = await executeCliInstall(command);
+  if (!installed.ok) {
+    const exitCode =
+      installed.error.code === "InteractionRequired"
+        ? 3
+        : 1;
+    renderFailure(
+      command.command,
+      installed.error,
+      command.json,
+      exitCode
+    );
+    return exitCode;
+  }
+
+  const exitCode =
+    installed.value.result.status === "declined"
+      ? 3
+      : 0;
+  if (
+    installed.value.presentationRendered &&
+    !command.json
+  ) {
+    process.stdout.write(
+      "Status: " + installed.value.result.status + "\n"
+    );
+  } else {
+    renderSuccess(
+      command.command,
+      installed.value.result,
+      command.json
+    );
+  }
+  return exitCode;
 }
 
 async function runStatus(
@@ -191,6 +251,11 @@ function parseArguments(
       );
     case "search":
       return parseSearch(
+        withoutJson.slice(1),
+        json
+      );
+    case "install":
+      return parseInstall(
         withoutJson.slice(1),
         json
       );
@@ -268,6 +333,192 @@ function parseSearch(
     value: {
       command: "search",
       query,
+      json
+    }
+  };
+}
+
+function parseInstall(
+  argv: ReadonlyArray<string>,
+  json: boolean
+):
+  | Readonly<{ ok: true; value: ParsedInstall }>
+  | Readonly<{ ok: false; value: UsageFailure }> {
+  const coordinate = argv[0];
+  if (
+    coordinate === undefined ||
+    coordinate.startsWith("-")
+  ) {
+    return usage(
+      "install",
+      json,
+      "install requires exactly one coordinate"
+    );
+  }
+
+  let target: string | undefined;
+  let host: string | undefined;
+  let scope: string | undefined;
+  let version: string | undefined;
+  let gitRef: string | undefined;
+  let name: string | undefined;
+  let plan = false;
+  let yes = false;
+  let allowReleaseRetarget = false;
+  let nonInteractive = false;
+  const seenFlags = new Set<string>();
+
+  for (let index = 1; index < argv.length; index += 1) {
+    const option = argv[index]!;
+    if (
+      option === "--plan" ||
+      option === "--yes" ||
+      option === "--allow-release-retarget" ||
+      option === "--non-interactive"
+    ) {
+      if (seenFlags.has(option)) {
+        return usage(
+          "install",
+          json,
+          "duplicate " + option
+        );
+      }
+      seenFlags.add(option);
+      if (option === "--plan") {
+        plan = true;
+      } else if (option === "--yes") {
+        yes = true;
+      } else if (option === "--allow-release-retarget") {
+        allowReleaseRetarget = true;
+      } else {
+        nonInteractive = true;
+      }
+      continue;
+    }
+
+    if (
+      option !== "--target" &&
+      option !== "--host" &&
+      option !== "--scope" &&
+      option !== "--version" &&
+      option !== "--git" &&
+      option !== "--name"
+    ) {
+      return usage(
+        "install",
+        json,
+        "unknown option: " + option
+      );
+    }
+
+    const value = argv[index + 1];
+    if (
+      value === undefined ||
+      value.startsWith("--")
+    ) {
+      return usage(
+        "install",
+        json,
+        "missing value for " + option
+      );
+    }
+    index += 1;
+
+    if (option === "--target") {
+      if (target !== undefined) {
+        return usage(
+          "install",
+          json,
+          "duplicate --target"
+        );
+      }
+      target = value;
+    } else if (option === "--host") {
+      if (host !== undefined) {
+        return usage(
+          "install",
+          json,
+          "duplicate --host"
+        );
+      }
+      host = value;
+    } else if (option === "--scope") {
+      if (scope !== undefined) {
+        return usage(
+          "install",
+          json,
+          "duplicate --scope"
+        );
+      }
+      scope = value;
+    } else if (option === "--version") {
+      if (version !== undefined) {
+        return usage(
+          "install",
+          json,
+          "duplicate --version"
+        );
+      }
+      version = value;
+    } else if (option === "--git") {
+      if (gitRef !== undefined) {
+        return usage(
+          "install",
+          json,
+          "duplicate --git"
+        );
+      }
+      gitRef = value;
+    } else {
+      if (name !== undefined) {
+        return usage(
+          "install",
+          json,
+          "duplicate --name"
+        );
+      }
+      name = value;
+    }
+  }
+
+  const intent = buildCliInstallIntent({
+    coordinate,
+    ...(version === undefined ? {} : { version }),
+    ...(gitRef === undefined ? {} : { gitRef }),
+    ...(name === undefined ? {} : { name })
+  });
+  if (!intent.ok) {
+    return usage(
+      "install",
+      json,
+      intent.reason
+    );
+  }
+
+  const resolved = resolveCliTarget({
+    cwd: process.cwd(),
+    ...(target === undefined ? {} : { target }),
+    ...(host === undefined ? {} : { host }),
+    ...(scope === undefined ? {} : { scope })
+  });
+  if (!resolved.ok) {
+    return usage(
+      "install",
+      json,
+      resolved.reason
+    );
+  }
+
+  return {
+    ok: true,
+    value: {
+      command: "install",
+      intent: intent.value,
+      target: resolved.value,
+      plan,
+      yes,
+      allowReleaseRetarget,
+      nonInteractive,
       json
     }
   };
@@ -386,7 +637,8 @@ function renderSuccess(
   result:
     | ValidateLocalPathResult
     | CliStatusResult
-    | SkillsMpSearchResult,
+    | SkillsMpSearchResult
+    | CliInstallResult,
   json: boolean
 ): void {
   if (json) {
@@ -406,6 +658,12 @@ function renderSuccess(
   if (command === "validate") {
     process.stdout.write(
       `Valid Skiloom package: ${(result as ValidateLocalPathResult).path}\n`
+    );
+    return;
+  }
+  if (command === "install") {
+    process.stdout.write(
+      formatCliInstallResult(result as CliInstallResult)
     );
     return;
   }
