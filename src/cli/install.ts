@@ -43,10 +43,9 @@ import type {
 import {
   executeFirstAcceptedInstall
 } from "../runtime/orchestration/lifecycle/first-install.js";
-import {
-  openMachineRegistry,
-  type MachineRegistry,
-  type RegistryTargetState
+import type {
+  MachineRegistry,
+  RegistryTargetState
 } from "../runtime/registry/index.js";
 import {
   createGitHubJsonFetchTransport,
@@ -294,7 +293,12 @@ async function executeWhileLocked(
     status.value.registry?.targetId;
   let registry: MachineRegistry | undefined;
   try {
-    if (existingTargetId !== undefined || !input.plan) {
+    if (
+      existingTargetId !== undefined ||
+      freshInstallNeedsRegistry(input)
+    ) {
+      const { openMachineRegistry } =
+        await import("../runtime/registry/index.js");
       const opened = await openMachineRegistry(home, lock);
       if (!opened.ok) {
         return opened;
@@ -380,6 +384,23 @@ async function executeWhileLocked(
   } finally {
     registry?.close();
   }
+}
+
+function freshInstallNeedsRegistry(
+  input: CliInstallInvocation
+): boolean {
+  if (input.plan) {
+    return false;
+  }
+  if (
+    input.json ||
+    input.nonInteractive ||
+    process.stdin.isTTY !== true ||
+    process.stdout.isTTY !== true
+  ) {
+    return input.yes;
+  }
+  return true;
 }
 
 function createInstallAcceptance(
