@@ -22,7 +22,13 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
+      - name: Install Rust 1.89.0
+        run: rustup toolchain install 1.89.0 --profile minimal
+      - name: Build skiloom-lock
+        run: cargo +1.89.0 build --manifest-path native/skiloom-lock/Cargo.toml --locked
       - run: npm run check
+        env:
+          SKILOOM_LOCK_TEST_BINARY: ${{ github.workspace }}/native/skiloom-lock/target/debug/skiloom-lock
 
   target-projection:
     name: Target projection (${{ matrix.os }})
@@ -55,17 +61,13 @@ jobs:
         run: cargo +1.89.0 test --manifest-path native/skiloom-lock/Cargo.toml --locked
 
   lock-bridge:
-    name: Lock bridge + install CLI (Node ${{ matrix.node }} / Rust 1.89)
+    name: Lock bridge (Node 22 / Rust 1.89)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        node: [22, 24]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 22
           cache: npm
       - run: npm ci
       - name: Install Rust 1.89.0
@@ -78,9 +80,5 @@ jobs:
           SKILOOM_LOCK_TEST_BINARY: ${{ github.workspace }}/native/skiloom-lock/target/debug/skiloom-lock
       - name: Test locked Machine State integration
         run: npm run test:machine-state
-        env:
-          SKILOOM_LOCK_TEST_BINARY: ${{ github.workspace }}/native/skiloom-lock/target/debug/skiloom-lock
-      - name: Test install CLI with real helper
-        run: npm run test:cli-install
         env:
           SKILOOM_LOCK_TEST_BINARY: ${{ github.workspace }}/native/skiloom-lock/target/debug/skiloom-lock

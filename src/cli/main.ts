@@ -82,6 +82,17 @@ type ParsedCommand =
   | ParsedSearch
   | ParsedInstall;
 
+type CliTargetOption =
+  | "--target"
+  | "--host"
+  | "--scope";
+
+type CliTargetOptions = Readonly<{
+  target?: string;
+  host?: string;
+  scope?: string;
+}>;
+
 type UsageFailure = Readonly<{
   command: string;
   json: boolean;
@@ -356,9 +367,7 @@ function parseInstall(
     );
   }
 
-  let target: string | undefined;
-  let host: string | undefined;
-  let scope: string | undefined;
+  let targetOptions: CliTargetOptions = {};
   let version: string | undefined;
   let gitRef: string | undefined;
   let name: string | undefined;
@@ -397,9 +406,7 @@ function parseInstall(
     }
 
     if (
-      option !== "--target" &&
-      option !== "--host" &&
-      option !== "--scope" &&
+      !isCliTargetOption(option) &&
       option !== "--version" &&
       option !== "--git" &&
       option !== "--name"
@@ -424,33 +431,20 @@ function parseInstall(
     }
     index += 1;
 
-    if (option === "--target") {
-      if (target !== undefined) {
+    if (isCliTargetOption(option)) {
+      const updated = addCliTargetOption(
+        targetOptions,
+        option,
+        value
+      );
+      if (!updated.ok) {
         return usage(
           "install",
           json,
-          "duplicate --target"
+          updated.reason
         );
       }
-      target = value;
-    } else if (option === "--host") {
-      if (host !== undefined) {
-        return usage(
-          "install",
-          json,
-          "duplicate --host"
-        );
-      }
-      host = value;
-    } else if (option === "--scope") {
-      if (scope !== undefined) {
-        return usage(
-          "install",
-          json,
-          "duplicate --scope"
-        );
-      }
-      scope = value;
+      targetOptions = updated.value;
     } else if (option === "--version") {
       if (version !== undefined) {
         return usage(
@@ -495,12 +489,9 @@ function parseInstall(
     );
   }
 
-  const resolved = resolveCliTarget({
-    cwd: process.cwd(),
-    ...(target === undefined ? {} : { target }),
-    ...(host === undefined ? {} : { host }),
-    ...(scope === undefined ? {} : { scope })
-  });
+  const resolved = resolveCliTargetOptions(
+    targetOptions
+  );
   if (!resolved.ok) {
     return usage(
       "install",
@@ -530,17 +521,11 @@ function parseStatus(
 ):
   | Readonly<{ ok: true; value: ParsedStatus }>
   | Readonly<{ ok: false; value: UsageFailure }> {
-  let target: string | undefined;
-  let host: string | undefined;
-  let scope: string | undefined;
+  let targetOptions: CliTargetOptions = {};
 
   for (let index = 0; index < argv.length; index += 1) {
     const option = argv[index]!;
-    if (
-      option !== "--target" &&
-      option !== "--host" &&
-      option !== "--scope"
-    ) {
+    if (!isCliTargetOption(option)) {
       return usage(
         "status",
         json,
@@ -560,42 +545,24 @@ function parseStatus(
     }
     index += 1;
 
-    if (option === "--target") {
-      if (target !== undefined) {
-        return usage(
-          "status",
-          json,
-          "duplicate --target"
-        );
-      }
-      target = value;
-    } else if (option === "--host") {
-      if (host !== undefined) {
-        return usage(
-          "status",
-          json,
-          "duplicate --host"
-        );
-      }
-      host = value;
-    } else {
-      if (scope !== undefined) {
-        return usage(
-          "status",
-          json,
-          "duplicate --scope"
-        );
-      }
-      scope = value;
+    const updated = addCliTargetOption(
+      targetOptions,
+      option,
+      value
+    );
+    if (!updated.ok) {
+      return usage(
+        "status",
+        json,
+        updated.reason
+      );
     }
+    targetOptions = updated.value;
   }
 
-  const resolved = resolveCliTarget({
-    cwd: process.cwd(),
-    ...(target === undefined ? {} : { target }),
-    ...(host === undefined ? {} : { host }),
-    ...(scope === undefined ? {} : { scope })
-  });
+  const resolved = resolveCliTargetOptions(
+    targetOptions
+  );
   if (!resolved.ok) {
     return usage(
       "status",
@@ -612,6 +579,53 @@ function parseStatus(
       json
     }
   };
+}
+
+function isCliTargetOption(
+  option: string
+): option is CliTargetOption {
+  return (
+    option === "--target" ||
+    option === "--host" ||
+    option === "--scope"
+  );
+}
+
+function addCliTargetOption(
+  current: CliTargetOptions,
+  option: CliTargetOption,
+  value: string
+):
+  | Readonly<{ ok: true; value: CliTargetOptions }>
+  | Readonly<{ ok: false; reason: string }> {
+  const key =
+    option === "--target"
+      ? "target"
+      : option === "--host"
+        ? "host"
+        : "scope";
+  if (current[key] !== undefined) {
+    return {
+      ok: false,
+      reason: "duplicate " + option
+    };
+  }
+  return {
+    ok: true,
+    value: {
+      ...current,
+      [key]: value
+    }
+  };
+}
+
+function resolveCliTargetOptions(
+  options: CliTargetOptions
+): ReturnType<typeof resolveCliTarget> {
+  return resolveCliTarget({
+    cwd: process.cwd(),
+    ...options
+  });
 }
 
 function usage(

@@ -170,6 +170,58 @@ test("install applies Package and repository-wide GitHub Release roots through t
   });
 });
 
+test("reinstalling one Package with a new version upserts the direct requirement at the executable boundary", async () => {
+  await withCliRuntime("version-upsert", async ({ home, cwd, target }) => {
+    const first = await runCli(
+      [
+        "install",
+        "acme/app/app",
+        "--version",
+        "^1.0.0",
+        "--yes",
+        "--json"
+      ],
+      { home, cwd, mode: "versions" }
+    );
+    assert.equal(first.code, 0);
+    const installed = parseJson(first.stdout);
+    assert.equal(installed.result.status, "installed");
+    assert.equal(installed.result.directRequirements.length, 1);
+    assert.equal(
+      installed.result.directRequirements[0]?.versionRequirement,
+      "^1.0.0"
+    );
+
+    const second = await runCli(
+      [
+        "install",
+        "acme/app/app",
+        "--version",
+        "^2.0.0",
+        "--yes",
+        "--json"
+      ],
+      { home, cwd, mode: "versions" }
+    );
+    assert.equal(second.code, 0);
+    const applied = parseJson(second.stdout);
+    assert.equal(applied.result.status, "applied");
+    assert.equal(applied.result.acceptedState.generation, 2);
+    assert.deepEqual(applied.result.directRequirements, [
+      {
+        kind: "package",
+        coordinate: "acme/app/app",
+        sourceKind: "github-release",
+        versionRequirement: "^2.0.0"
+      }
+    ]);
+    assert.match(
+      await readFile(join(target, "app", "SKILL.md"), "utf8"),
+      /Version two application\./u
+    );
+  });
+});
+
 test("install supports explicit Git source and Package activation rename while preserving Package identity", async () => {
   await withCliRuntime("git", async ({ home, cwd }) => {
     const result = await runCli(

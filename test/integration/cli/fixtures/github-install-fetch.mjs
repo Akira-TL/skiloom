@@ -34,25 +34,36 @@ function snapshot(entries) {
 
 function appRepository() {
   const retarget = mode === "retarget";
+  const releases = [
+    {
+      tag: "v1.0.0",
+      commit: commit(retarget ? "4" : "1"),
+      immutable: true,
+      snapshot: snapshot([
+        skill(
+          ".",
+          "app",
+          retarget
+            ? "Retargeted application."
+            : "Baseline application."
+        )
+      ])
+    }
+  ];
+  if (mode === "versions") {
+    releases.unshift({
+      tag: "v2.0.0",
+      commit: commit("5"),
+      immutable: true,
+      snapshot: snapshot([
+        skill(".", "app", "Version two application.")
+      ])
+    });
+  }
   return {
     repository: "acme/app",
     sourceKind: "github-release",
-    releases: [
-      {
-        tag: "v1.0.0",
-        commit: commit(retarget ? "4" : "1"),
-        immutable: true,
-        snapshot: snapshot([
-          skill(
-            ".",
-            "app",
-            retarget
-              ? "Retargeted application."
-              : "Baseline application."
-          )
-        ])
-      }
-    ]
+    releases
   };
 }
 
