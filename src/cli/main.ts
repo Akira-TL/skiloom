@@ -4,6 +4,10 @@ import process from "node:process";
 
 import type { ProductError } from "../domain/errors/index.js";
 import {
+  searchSkillsMp,
+  type SkillsMpSearchResult
+} from "../runtime/catalog/skillsmp.js";
+import {
   readCliStatus,
   type CliStatusResult
 } from "./status.js";
@@ -48,9 +52,16 @@ type ParsedStatus = Readonly<{
   json: boolean;
 }>;
 
+type ParsedSearch = Readonly<{
+  command: "search";
+  query: string;
+  json: boolean;
+}>;
+
 type ParsedCommand =
   | ParsedValidate
-  | ParsedStatus;
+  | ParsedStatus
+  | ParsedSearch;
 
 type UsageFailure = Readonly<{
   command: string;
@@ -78,6 +89,8 @@ async function main(): Promise<number> {
       return runValidate(parsed.value);
     case "status":
       return runStatus(parsed.value);
+    case "search":
+      return runSearch(parsed.value);
   }
 }
 
@@ -98,6 +111,28 @@ async function runValidate(
   renderSuccess(
     command.command,
     validated.value,
+    command.json
+  );
+  return 0;
+}
+
+async function runSearch(
+  command: ParsedSearch
+): Promise<number> {
+  const searched = await searchSkillsMp(command.query);
+  if (!searched.ok) {
+    renderFailure(
+      command.command,
+      searched.error,
+      command.json,
+      1
+    );
+    return 1;
+  }
+
+  renderSuccess(
+    command.command,
+    searched.value,
     command.json
   );
   return 0;
@@ -154,6 +189,11 @@ function parseArguments(
         withoutJson.slice(1),
         json
       );
+    case "search":
+      return parseSearch(
+        withoutJson.slice(1),
+        json
+      );
     default:
       return usage(
         command,
@@ -192,6 +232,42 @@ function parseValidate(
     value: {
       command: "validate",
       path: argv[0] ?? process.cwd(),
+      json
+    }
+  };
+}
+
+function parseSearch(
+  argv: ReadonlyArray<string>,
+  json: boolean
+):
+  | Readonly<{ ok: true; value: ParsedSearch }>
+  | Readonly<{ ok: false; value: UsageFailure }> {
+  const query = argv[0];
+  if (
+    argv.length !== 1 ||
+    query === undefined ||
+    query.startsWith("-")
+  ) {
+    return usage(
+      "search",
+      json,
+      "search requires exactly one query"
+    );
+  }
+  if (query.trim().length === 0) {
+    return usage(
+      "search",
+      json,
+      "search query must not be empty"
+    );
+  }
+
+  return {
+    ok: true,
+    value: {
+      command: "search",
+      query,
       json
     }
   };
@@ -307,7 +383,10 @@ function usage(
 
 function renderSuccess(
   command: string,
-  result: ValidateLocalPathResult | CliStatusResult,
+  result:
+    | ValidateLocalPathResult
+    | CliStatusResult
+    | SkillsMpSearchResult,
   json: boolean
 ): void {
   if (json) {
@@ -328,6 +407,18 @@ function renderSuccess(
     process.stdout.write(
       `Valid Skiloom package: ${(result as ValidateLocalPathResult).path}\n`
     );
+    return;
+  }
+  if (command === "search") {
+    const search = result as SkillsMpSearchResult;
+    for (const candidate of search.candidates) {
+      const source = candidate.githubRepository === null
+        ? "display-only"
+        : candidate.githubRepository;
+      process.stdout.write(
+        `[SkillsMP] ${candidate.name} — ${source}\n`
+      );
+    }
     return;
   }
 
