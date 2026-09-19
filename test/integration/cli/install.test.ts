@@ -22,6 +22,41 @@ const LOCK_HELPER =
   process.env.SKILOOM_LOCK_TEST_BINARY ??
   resolve("native/skiloom-lock/target/debug/skiloom-lock");
 
+type ParsedCliOutput = Readonly<{
+  schema: string;
+  ok: boolean;
+  command: string;
+  result: Readonly<{
+    status: string;
+    target: Readonly<{ path: string }>;
+    directRequirements: ReadonlyArray<Readonly<{
+      kind: string;
+      coordinate: string;
+      sourceKind: string;
+      versionRequirement?: string;
+      requestedRef?: string;
+    }>>;
+    sources: ReadonlyArray<Readonly<{
+      repositoryCoordinate: string;
+      sourceKind: string;
+    }>>;
+    packages: ReadonlyArray<Readonly<{
+      packageCoordinate: string;
+    }>>;
+    projectionRenames: ReadonlyArray<Readonly<{
+      packageCoordinate: string;
+      activationName: string;
+    }>>;
+    acceptedState: Readonly<{ generation: number }>;
+    registry: unknown;
+    marker: unknown;
+  }>;
+  error: Readonly<{
+    code: string;
+    facts: Readonly<{ reason: string }>;
+  }>;
+}>;
+
 test("install --plan renders a complete human candidate without committing Registry or Target", async () => {
   await withCliRuntime("plan-human", async ({ home, cwd, target }) => {
     const result = await runCli(
@@ -160,8 +195,7 @@ test("install applies Package and repository-wide GitHub Release roots through t
     );
     assert.deepEqual(
       output.result.packages.map(
-        (entry: { packageCoordinate: string }) =>
-          entry.packageCoordinate
+        (entry) => entry.packageCoordinate
       ),
       ["acme/suite/alpha", "acme/suite/beta"]
     );
@@ -444,8 +478,8 @@ function runCli(
   });
 }
 
-function parseJson(source: string): any {
-  return JSON.parse(source);
+function parseJson(source: string): ParsedCliOutput {
+  return JSON.parse(source) as ParsedCliOutput;
 }
 
 function escapeRegExp(source: string): string {
