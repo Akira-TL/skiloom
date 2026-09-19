@@ -47,6 +47,9 @@ import {
   type CliLocalResult
 } from "./local/index.js";
 import {
+  parseCliSearchArguments
+} from "./search/index.js";
+import {
   parseCliStatusArguments,
   readCliStatus,
   type CliStatusResult
@@ -62,6 +65,7 @@ import {
   type CliUpdateResult
 } from "./update.js";
 import {
+  parseCliValidateArguments,
   validateLocalPath,
   type ValidateLocalPathResult
 } from "./validate.js";
@@ -440,32 +444,20 @@ function parseValidate(
 ):
   | Readonly<{ ok: true; value: ParsedValidate }>
   | Readonly<{ ok: false; value: UsageFailure }> {
-  const option = argv.find((argument) =>
-    argument.startsWith("-")
+  const parsed = parseCliValidateArguments(
+    argv,
+    process.cwd(),
+    json
   );
-  if (option !== undefined) {
-    return usage(
-      "validate",
-      json,
-      `unknown option: ${option}`
-    );
-  }
-  if (argv.length > 1) {
-    return usage(
-      "validate",
-      json,
-      "validate accepts at most one path"
-    );
-  }
-
-  return {
-    ok: true,
-    value: {
-      command: "validate",
-      path: argv[0] ?? process.cwd(),
-      json
-    }
-  };
+  return parsed.ok
+    ? {
+        ok: true,
+        value: {
+          command: "validate",
+          ...parsed.value
+        }
+      }
+    : usage("validate", json, parsed.reason);
 }
 
 function parseSearch(
@@ -474,34 +466,16 @@ function parseSearch(
 ):
   | Readonly<{ ok: true; value: ParsedSearch }>
   | Readonly<{ ok: false; value: UsageFailure }> {
-  const query = argv[0];
-  if (
-    argv.length !== 1 ||
-    query === undefined ||
-    query.startsWith("-")
-  ) {
-    return usage(
-      "search",
-      json,
-      "search requires exactly one query"
-    );
-  }
-  if (query.trim().length === 0) {
-    return usage(
-      "search",
-      json,
-      "search query must not be empty"
-    );
-  }
-
-  return {
-    ok: true,
-    value: {
-      command: "search",
-      query,
-      json
-    }
-  };
+  const parsed = parseCliSearchArguments(argv, json);
+  return parsed.ok
+    ? {
+        ok: true,
+        value: {
+          command: "search",
+          ...parsed.value
+        }
+      }
+    : usage("search", json, parsed.reason);
 }
 
 function parseInstall(

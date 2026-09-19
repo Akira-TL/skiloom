@@ -42,6 +42,48 @@ export type ValidateLocalPathError =
   | PackageMetadataError
   | RepositoryMetadataError;
 
+export type ParseCliValidateResult =
+  | Readonly<{
+      ok: true;
+      value: Readonly<{
+        path: string;
+        json: boolean;
+      }>;
+    }>
+  | Readonly<{
+      ok: false;
+      reason: string;
+    }>;
+
+export function parseCliValidateArguments(
+  argv: ReadonlyArray<string>,
+  cwd: string,
+  json: boolean
+): ParseCliValidateResult {
+  const option = argv.find((argument) =>
+    argument.startsWith("-")
+  );
+  if (option !== undefined) {
+    return {
+      ok: false,
+      reason: `unknown option: ${option}`
+    };
+  }
+  if (argv.length > 1) {
+    return {
+      ok: false,
+      reason: "validate accepts at most one path"
+    };
+  }
+  return {
+    ok: true,
+    value: {
+      path: argv[0] ?? cwd,
+      json
+    }
+  };
+}
+
 export type ValidateLocalPathResult = Readonly<{
   path: string;
   repository: Readonly<{
