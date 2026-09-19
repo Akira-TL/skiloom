@@ -58,6 +58,13 @@ import type {
   ResolvedCliTarget
 } from "./target-selector.js";
 import {
+  executeCliExport,
+  formatCliExportResult,
+  parseCliExportArguments,
+  type CliExportInvocation,
+  type CliExportResult
+} from "./transfer/index.js";
+import {
   executeCliUpdate,
   formatCliUpdateResult,
   parseCliUpdateArguments,
@@ -72,7 +79,7 @@ import {
 
 const CLI_SCHEMA = "SKILOOM-CLI-V1" as const;
 
-type CliWarning = Readonly<Record<string, unknown>>;
+type CliWarning = ProductError;
 
 type CliSuccess = Readonly<{
   schema: typeof CLI_SCHEMA;
@@ -128,6 +135,8 @@ type ParsedSync = CliSyncInvocation & Readonly<{ command: "sync" }>;
 type ParsedRepair = CliRepairInvocation & Readonly<{ command: "repair" }>;
 type ParsedLocal = CliLocalInvocation &
   Readonly<{ command: CliLocalOperation }>;
+type ParsedExport = CliExportInvocation &
+  Readonly<{ command: "export" }>;
 
 type ParsedCommand =
   | ParsedValidate
@@ -139,7 +148,8 @@ type ParsedCommand =
   | ParsedRecovery
   | ParsedSync
   | ParsedRepair
-  | ParsedLocal;
+  | ParsedLocal
+  | ParsedExport;
 
 type ParsedCandidate =
   | ParsedInstall
@@ -193,9 +203,10 @@ async function main(): Promise<number> {
     case "fork":
       return runCandidate(parsed.value);
     case "sync":
-      return runSync(parsed.value);
     case "repair":
-      return runRepair(parsed.value);
+      return runMaintenance(parsed.value);
+    case "export":
+      return runExport(parsed.value);
     case "rename":
     case "detach":
     case "rebind":
@@ -256,54 +267,44 @@ async function runCandidate(
       );
 }
 
-async function runSync(command: ParsedSync): Promise<number> {
-  return runMaintenance(
-    command.command,
-    command.json,
-    executeCliSync(command)
-  );
-}
-
-async function runRepair(command: ParsedRepair): Promise<number> {
-  return runMaintenance(
-    command.command,
-    command.json,
-    executeCliRepair(command)
-  );
+async function runExport(command: ParsedExport): Promise<number> {
+  const exported = await executeCliExport(command);
+  if (!exported.ok) {
+    return renderOperationFailure("export", command.json, exported.error, 1);
+  }
+  renderSuccess("export", exported.value.result, command.json, exported.value.warnings);
+  return 0;
 }
 
 async function runLocal(command: ParsedLocal): Promise<number> {
   const operated = await executeCliLocalOperation(command);
   if (!operated.ok) {
-    return renderOperationFailure(
-      command.command,
-      command.json,
-      operated.error,
-      1
-    );
+    return renderOperationFailure(command.command, command.json, operated.error, 1);
   }
   renderSuccess(command.command, operated.value, command.json);
   return 0;
 }
 
 async function runMaintenance(
-  command: "sync" | "repair",
-  json: boolean,
-  pending: Promise<
-    | Readonly<{ ok: true; value: CliMaintenanceResult }>
-    | Readonly<{ ok: false; error: ProductError }>
-  >
+  command: ParsedSync | ParsedRepair
 ): Promise<number> {
-  const maintained = await pending;
+  const maintained =
+    command.command === "sync"
+      ? await executeCliSync(command)
+      : await executeCliRepair(command);
   if (!maintained.ok) {
     return renderOperationFailure(
-      command,
-      json,
+      command.command,
+      command.json,
       maintained.error,
       1
     );
   }
-  renderSuccess(command, maintained.value, json);
+  renderSuccess(
+    command.command,
+    maintained.value,
+    command.json
+  );
   return 0;
 }
 
@@ -420,6 +421,8 @@ function parseArguments(
       return parseSync(withoutJson.slice(1), json);
     case "repair":
       return parseRepair(withoutJson.slice(1), json);
+    case "export":
+      return parseExport(withoutJson.slice(1), json);
     case "rename":
     case "detach":
     case "rebind":
@@ -545,6 +548,15 @@ function parseRecovery(
     : usage(command, json, parsed.reason);
 }
 
+function parseExport(argv: ReadonlyArray<string>, json: boolean):
+  | Readonly<{ ok: true; value: ParsedExport }>
+  | Readonly<{ ok: false; value: UsageFailure }> {
+  const parsed = parseCliExportArguments(argv, json);
+  return parsed.ok
+    ? { ok: true, value: { command: "export", ...parsed.value } }
+    : usage("export", json, parsed.reason);
+}
+
 function parseSync(
   argv: ReadonlyArray<string>,
   json: boolean
@@ -658,9 +670,11 @@ function renderSuccess(
     | CliUpdateResult
     | CliRemoveResult
     | CliRecoveryResult
+    | CliExportResult
     | CliMaintenanceResult
     | CliLocalResult,
-  json: boolean
+  json: boolean,
+  warnings: ReadonlyArray<CliWarning> = []
 ): void {
   if (json) {
     const output: CliSuccess = {
@@ -668,7 +682,7 @@ function renderSuccess(
       ok: true,
       command,
       result,
-      warnings: []
+      warnings
     };
     process.stdout.write(
       JSON.stringify(output) + "\n"
@@ -692,6 +706,15 @@ function renderSuccess(
     process.stdout.write(
       formatCliRemoveResult(result as CliRemoveResult)
     );
+    return;
+  }
+  if (command === "export") {
+    process.stdout.write(
+      formatCliExportResult(result as CliExportResult)
+    );
+    for (const warning of warnings) {
+      process.stdout.write("Warning: " + warning.code + "\n");
+    }
     return;
   }
   if (command === "recover" || command === "fork") {
