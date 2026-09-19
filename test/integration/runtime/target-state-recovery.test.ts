@@ -30,6 +30,30 @@ import {
 const state = registryState();
 const marker = expectedMarker(5);
 
+test("Registry marker facts omit default activation names from sparse projection overrides", () => {
+  const defaultProjectionState: RegistryTargetState = {
+    ...state,
+    projections: [
+      {
+        packageCoordinate: "akira-tl/skills/ask-matt",
+        activationName: "ask-matt",
+        ownership: "managed",
+        materialization: "symlink",
+        transformJson: null
+      }
+    ]
+  };
+
+  const facts = targetStateMarkerFactsFromRegistryState(
+    defaultProjectionState
+  );
+
+  assert.equal(facts.ok, true);
+  if (facts.ok) {
+    assert.deepEqual(facts.value.projectionOverrides, []);
+  }
+});
+
 test("runtime Target recovery inspection delegates current stale ahead and identity semantics to the domain decision", async () => {
   await withTarget(async (targetRoot) => {
     assert.deepEqual(

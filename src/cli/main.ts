@@ -32,6 +32,14 @@ import {
   type CliSyncInvocation
 } from "./maintenance/index.js";
 import {
+  executeCliLocalOperation,
+  formatCliLocalResult,
+  parseCliLocalArguments,
+  type CliLocalInvocation,
+  type CliLocalOperation,
+  type CliLocalResult
+} from "./local/index.js";
+import {
   parseCliStatusArguments,
   readCliStatus,
   type CliStatusResult
@@ -106,6 +114,8 @@ type ParsedUpdate = CliUpdateInvocation &
 type ParsedRemove = CliRemoveInvocation & Readonly<{ command: "remove" }>;
 type ParsedSync = CliSyncInvocation & Readonly<{ command: "sync" }>;
 type ParsedRepair = CliRepairInvocation & Readonly<{ command: "repair" }>;
+type ParsedLocal = CliLocalInvocation &
+  Readonly<{ command: CliLocalOperation }>;
 
 type ParsedCommand =
   | ParsedValidate
@@ -115,7 +125,8 @@ type ParsedCommand =
   | ParsedUpdate
   | ParsedRemove
   | ParsedSync
-  | ParsedRepair;
+  | ParsedRepair
+  | ParsedLocal;
 
 type CandidateCliResult =
   | CliInstallResult
@@ -165,6 +176,11 @@ async function main(): Promise<number> {
       return runSync(parsed.value);
     case "repair":
       return runRepair(parsed.value);
+    case "rename":
+    case "detach":
+    case "rebind":
+    case "forget":
+      return runLocal(parsed.value);
   }
 }
 
@@ -255,6 +271,20 @@ async function runRepair(command: ParsedRepair): Promise<number> {
     command.json,
     executeCliRepair(command)
   );
+}
+
+async function runLocal(command: ParsedLocal): Promise<number> {
+  const operated = await executeCliLocalOperation(command);
+  if (!operated.ok) {
+    return renderOperationFailure(
+      command.command,
+      command.json,
+      operated.error,
+      1
+    );
+  }
+  renderSuccess(command.command, operated.value, command.json);
+  return 0;
 }
 
 async function runMaintenance(
@@ -379,6 +409,15 @@ function parseArguments(
       return parseSync(withoutJson.slice(1), json);
     case "repair":
       return parseRepair(withoutJson.slice(1), json);
+    case "rename":
+    case "detach":
+    case "rebind":
+    case "forget":
+      return parseLocal(
+        command,
+        withoutJson.slice(1),
+        json
+      );
     default:
       return usage(
         command,
@@ -550,6 +589,30 @@ function parseRepair(
   };
 }
 
+function parseLocal(
+  command: CliLocalOperation,
+  argv: ReadonlyArray<string>,
+  json: boolean
+):
+  | Readonly<{ ok: true; value: ParsedLocal }>
+  | Readonly<{ ok: false; value: UsageFailure }> {
+  const parsed = parseCliLocalArguments(
+    command,
+    argv,
+    json
+  );
+  if (!parsed.ok) {
+    return usage(command, json, parsed.reason);
+  }
+  return {
+    ok: true,
+    value: {
+      command,
+      ...parsed.value
+    }
+  };
+}
+
 function parseStatus(
   argv: ReadonlyArray<string>,
   json: boolean
@@ -600,7 +663,8 @@ function renderSuccess(
     | CliInstallResult
     | CliUpdateResult
     | CliRemoveResult
-    | CliMaintenanceResult,
+    | CliMaintenanceResult
+    | CliLocalResult,
   json: boolean
 ): void {
   if (json) {
@@ -640,6 +704,17 @@ function renderSuccess(
       formatCliMaintenanceResult(
         result as CliMaintenanceResult
       )
+    );
+    return;
+  }
+  if (
+    command === "rename" ||
+    command === "detach" ||
+    command === "rebind" ||
+    command === "forget"
+  ) {
+    process.stdout.write(
+      formatCliLocalResult(result as CliLocalResult)
     );
     return;
   }
