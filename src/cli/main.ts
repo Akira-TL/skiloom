@@ -4,6 +4,14 @@ import process from "node:process";
 
 import type { ProductError } from "../domain/errors/index.js";
 import {
+  readCliStatus,
+  type CliStatusResult
+} from "./status.js";
+import {
+  resolveCliTarget,
+  type ResolvedCliTarget
+} from "./target-selector.js";
+import {
   validateLocalPath,
   type ValidateLocalPathResult
 } from "./validate.js";
@@ -34,7 +42,15 @@ type ParsedValidate = Readonly<{
   json: boolean;
 }>;
 
-type ParsedCommand = ParsedValidate;
+type ParsedStatus = Readonly<{
+  command: "status";
+  target: ResolvedCliTarget;
+  json: boolean;
+}>;
+
+type ParsedCommand =
+  | ParsedValidate
+  | ParsedStatus;
 
 type UsageFailure = Readonly<{
   command: string;
@@ -60,6 +76,8 @@ async function main(): Promise<number> {
   switch (parsed.value.command) {
     case "validate":
       return runValidate(parsed.value);
+    case "status":
+      return runStatus(parsed.value);
   }
 }
 
@@ -85,41 +103,185 @@ async function runValidate(
   return 0;
 }
 
+async function runStatus(
+  command: ParsedStatus
+): Promise<number> {
+  const status = await readCliStatus(command.target);
+  if (!status.ok) {
+    renderFailure(
+      command.command,
+      status.error,
+      command.json,
+      1
+    );
+    return 1;
+  }
+
+  renderSuccess(
+    command.command,
+    status.value,
+    command.json
+  );
+  return 0;
+}
+
 function parseArguments(
   argv: ReadonlyArray<string>
 ):
   | Readonly<{ ok: true; value: ParsedCommand }>
   | Readonly<{ ok: false; value: UsageFailure }> {
-  const json = argv.includes("--json");
-  const positional = argv.filter((argument) => argument !== "--json");
-  const command = positional[0] ?? "";
+  const jsonCount = argv.filter(
+    (argument) => argument === "--json"
+  ).length;
+  const json = jsonCount > 0;
+  const withoutJson = argv.filter(
+    (argument) => argument !== "--json"
+  );
+  const command = withoutJson[0] ?? "";
 
-  if (argv.filter((argument) => argument === "--json").length > 1) {
+  if (jsonCount > 1) {
     return usage(command, json, "duplicate --json");
   }
-  if (command !== "validate") {
-    return usage(command, json, "unknown or missing command");
-  }
 
-  const options = argv.filter(
-    (argument) =>
-      argument.startsWith("-") &&
-      argument !== "--json"
+  switch (command) {
+    case "validate":
+      return parseValidate(
+        withoutJson.slice(1),
+        json
+      );
+    case "status":
+      return parseStatus(
+        withoutJson.slice(1),
+        json
+      );
+    default:
+      return usage(
+        command,
+        json,
+        "unknown or missing command"
+      );
+  }
+}
+
+function parseValidate(
+  argv: ReadonlyArray<string>,
+  json: boolean
+):
+  | Readonly<{ ok: true; value: ParsedValidate }>
+  | Readonly<{ ok: false; value: UsageFailure }> {
+  const option = argv.find((argument) =>
+    argument.startsWith("-")
   );
-  if (options.length > 0) {
-    return usage(command, json, `unknown option: ${options[0]}`);
+  if (option !== undefined) {
+    return usage(
+      "validate",
+      json,
+      `unknown option: ${option}`
+    );
   }
-
-  const operands = positional.slice(1);
-  if (operands.length > 1) {
-    return usage(command, json, "validate accepts at most one path");
+  if (argv.length > 1) {
+    return usage(
+      "validate",
+      json,
+      "validate accepts at most one path"
+    );
   }
 
   return {
     ok: true,
     value: {
       command: "validate",
-      path: operands[0] ?? process.cwd(),
+      path: argv[0] ?? process.cwd(),
+      json
+    }
+  };
+}
+
+function parseStatus(
+  argv: ReadonlyArray<string>,
+  json: boolean
+):
+  | Readonly<{ ok: true; value: ParsedStatus }>
+  | Readonly<{ ok: false; value: UsageFailure }> {
+  let target: string | undefined;
+  let host: string | undefined;
+  let scope: string | undefined;
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const option = argv[index]!;
+    if (
+      option !== "--target" &&
+      option !== "--host" &&
+      option !== "--scope"
+    ) {
+      return usage(
+        "status",
+        json,
+        `unknown option: ${option}`
+      );
+    }
+    const value = argv[index + 1];
+    if (
+      value === undefined ||
+      value.startsWith("--")
+    ) {
+      return usage(
+        "status",
+        json,
+        `missing value for ${option}`
+      );
+    }
+    index += 1;
+
+    if (option === "--target") {
+      if (target !== undefined) {
+        return usage(
+          "status",
+          json,
+          "duplicate --target"
+        );
+      }
+      target = value;
+    } else if (option === "--host") {
+      if (host !== undefined) {
+        return usage(
+          "status",
+          json,
+          "duplicate --host"
+        );
+      }
+      host = value;
+    } else {
+      if (scope !== undefined) {
+        return usage(
+          "status",
+          json,
+          "duplicate --scope"
+        );
+      }
+      scope = value;
+    }
+  }
+
+  const resolved = resolveCliTarget({
+    cwd: process.cwd(),
+    ...(target === undefined ? {} : { target }),
+    ...(host === undefined ? {} : { host }),
+    ...(scope === undefined ? {} : { scope })
+  });
+  if (!resolved.ok) {
+    return usage(
+      "status",
+      json,
+      resolved.reason
+    );
+  }
+
+  return {
+    ok: true,
+    value: {
+      command: "status",
+      target: resolved.value,
       json
     }
   };
@@ -145,7 +307,7 @@ function usage(
 
 function renderSuccess(
   command: string,
-  result: ValidateLocalPathResult,
+  result: ValidateLocalPathResult | CliStatusResult,
   json: boolean
 ): void {
   if (json) {
@@ -156,12 +318,24 @@ function renderSuccess(
       result,
       warnings: []
     };
-    process.stdout.write(JSON.stringify(output) + "\n");
+    process.stdout.write(
+      JSON.stringify(output) + "\n"
+    );
     return;
   }
 
+  if (command === "validate") {
+    process.stdout.write(
+      `Valid Skiloom package: ${(result as ValidateLocalPathResult).path}\n`
+    );
+    return;
+  }
+
+  const status = result as CliStatusResult;
   process.stdout.write(
-    `Valid Skiloom package: ${result.path}\n`
+    `Target: ${status.target.path}\n` +
+      `Registry: ${status.registry === null ? "unregistered" : status.registry.targetId}\n` +
+      `Marker: ${status.marker === null ? "absent" : status.marker.targetId}\n`
   );
 }
 
@@ -179,7 +353,9 @@ function renderFailure(
       error,
       warnings: []
     };
-    process.stdout.write(JSON.stringify(output) + "\n");
+    process.stdout.write(
+      JSON.stringify(output) + "\n"
+    );
     return;
   }
 
