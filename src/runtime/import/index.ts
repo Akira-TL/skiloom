@@ -19,3 +19,12 @@ export {
   type MergeExactPackageInput,
   type MergeExactPackageResult
 } from "./merge.js";
+
+export {
+  recoverInterruptedExactImport,
+  type InterruptedExactImportRecoveryConflict,
+  type InterruptedExactImportRecoveryConflictReason,
+  type RecoverInterruptedExactImportError,
+  type RecoverInterruptedExactImportInput,
+  type RecoverInterruptedExactImportResult
+} from "./recovery/index.js";

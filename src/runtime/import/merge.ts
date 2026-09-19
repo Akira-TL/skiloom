@@ -33,9 +33,7 @@ import type {
 } from "../registry/index.js";
 import type { PackageStoreError } from "../store.js";
 import {
-  materializeVerifiedUserPayloadTree,
-  scanUserPayloadTree,
-  type MaterializeUserPayloadError
+  scanUserPayloadTree
 } from "../user-payload.js";
 import {
   buildMarkerFacts,
@@ -60,6 +58,14 @@ import {
   type PrepareExactImportError,
   type PreparedImportUserPayload
 } from "./prepare.js";
+import {
+  activateStagedImportUserPayload,
+  importUserPendingActions,
+  planImportUserStaging,
+  stageImportUserPayloads,
+  type ImportUserActivationError,
+  type ImportUserStagingError
+} from "./recovery/user-staging.js";
 import {
   prepareExactMergeFacts,
   type ExactMergeConflict,
@@ -91,7 +97,8 @@ export type MergeExactPackageError =
   | OperationLockLost
   | PackageStoreError
   | TargetReconciliationError
-  | MaterializeUserPayloadError
+  | ImportUserStagingError
+  | ImportUserActivationError
   | LifecycleMarkerSyncFailed;
 
 export type MergeExactPackageResult =
@@ -252,6 +259,10 @@ export async function mergeExactPackage(
 
   const operationId =
     (input.createOperationId ?? randomUUID)();
+  const plannedUser = planImportUserStaging(
+    targetRoot,
+    filesystem.value.userPayloadsToWrite
+  );
   const preparedReconciliation =
     await prepareTargetReconciliation({
       home: input.home,
@@ -264,10 +275,33 @@ export async function mergeExactPackage(
       currentProjections:
         merged.value.currentOwned,
       nextState: merged.value.nextState,
-      deferPendingCompletion: true
+      deferPendingCompletion: true,
+      extraPendingActions:
+        importUserPendingActions(plannedUser)
     });
   if (!preparedReconciliation.ok) {
     return preparedReconciliation;
+  }
+
+  const stagedUser = await stageImportUserPayloads({
+    operationId,
+    targetId: input.targetId,
+    lock: input.lock,
+    planned: plannedUser
+  });
+  if (!stagedUser.ok) {
+    if (stagedUser.error.code !== "OperationLockLost") {
+      const cleaned = await cleanupPendingTargetStaging({
+        targetId: input.targetId,
+        targetRoot,
+        lock: input.lock,
+        registry: input.registry
+      });
+      if (!cleaned.ok) {
+        return cleaned;
+      }
+    }
+    return stagedUser;
   }
 
   const committed =
@@ -283,25 +317,15 @@ export async function mergeExactPackage(
     return reconciled;
   }
 
-  for (
-    const payload of
-    filesystem.value.userPayloadsToWrite
-  ) {
-    const stillHeld = input.lock.checkHeld();
-    if (!stillHeld.ok) {
-      return stillHeld;
-    }
-    const materialized =
-      await materializeVerifiedUserPayloadTree({
-        destinationRoot: join(
-          targetRoot,
-          payload.activationName
-        ),
-        expectedDigest: payload.contentDigest,
-        entries: payload.entries
-      });
-    if (!materialized.ok) {
-      return materialized;
+  for (const staged of stagedUser.value) {
+    const activated = await activateStagedImportUserPayload({
+      targetRoot,
+      stagingPath: staged.stagingPath,
+      manifest: staged.manifest,
+      lock: input.lock
+    });
+    if (!activated.ok) {
+      return activated;
     }
   }
 

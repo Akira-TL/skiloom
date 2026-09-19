@@ -32,10 +32,6 @@ import type {
   PackageStoreError
 } from "../store.js";
 import {
-  materializeVerifiedUserPayloadTree,
-  type MaterializeUserPayloadError
-} from "../user-payload.js";
-import {
   buildMarkerFacts,
   publishLifecycleCandidateSnapshots
 } from "../orchestration/lifecycle/apply.js";
@@ -51,9 +47,16 @@ import {
 } from "../orchestration/target-reconcile.js";
 import {
   prepareExactImport,
-  type PrepareExactImportError,
-  type PreparedExactImport
+  type PrepareExactImportError
 } from "./prepare.js";
+import {
+  activateStagedImportUserPayload,
+  importUserPendingActions,
+  planImportUserStaging,
+  stageImportUserPayloads,
+  type ImportUserActivationError,
+  type ImportUserStagingError
+} from "./recovery/user-staging.js";
 
 export type ExactImportTargetUnavailable = ProductError<
   "ExactImportTargetUnavailable",
@@ -106,7 +109,8 @@ export type ExactImportError =
   | PrepareExactImportError
   | PackageStoreError
   | TargetReconciliationError
-  | MaterializeUserPayloadError
+  | ImportUserStagingError
+  | ImportUserActivationError
   | LifecycleMarkerSyncFailed;
 
 export type ExactImportResult =
@@ -230,6 +234,10 @@ export async function importExactPackage(
 
   const operationId =
     (input.createOperationId ?? randomUUID)();
+  const plannedUser = planImportUserStaging(
+    targetRoot,
+    prepared.value.userPayloads
+  );
   const reconciliation =
     await prepareTargetReconciliation({
       home: input.home,
@@ -242,10 +250,33 @@ export async function importExactPackage(
       currentProjections:
         prepared.value.currentProjections,
       nextState: prepared.value.nextState,
-      deferPendingCompletion: true
+      deferPendingCompletion: true,
+      extraPendingActions:
+        importUserPendingActions(plannedUser)
     });
   if (!reconciliation.ok) {
     return reconciliation;
+  }
+
+  const stagedUser = await stageImportUserPayloads({
+    operationId,
+    targetId,
+    lock: input.lock,
+    planned: plannedUser
+  });
+  if (!stagedUser.ok) {
+    if (stagedUser.error.code !== "OperationLockLost") {
+      const cleaned = await cleanupPendingTargetStaging({
+        targetId,
+        targetRoot,
+        lock: input.lock,
+        registry: input.registry
+      });
+      if (!cleaned.ok) {
+        return cleaned;
+      }
+    }
+    return stagedUser;
   }
 
   const committed =
@@ -260,13 +291,16 @@ export async function importExactPackage(
     return reconciled;
   }
 
-  const restoredUser = await restoreUserPayloads(
-    input,
-    targetRoot,
-    prepared.value
-  );
-  if (!restoredUser.ok) {
-    return restoredUser;
+  for (const staged of stagedUser.value) {
+    const activated = await activateStagedImportUserPayload({
+      targetRoot,
+      stagingPath: staged.stagingPath,
+      manifest: staged.manifest,
+      lock: input.lock
+    });
+    if (!activated.ok) {
+      return activated;
+    }
   }
 
   const heldBeforeMarker = input.lock.checkHeld();
@@ -370,34 +404,6 @@ async function inspectEmptyTarget(
         }
       )
     };
-  }
-  return { ok: true, value: undefined };
-}
-
-async function restoreUserPayloads(
-  input: ImportExactPackageInput,
-  targetRoot: string,
-  prepared: PreparedExactImport
-): Promise<
-  Result<void, OperationLockLost | MaterializeUserPayloadError>
-> {
-  for (const payload of prepared.userPayloads) {
-    const held = input.lock.checkHeld();
-    if (!held.ok) {
-      return held;
-    }
-    const materialized =
-      await materializeVerifiedUserPayloadTree({
-        destinationRoot: join(
-          targetRoot,
-          payload.activationName
-        ),
-        expectedDigest: payload.contentDigest,
-        entries: payload.entries
-      });
-    if (!materialized.ok) {
-      return materialized;
-    }
   }
   return { ok: true, value: undefined };
 }
