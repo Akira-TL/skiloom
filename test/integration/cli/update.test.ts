@@ -20,6 +20,11 @@ const LOCK_HELPER =
   resolve("native/skiloom-lock/target/debug/skiloom-lock");
 
 type ParsedUpdateOutput = Readonly<{
+  ok: boolean;
+  error?: Readonly<{
+    code: string;
+    facts: Readonly<{ reason: string }>;
+  }>;
   result: Readonly<{
     status: string;
     directRequirements: ReadonlyArray<Readonly<{
@@ -35,6 +40,12 @@ type ParsedUpdateOutput = Readonly<{
       activationName: string;
       ownership: string;
     }>>;
+    comparison: Readonly<{
+      sourceDeltas: ReadonlyArray<Readonly<{
+        kind: string;
+        repositoryCoordinate: string;
+      }>>;
+    }>;
     acceptedState: Readonly<{
       generation: number;
     }>;
@@ -101,6 +112,132 @@ test("update --plan returns candidate projection ownership without mutating acce
     assert.match(
       await readFile(join(target, "app", "SKILL.md"), "utf8"),
       /Baseline application\./u
+    );
+  });
+});
+
+test("noninteractive update without --yes requires approval before mutation", async () => {
+  await withCliRuntime(async ({ home, cwd, target }) => {
+    const installed = await runCli(
+      ["install", "acme/app/app", "--yes", "--json"],
+      { home, cwd, mode: "base" }
+    );
+    assert.equal(installed.code, 0);
+
+    const blocked = await runCli(
+      ["update", "--json"],
+      { home, cwd, mode: "versions" }
+    );
+
+    assert.equal(blocked.code, 3);
+    assert.equal(blocked.stderr, "");
+    const output = parseUpdateOutput(blocked.stdout);
+    assert.equal(output.ok, false);
+    assert.equal(output.error?.code, "InteractionRequired");
+    assert.equal(
+      output.error?.facts.reason,
+      "ordinary-approval-required"
+    );
+    assert.match(
+      await readFile(join(target, "app", "SKILL.md"), "utf8"),
+      /Baseline application\./u
+    );
+
+    const status = await runCli(
+      ["status", "--json"],
+      { home, cwd, mode: "versions" }
+    );
+    assert.equal(status.code, 0);
+    const statusOutput = JSON.parse(status.stdout) as {
+      result: { registry: { generation: number } };
+    };
+    assert.equal(statusOutput.result.registry.generation, 1);
+  });
+});
+
+test("identical update is a no-op without approval or generation change", async () => {
+  await withCliRuntime(async ({ home, cwd, target }) => {
+    const installed = await runCli(
+      ["install", "acme/app/app", "--yes", "--json"],
+      { home, cwd, mode: "base" }
+    );
+    assert.equal(installed.code, 0);
+
+    const noOp = await runCli(
+      ["update", "--json"],
+      { home, cwd, mode: "base" }
+    );
+
+    assert.equal(noOp.code, 0);
+    assert.equal(noOp.stderr, "");
+    const output = parseUpdateOutput(noOp.stdout);
+    assert.equal(output.result.status, "no-op");
+    assert.equal(output.result.acceptedState.generation, 1);
+    assert.deepEqual(output.result.comparison.sourceDeltas, []);
+    assert.match(
+      await readFile(join(target, "app", "SKILL.md"), "utf8"),
+      /Baseline application\./u
+    );
+  });
+});
+
+test("release retarget requires independent authorization after --yes", async () => {
+  await withCliRuntime(async ({ home, cwd, target }) => {
+    const installed = await runCli(
+      ["install", "acme/app/app", "--yes", "--json"],
+      { home, cwd, mode: "base" }
+    );
+    assert.equal(installed.code, 0);
+
+    const blocked = await runCli(
+      ["update", "--yes", "--json"],
+      { home, cwd, mode: "retarget" }
+    );
+
+    assert.equal(blocked.code, 3);
+    const blockedOutput = parseUpdateOutput(blocked.stdout);
+    assert.equal(blockedOutput.error?.code, "InteractionRequired");
+    assert.equal(
+      blockedOutput.error?.facts.reason,
+      "release-retarget-authorization-required"
+    );
+    assert.match(
+      await readFile(join(target, "app", "SKILL.md"), "utf8"),
+      /Baseline application\./u
+    );
+
+    const accepted = await runCli(
+      [
+        "update",
+        "--yes",
+        "--allow-release-retarget",
+        "--json"
+      ],
+      { home, cwd, mode: "retarget" }
+    );
+
+    assert.equal(accepted.code, 0);
+    const output = parseUpdateOutput(accepted.stdout);
+    assert.equal(output.result.status, "updated");
+    assert.equal(output.result.acceptedState.generation, 2);
+    assert.equal(
+      output.result.comparison.sourceDeltas[0]?.kind,
+      "release-retarget"
+    );
+    assert.equal(
+      output.result.comparison.sourceDeltas[0]?.repositoryCoordinate,
+      "acme/app"
+    );
+    assert.deepEqual(output.result.projections, [
+      {
+        packageCoordinate: "acme/app/app",
+        activationName: "app",
+        ownership: "managed"
+      }
+    ]);
+    assert.match(
+      await readFile(join(target, "app", "SKILL.md"), "utf8"),
+      /Retargeted application\./u
     );
   });
 });
