@@ -79,6 +79,7 @@ export type PrepareExactImportError =
 
 export type PreparedImportUserPayload = Readonly<{
   kind: "detached" | "user-skill";
+  packageCoordinate: string | null;
   activationName: string;
   contentDigest: string;
   entries: ReadonlyArray<Readonly<{
@@ -505,6 +506,7 @@ function buildUserPayloads(
   for (const detached of parsed.manifest.detached) {
     result.push({
       kind: "detached",
+      packageCoordinate: detached.packageCoordinate,
       activationName: detached.activationName,
       contentDigest: detached.userContentDigest,
       entries: (framesByPayload.get(detached.payloadId) ?? []).map(
@@ -556,6 +558,7 @@ function buildUserPayloads(
 
     result.push({
       kind: "user-skill",
+      packageCoordinate: null,
       activationName: userSkill.activationName,
       contentDigest: userSkill.userContentDigest,
       entries: frames.map((frame) => ({
