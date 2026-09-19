@@ -222,29 +222,22 @@ async function runInstall(
   return exitCode;
 }
 
-async function runUpdate(
-  command: ParsedUpdate
-): Promise<number> {
+async function runUpdate(command: ParsedUpdate): Promise<number> {
   const updated = await executeCliUpdate(command);
   if (!updated.ok) {
     const exitCode =
-      updated.error.code === "InteractionRequired"
-        ? 3
-        : 1;
-    renderFailure(
-      command.command,
-      updated.error,
-      command.json,
-      exitCode
-    );
+      updated.error.code === "InteractionRequired" ? 3 : 1;
+    renderFailure(command.command, updated.error, command.json, exitCode);
     return exitCode;
   }
 
-  const exitCode =
-    updated.value.status === "declined"
-      ? 3
-      : 0;
-  renderSuccess(command.command, updated.value, command.json);
+  const { result, presentationRendered } = updated.value;
+  const exitCode = result.status === "declined" ? 3 : 0;
+  if (presentationRendered && !command.json) {
+    process.stdout.write("Status: " + result.status + "\n");
+  } else {
+    renderSuccess(command.command, result, command.json);
+  }
   return exitCode;
 }
 

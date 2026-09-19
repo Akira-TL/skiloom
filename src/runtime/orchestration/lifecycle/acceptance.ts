@@ -10,13 +10,17 @@ import type { Result } from "../../../domain/errors/index.js";
 import type {
   LifecycleCandidatePlan
 } from "../lifecycle-candidate.js";
+import type {
+  LifecycleCandidateProjection
+} from "./projection/plan.js";
 
 export type LifecycleCandidateAcceptanceResponse =
   | boolean
   | LifecycleAcceptanceDecision;
 
 export type LifecycleCandidateAcceptanceCallback = (
-  plan: LifecycleCandidatePlan
+  plan: LifecycleCandidatePlan,
+  projections?: ReadonlyArray<LifecycleCandidateProjection>
 ) =>
   | LifecycleCandidateAcceptanceResponse
   | Promise<LifecycleCandidateAcceptanceResponse>;

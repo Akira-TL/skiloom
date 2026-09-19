@@ -72,6 +72,7 @@ test("update --plan human output presents the complete candidate surface", async
     assert.match(planned.stdout, /Direct Install Requirements:/u);
     assert.match(planned.stdout, /Sources:/u);
     assert.match(planned.stdout, /Packages:/u);
+    assert.match(planned.stdout, /Dependency Edges:/u);
     assert.match(planned.stdout, /Projections \/ Ownership:/u);
     assert.match(planned.stdout, /acme\/app\/app -> app \(managed\)/u);
     assert.match(planned.stdout, /Changes:/u);
@@ -109,6 +110,41 @@ test("update --plan returns candidate projection ownership without mutating acce
       }
     ]);
     assert.equal(output.result.acceptedState.generation, 1);
+    assert.match(
+      await readFile(join(target, "app", "SKILL.md"), "utf8"),
+      /Baseline application\./u
+    );
+  });
+});
+
+test("interactive update presents the complete candidate and defaults to rejection", async () => {
+  await withCliRuntime(async ({ home, cwd, target }) => {
+    const installed = await runCli(
+      ["install", "acme/app/app", "--yes", "--json"],
+      { home, cwd, mode: "base" }
+    );
+    assert.equal(installed.code, 0);
+
+    const rejected = await runInteractiveCli(
+      ["update"],
+      { home, cwd, mode: "versions", input: "n\n" }
+    );
+
+    assert.equal(rejected.code, 3);
+    assert.match(
+      rejected.stdout,
+      new RegExp("Target: " + escapeRegExp(target))
+    );
+    assert.match(rejected.stdout, /Status: candidate/u);
+    assert.match(rejected.stdout, /Direct Install Requirements:/u);
+    assert.match(rejected.stdout, /Sources:/u);
+    assert.match(rejected.stdout, /Packages:/u);
+    assert.match(rejected.stdout, /Projections \/ Ownership:/u);
+    assert.match(
+      rejected.stdout,
+      /acme\/app\/app -> app \(managed\)/u
+    );
+    assert.match(rejected.stdout, /Apply this complete state\? \[y\/N\]/u);
     assert.match(
       await readFile(join(target, "app", "SKILL.md"), "utf8"),
       /Baseline application\./u
@@ -350,8 +386,66 @@ function runCli(
   });
 }
 
+function runInteractiveCli(
+  args: ReadonlyArray<string>,
+  options: Readonly<{
+    home: string;
+    cwd: string;
+    mode: string;
+    input: string;
+  }>
+): Promise<Readonly<{
+  code: number | null;
+  stdout: string;
+  stderr: string;
+}>> {
+  return new Promise((resolveResult, reject) => {
+    const command = [
+      process.execPath,
+      "--import",
+      FETCH_PRELOAD,
+      CLI_ENTRY,
+      ...args
+    ].map(shellQuote).join(" ");
+    const child = spawn(
+      "/usr/bin/script",
+      ["-qefc", command, "/dev/null"],
+      {
+        cwd: options.cwd,
+        env: {
+          ...process.env,
+          HOME: options.home,
+          USERPROFILE: options.home,
+          SKILOOM_LOCK_TEST_BINARY: LOCK_HELPER,
+          SKILOOM_TEST_GITHUB_MODE: options.mode
+        },
+        stdio: ["pipe", "pipe", "pipe"]
+      }
+    );
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk: string) => {
+      stderr += chunk;
+    });
+    child.once("error", reject);
+    child.once("close", (code) => {
+      resolveResult({ code, stdout, stderr });
+    });
+    child.stdin.end(options.input);
+  });
+}
+
 function parseUpdateOutput(source: string): ParsedUpdateOutput {
   return JSON.parse(source) as ParsedUpdateOutput;
+}
+
+function shellQuote(source: string): string {
+  return "'" + source.replace(/'/gu, "'\\''") + "'";
 }
 
 function escapeRegExp(source: string): string {

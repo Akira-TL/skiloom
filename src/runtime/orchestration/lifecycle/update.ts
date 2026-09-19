@@ -140,7 +140,7 @@ export async function updateAcceptedTarget(
     ...(input.sourceCachePath === undefined
       ? {}
       : { sourceCachePath: input.sourceCachePath }),
-    acceptCandidate: async (plan) => {
+    acceptCandidate: async (plan, projections) => {
       const retargets = releaseRetargets(plan);
       if (retargets.length > 0) {
         if (input.authorizeReleaseRetarget === undefined) {
@@ -177,7 +177,10 @@ export async function updateAcceptedTarget(
         }
       }
 
-      return await input.acceptCandidate(plan);
+      return await input.acceptCandidate(
+        plan,
+        projections
+      );
     },
     ...(input.syncMarker === undefined
       ? {}

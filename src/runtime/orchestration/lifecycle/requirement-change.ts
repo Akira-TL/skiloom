@@ -262,7 +262,10 @@ export async function applyAcceptedRequirementChange(
   let acceptance;
   try {
     acceptance = resolveLifecycleCandidateAcceptance(
-      await input.acceptCandidate(candidatePlan)
+      await input.acceptCandidate(
+        candidatePlan,
+        candidateProjections
+      )
     );
   } catch {
     return {
