@@ -24,6 +24,9 @@ import {
   type UserPayloadContentEntry,
   type UserPayloadError
 } from "../domain/user-payload/index.js";
+import type {
+  OperationLockLost
+} from "../native/skiloom-lock.js";
 
 const UTF8_DECODER = new TextDecoder("utf-8", {
   fatal: true
@@ -68,7 +71,8 @@ export type ScanUserPayloadError =
 export type MaterializeUserPayloadError =
   | UserPayloadError
   | UserPayloadDestinationExists
-  | UserPayloadMaterializationFailed;
+  | UserPayloadMaterializationFailed
+  | OperationLockLost;
 
 export async function scanUserPayloadTree(
   root: string
@@ -116,6 +120,7 @@ export async function materializeVerifiedUserPayloadTree(
     destinationRoot: string;
     expectedDigest: string;
     entries: ReadonlyArray<UserPayloadContentEntry>;
+    checkMutationCapability?: () => Result<void, OperationLockLost>;
   }>
 ): Promise<
   Result<UserPayload, MaterializeUserPayloadError>
@@ -146,6 +151,10 @@ export async function materializeVerifiedUserPayloadTree(
   let stagingCreated = false;
 
   try {
+    const beforeStaging = checkMutationCapability(input);
+    if (!beforeStaging.ok) {
+      return beforeStaging;
+    }
     await mkdir(stagingRoot, {
       recursive: false,
       mode: 0o700
@@ -153,6 +162,10 @@ export async function materializeVerifiedUserPayloadTree(
     stagingCreated = true;
 
     for (const entry of verified.value.entries) {
+      const beforeEntry = checkMutationCapability(input);
+      if (!beforeEntry.ok) {
+        return beforeEntry;
+      }
       const destination = join(
         stagingRoot,
         ...entry.path.split("/")
@@ -180,6 +193,10 @@ export async function materializeVerifiedUserPayloadTree(
       }
     }
 
+    const beforePublish = checkMutationCapability(input);
+    if (!beforePublish.ok) {
+      return beforePublish;
+    }
     if (await pathExists(destinationRoot)) {
       return {
         ok: false,
@@ -191,7 +208,10 @@ export async function materializeVerifiedUserPayloadTree(
     }
     await rename(stagingRoot, destinationRoot);
     stagingCreated = false;
-    return verified;
+    const afterPublish = checkMutationCapability(input);
+    return afterPublish.ok
+      ? verified
+      : afterPublish;
   } catch {
     return {
       ok: false,
@@ -208,6 +228,17 @@ export async function materializeVerifiedUserPayloadTree(
       }).catch(() => {});
     }
   }
+}
+
+function checkMutationCapability(
+  input: Readonly<{
+    checkMutationCapability?: () => Result<void, OperationLockLost>;
+  }>
+): Result<void, OperationLockLost> {
+  return input.checkMutationCapability?.() ?? {
+    ok: true,
+    value: undefined
+  };
 }
 
 async function scanDirectory(

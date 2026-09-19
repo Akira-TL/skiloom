@@ -4,7 +4,6 @@ import {
   lstat,
   mkdir,
   open,
-  readFile,
   rename
 } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -164,7 +163,9 @@ export async function stageImportUserPayloads(
           PAYLOAD_DIRECTORY
         ),
         expectedDigest: entry.payload.contentDigest,
-        entries: entry.payload.entries
+        entries: entry.payload.entries,
+        checkMutationCapability: () =>
+          input.lock.checkHeld()
       });
     if (!materialized.ok) {
       return materialized;

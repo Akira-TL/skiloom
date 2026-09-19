@@ -167,6 +167,50 @@ test("verified user payload materialization checks digest before creating destin
   });
 });
 
+test("user payload materialization stops before the next protected mutation when capability is lost", async () => {
+  await withTemp(async (root) => {
+    const destination = join(root, "capability-loss");
+    let checks = 0;
+    const result = await materializeVerifiedUserPayloadTree({
+      destinationRoot: destination,
+      expectedDigest: digest,
+      entries: [
+        {
+          path: "a.txt",
+          executable: false,
+          content: Uint8Array.from(Buffer.from("A\n"))
+        },
+        {
+          path: "bin/run.sh",
+          executable: true,
+          content: Uint8Array.from(Buffer.from("#!/bin/sh\n"))
+        }
+      ],
+      checkMutationCapability: () => {
+        checks += 1;
+        return checks < 3
+          ? { ok: true, value: undefined }
+          : {
+              ok: false,
+              error: {
+                code: "OperationLockLost",
+                facts: {
+                  lockPath: "/test/operation.lock",
+                  reason: "session-not-held"
+                }
+              }
+            };
+      }
+    });
+
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.error.code, "OperationLockLost");
+    }
+    await assert.rejects(lstat(destination));
+  });
+});
+
 test("verified user payload materialization refuses an existing destination", async () => {
   await withTemp(async (root) => {
     const destination = join(root, "existing");
