@@ -1,17 +1,12 @@
 import { mkdir } from "node:fs/promises";
-import { homedir } from "node:os";
 import { resolve } from "node:path";
 import process from "node:process";
-import { createInterface } from "node:readline/promises";
 
 import {
   productError,
   type ProductError,
   type Result
 } from "../domain/errors/index.js";
-import type {
-  DirectInstallRequirement
-} from "../domain/resolver/index.js";
 import {
   acquireOperationLock,
   type OperationLockSession
@@ -20,17 +15,11 @@ import {
   resolveSkiloomHomePaths,
   type SkiloomHomePaths
 } from "../runtime/home.js";
-import {
-  createNonInteractiveLifecycleAcceptance,
-  type LifecycleCandidateAcceptanceCallback,
-  type LifecycleCandidateAcceptanceResponse
-} from "../runtime/orchestration/lifecycle/acceptance.js";
 import type {
   LifecycleCandidatePlan
 } from "../runtime/orchestration/lifecycle-candidate.js";
 import {
-  updateAcceptedTarget,
-  type ReleaseRetargetFact
+  updateAcceptedTarget
 } from "../runtime/orchestration/lifecycle/update.js";
 import type {
   MachineRegistry,
@@ -40,6 +29,13 @@ import {
   createGitHubJsonFetchTransport,
   createGitHubRepositoryFetchTransport
 } from "../runtime/source/github/index.js";
+import {
+  createCliCandidateAcceptance,
+  currentUserHome,
+  formatReleaseRetargetRisk,
+  presentDirectRequirement,
+  type CliPresentedDirectRequirement
+} from "./candidate-acceptance.js";
 import {
   readCliStatus
 } from "./status.js";
@@ -57,13 +53,8 @@ export type CliUpdateInvocation = Readonly<{
   json: boolean;
 }>;
 
-export type CliUpdateDirectRequirement = Readonly<{
-  kind: "package" | "repository";
-  coordinate: string;
-  sourceKind: "github-release" | "git";
-  versionRequirement?: string;
-  requestedRef?: string;
-}>;
+export type CliUpdateDirectRequirement =
+  CliPresentedDirectRequirement;
 
 export type CliUpdateResult = Readonly<{
   status: "planned" | "declined" | "updated" | "no-op";
@@ -92,16 +83,6 @@ export type CliUpdateResult = Readonly<{
 export type CliUpdateExecution = Readonly<{
   result: CliUpdateResult;
   presentationRendered: boolean;
-}>;
-
-type CliUpdateAcceptance = Readonly<{
-  acceptCandidate: LifecycleCandidateAcceptanceCallback;
-  authorizeReleaseRetarget: (
-    retargets: ReadonlyArray<ReleaseRetargetFact>,
-    plan: LifecycleCandidatePlan
-  ) =>
-    | LifecycleCandidateAcceptanceResponse
-    | Promise<LifecycleCandidateAcceptanceResponse>;
 }>;
 
 export type ParseCliUpdateResult =
@@ -285,23 +266,25 @@ async function executeWhileLocked(
     registry = opened.value;
 
     let presentationRendered = false;
-    const authorization = createUpdateAcceptance(
+    const authorization = createCliCandidateAcceptance(
       input,
-      (plan, projections) => {
-        presentationRendered = true;
-        process.stdout.write(
-          formatUpdateCandidate(
-            input.target,
-            plan,
-            projections
-          )
-        );
-      },
-      (retargets) => {
-        presentationRendered = true;
-        process.stdout.write(
-          formatReleaseRetargetRisk(retargets)
-        );
+      {
+        presentCandidate: (plan, projections) => {
+          presentationRendered = true;
+          process.stdout.write(
+            formatUpdateCandidate(
+              input.target,
+              plan,
+              projections
+            )
+          );
+        },
+        presentRetargets: (retargets) => {
+          presentationRendered = true;
+          process.stdout.write(
+            formatReleaseRetargetRisk(retargets)
+          );
+        }
       }
     );
     const lifecycle = await updateAcceptedTarget({
@@ -338,88 +321,6 @@ async function executeWhileLocked(
   } finally {
     registry?.close();
   }
-}
-
-function createUpdateAcceptance(
-  input: CliUpdateInvocation,
-  presentCandidate: (
-    plan: LifecycleCandidatePlan,
-    projections: CliUpdateResult["projections"]
-  ) => void,
-  presentRetargets: (
-    retargets: ReadonlyArray<ReleaseRetargetFact>
-  ) => void
-): CliUpdateAcceptance {
-  const interactive =
-    !input.json &&
-    !input.nonInteractive &&
-    process.stdin.isTTY === true &&
-    process.stdout.isTTY === true;
-
-  if (!interactive || input.plan || input.yes) {
-    return createNonInteractiveLifecycleAcceptance({
-      mode: input.plan ? "plan" : "apply",
-      ordinaryApproval: input.yes,
-      releaseRetargetApproval:
-        input.allowReleaseRetarget
-    });
-  }
-
-  return {
-    authorizeReleaseRetarget: async (retargets) => {
-      presentRetargets(retargets);
-      if (
-        await confirm(
-          "Accept release tag retarget risk? [y/N] "
-        )
-      ) {
-        return { kind: "accept" };
-      }
-      return {
-        kind: "reject",
-        error: productError("InteractionRequired", {
-          reason: "release-retarget-authorization-required",
-          repositories: retargets
-            .map((entry) => entry.repositoryCoordinate)
-            .sort(compareUtf8)
-        })
-      };
-    },
-    acceptCandidate: async (plan, projections = []) => {
-      presentCandidate(plan, projections);
-      return confirm("Apply this complete state? [y/N] ");
-    }
-  };
-}
-
-async function confirm(question: string): Promise<boolean> {
-  const terminal = createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
-  try {
-    const answer = (await terminal.question(question))
-      .trim()
-      .toLowerCase();
-    return answer === "y" || answer === "yes";
-  } finally {
-    terminal.close();
-  }
-}
-
-function formatReleaseRetargetRisk(
-  retargets: ReadonlyArray<ReleaseRetargetFact>
-): string {
-  const lines = ["Release retarget risk:"];
-  for (const retarget of retargets) {
-    lines.push(
-      "- " + retarget.repositoryCoordinate +
-      " " + retarget.actualTag +
-      " " + retarget.previousCommit +
-      " -> " + retarget.candidateCommit
-    );
-  }
-  return lines.join("\n") + "\n";
 }
 
 function formatUpdateCandidate(
@@ -466,29 +367,6 @@ function lifecycleResult(
       }))
     }
   };
-}
-
-function presentDirectRequirement(
-  requirement: DirectInstallRequirement
-): CliUpdateDirectRequirement {
-  return requirement.sourceKind === "git"
-    ? {
-        kind: requirement.kind,
-        coordinate: requirement.coordinate.canonical,
-        sourceKind: "git",
-        requestedRef: requirement.requestedRef
-      }
-    : {
-        kind: requirement.kind,
-        coordinate: requirement.coordinate.canonical,
-        sourceKind: "github-release",
-        ...(requirement.versionRequirement === undefined
-          ? {}
-          : {
-              versionRequirement:
-                requirement.versionRequirement
-            })
-      };
 }
 
 export function formatCliUpdateResult(
@@ -611,17 +489,4 @@ function formatUpdatePresentation(
   }
 
   return lines.join("\n") + "\n";
-}
-
-function compareUtf8(left: string, right: string): number {
-  return Buffer.compare(
-    Buffer.from(left, "utf8"),
-    Buffer.from(right, "utf8")
-  );
-}
-
-function currentUserHome(): string {
-  return process.env.HOME ??
-    process.env.USERPROFILE ??
-    homedir();
 }

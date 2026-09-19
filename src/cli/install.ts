@@ -1,8 +1,6 @@
 import { mkdir } from "node:fs/promises";
-import { homedir } from "node:os";
 import { resolve } from "node:path";
 import process from "node:process";
-import { createInterface } from "node:readline/promises";
 
 import {
   isValidSkillName,
@@ -34,9 +32,6 @@ import {
 import {
   addAcceptedTargetRoots
 } from "../runtime/orchestration/lifecycle/add-root.js";
-import {
-  createNonInteractiveLifecycleAcceptance
-} from "../runtime/orchestration/lifecycle/acceptance.js";
 import type {
   LifecycleCandidatePlan
 } from "../runtime/orchestration/lifecycle-candidate.js";
@@ -51,6 +46,13 @@ import {
   createGitHubJsonFetchTransport,
   createGitHubRepositoryFetchTransport
 } from "../runtime/source/github/index.js";
+import {
+  createCliCandidateAcceptance,
+  currentUserHome,
+  formatReleaseRetargetRisk,
+  presentDirectRequirement,
+  type CliPresentedDirectRequirement
+} from "./candidate-acceptance.js";
 import {
   readCliStatus
 } from "./status.js";
@@ -73,13 +75,8 @@ export type CliInstallInvocation = Readonly<{
   json: boolean;
 }>;
 
-export type CliInstallDirectRequirement = Readonly<{
-  kind: "package" | "repository";
-  coordinate: string;
-  sourceKind: "github-release" | "git";
-  versionRequirement?: string;
-  requestedRef?: string;
-}>;
+export type CliInstallDirectRequirement =
+  CliPresentedDirectRequirement;
 
 export type CliInstallAcceptedState = Readonly<{
   targetId: string;
@@ -310,18 +307,28 @@ async function executeWhileLocked(
     const repositoryTransport =
       createGitHubRepositoryFetchTransport();
     let presentationRendered = false;
-    const acceptCandidate =
-      createInstallAcceptance(input, (plan) => {
-        presentationRendered = true;
-        process.stdout.write(
-          formatInstallCandidate(
-            input.target,
-            input.intent,
-            plan,
-            "candidate"
-          )
-        );
-      });
+    const acceptance = createCliCandidateAcceptance(
+      input,
+      {
+        presentCandidate: (plan) => {
+          presentationRendered = true;
+          process.stdout.write(
+            formatInstallCandidate(
+              input.target,
+              input.intent,
+              plan,
+              "candidate"
+            )
+          );
+        },
+        presentRetargets: (retargets) => {
+          presentationRendered = true;
+          process.stdout.write(
+            formatReleaseRetargetRisk(retargets)
+          );
+        }
+      }
+    );
 
     const lifecycle =
       existingTargetId === undefined
@@ -336,7 +343,8 @@ async function executeWhileLocked(
             repositoryTransport,
             transport,
             sourceCachePath: home.sourceCachePath,
-            acceptCandidate,
+            acceptCandidate:
+              acceptance.acceptCandidateWithRetarget,
             ...(input.intent.requestedProjectionRename === undefined
               ? {}
               : {
@@ -354,7 +362,8 @@ async function executeWhileLocked(
             repositoryTransport,
             transport,
             sourceCachePath: home.sourceCachePath,
-            acceptCandidate,
+            acceptCandidate:
+              acceptance.acceptCandidateWithRetarget,
             ...(input.intent.requestedProjectionRename === undefined
               ? {}
               : {
@@ -403,57 +412,6 @@ function freshInstallNeedsRegistry(
   return true;
 }
 
-function createInstallAcceptance(
-  input: CliInstallInvocation,
-  present: (plan: LifecycleCandidatePlan) => void
-) {
-  const interactive =
-    !input.json &&
-    !input.nonInteractive &&
-    process.stdin.isTTY === true &&
-    process.stdout.isTTY === true;
-
-  if (!interactive || input.plan || input.yes) {
-    return createNonInteractiveLifecycleAcceptance({
-      mode: input.plan ? "plan" : "apply",
-      ordinaryApproval: input.yes,
-      releaseRetargetApproval:
-        input.allowReleaseRetarget
-    }).acceptCandidate;
-  }
-
-  return async (plan: LifecycleCandidatePlan): Promise<boolean> => {
-    present(plan);
-    const retargets = plan.comparison.sourceDeltas.filter(
-      (delta) => delta.kind === "release-retarget"
-    );
-    if (retargets.length > 0) {
-      const acceptedRisk = await confirm(
-        "Accept release tag retarget risk? [y/N] "
-      );
-      if (!acceptedRisk) {
-        return false;
-      }
-    }
-    return confirm("Apply this complete state? [y/N] ");
-  };
-}
-
-async function confirm(question: string): Promise<boolean> {
-  const terminal = createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
-  try {
-    const answer = (await terminal.question(question))
-      .trim()
-      .toLowerCase();
-    return answer === "y" || answer === "yes";
-  } finally {
-    terminal.close();
-  }
-}
-
 function lifecycleResult(
   target: ResolvedCliTarget,
   intent: CliInstallIntent,
@@ -488,29 +446,6 @@ function lifecycleResult(
             }))
           }
   };
-}
-
-function presentDirectRequirement(
-  requirement: DirectInstallRequirement
-): CliInstallDirectRequirement {
-  return requirement.sourceKind === "git"
-    ? {
-        kind: requirement.kind,
-        coordinate: requirement.coordinate.canonical,
-        sourceKind: "git",
-        requestedRef: requirement.requestedRef
-      }
-    : {
-        kind: requirement.kind,
-        coordinate: requirement.coordinate.canonical,
-        sourceKind: "github-release",
-        ...(requirement.versionRequirement === undefined
-          ? {}
-          : {
-              versionRequirement:
-                requirement.versionRequirement
-            })
-      };
 }
 
 export function formatCliInstallResult(
@@ -658,10 +593,4 @@ function planOnlyRegistry(): MachineRegistry {
     completePendingOperation: unexpected,
     replaceTargetState: unexpected
   };
-}
-
-function currentUserHome(): string {
-  return process.env.HOME ??
-    process.env.USERPROFILE ??
-    homedir();
 }
