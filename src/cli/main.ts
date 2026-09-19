@@ -23,6 +23,12 @@ import {
   type ResolvedCliTarget
 } from "./target-selector.js";
 import {
+  executeCliUpdate,
+  parseCliUpdateArguments,
+  type CliUpdateInvocation,
+  type CliUpdateResult
+} from "./update.js";
+import {
   validateLocalPath,
   type ValidateLocalPathResult
 } from "./validate.js";
@@ -76,11 +82,15 @@ type ParsedInstall = Readonly<{
   json: boolean;
 }>;
 
+type ParsedUpdate = CliUpdateInvocation &
+  Readonly<{ command: "update" }>;
+
 type ParsedCommand =
   | ParsedValidate
   | ParsedStatus
   | ParsedSearch
-  | ParsedInstall;
+  | ParsedInstall
+  | ParsedUpdate;
 
 type CliTargetOption =
   | "--target"
@@ -123,6 +133,8 @@ async function main(): Promise<number> {
       return runSearch(parsed.value);
     case "install":
       return runInstall(parsed.value);
+    case "update":
+      return runUpdate(parsed.value);
   }
 }
 
@@ -209,6 +221,32 @@ async function runInstall(
   return exitCode;
 }
 
+async function runUpdate(
+  command: ParsedUpdate
+): Promise<number> {
+  const updated = await executeCliUpdate(command);
+  if (!updated.ok) {
+    const exitCode =
+      updated.error.code === "InteractionRequired"
+        ? 3
+        : 1;
+    renderFailure(
+      command.command,
+      updated.error,
+      command.json,
+      exitCode
+    );
+    return exitCode;
+  }
+
+  const exitCode =
+    updated.value.status === "declined"
+      ? 3
+      : 0;
+  renderSuccess(command.command, updated.value, command.json);
+  return exitCode;
+}
+
 async function runStatus(
   command: ParsedStatus
 ): Promise<number> {
@@ -270,6 +308,8 @@ function parseArguments(
         withoutJson.slice(1),
         json
       );
+    case "update":
+      return parseUpdate(withoutJson.slice(1), json);
     default:
       return usage(
         command,
@@ -515,6 +555,25 @@ function parseInstall(
   };
 }
 
+function parseUpdate(
+  argv: ReadonlyArray<string>,
+  json: boolean
+):
+  | Readonly<{ ok: true; value: ParsedUpdate }>
+  | Readonly<{ ok: false; value: UsageFailure }> {
+  const parsed = parseCliUpdateArguments(argv, json);
+  if (!parsed.ok) {
+    return usage("update", json, parsed.reason);
+  }
+  return {
+    ok: true,
+    value: {
+      command: "update",
+      ...parsed.value
+    }
+  };
+}
+
 function parseStatus(
   argv: ReadonlyArray<string>,
   json: boolean
@@ -652,7 +711,8 @@ function renderSuccess(
     | ValidateLocalPathResult
     | CliStatusResult
     | SkillsMpSearchResult
-    | CliInstallResult,
+    | CliInstallResult
+    | CliUpdateResult,
   json: boolean
 ): void {
   if (json) {
@@ -678,6 +738,13 @@ function renderSuccess(
   if (command === "install") {
     process.stdout.write(
       formatCliInstallResult(result as CliInstallResult)
+    );
+    return;
+  }
+  if (command === "update") {
+    const update = result as CliUpdateResult;
+    process.stdout.write(
+      `Update status: ${update.status}\n`
     );
     return;
   }
