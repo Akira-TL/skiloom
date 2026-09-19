@@ -26,6 +26,7 @@ import type {
   MachineRegistry,
   RegistryPendingLockedError,
   RegistryPendingOperationInput,
+  RegistryPendingProjectionAction,
   RegistryReplaceLockedError,
   RegistryTargetState,
   RegistryTargetStateInput
@@ -40,7 +41,8 @@ import {
   type InvalidTargetReconciliationRecoveryManifest
 } from "./target-reconcile/recovery.js";
 import {
-  cleanupPendingTargetStaging
+  cleanupPendingTargetStaging,
+  validatePendingStagingActions
 } from "./target-reconcile/pending.js";
 import {
   prepareManagedProjection,
@@ -103,6 +105,7 @@ export type PrepareTargetReconciliationInput = Readonly<{
   currentProjections: ReadonlyArray<TargetOwnedProjection>;
   nextState: RegistryTargetStateInput;
   deferPendingCompletion?: boolean;
+  extraPendingActions?: ReadonlyArray<RegistryPendingProjectionAction>;
 }>;
 
 export type PreparedTargetReconciliation = Readonly<{
@@ -330,8 +333,17 @@ async function prepareReconciliationStaging(
     ...requests.removals.map((request) => ({
       stagingPath: request.cleanupPath,
       activationName: request.activationName
-    }))
+    })),
+    ...(input.extraPendingActions ?? [])
   ];
+  const validatedActions =
+    validatePendingStagingActions(
+      input.targetRoot,
+      recoveryActions
+    );
+  if (!validatedActions.ok) {
+    return validatedActions;
+  }
   const pending =
     pendingMode === "when-actions" && recoveryActions.length === 0
       ? null

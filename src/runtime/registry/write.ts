@@ -97,9 +97,51 @@ export function completePendingOperationRows(
 ): void {
   database.exec("BEGIN IMMEDIATE");
   try {
+    const pending = database
+      .prepare(
+        "SELECT target_id FROM pending_operations WHERE operation_id = ?"
+      )
+      .get(operationId);
+    const targetId =
+      typeof pending?.target_id === "string"
+        ? pending.target_id
+        : null;
+
     database
       .prepare("DELETE FROM pending_operations WHERE operation_id = ?")
       .run(operationId);
+
+    if (targetId !== null) {
+      database
+        .prepare(`
+          DELETE FROM targets
+          WHERE target_id = ?
+            AND generation = 0
+            AND NOT EXISTS (
+              SELECT 1 FROM pending_operations
+              WHERE target_id = ?
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM target_locations
+              WHERE target_id = ?
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM direct_requirements
+              WHERE target_id = ?
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM resolved_sources
+              WHERE target_id = ?
+            )
+        `)
+        .run(
+          targetId,
+          targetId,
+          targetId,
+          targetId,
+          targetId
+        );
+    }
     database.exec("COMMIT");
   } catch (error) {
     try {

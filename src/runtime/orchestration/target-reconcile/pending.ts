@@ -3,9 +3,11 @@ import type {
   OperationLockSession
 } from "../../../native/skiloom-lock.js";
 import type {
-  MachineRegistry
+  MachineRegistry,
+  RegistryPendingProjectionAction
 } from "../../registry/index.js";
 import type {
+  InvalidTargetReconciliationInput,
   TargetReconciliationError
 } from "../target-reconcile.js";
 import {
@@ -19,6 +21,27 @@ export type CleanupPendingTargetStagingInput = Readonly<{
   lock: OperationLockSession;
   registry: MachineRegistry;
 }>;
+
+export function validatePendingStagingActions(
+  targetRoot: string,
+  actions: ReadonlyArray<RegistryPendingProjectionAction>
+): Result<void, InvalidTargetReconciliationInput> {
+  for (const action of actions) {
+    if (!isSafePendingStagingPath(targetRoot, action)) {
+      return {
+        ok: false,
+        error: {
+          code: "InvalidTargetReconciliationInput",
+          facts: {
+            reason: "unsafe-pending-staging-path",
+            subject: action.stagingPath
+          }
+        }
+      };
+    }
+  }
+  return { ok: true, value: undefined };
+}
 
 export async function cleanupPendingTargetStaging(
   input: CleanupPendingTargetStagingInput
