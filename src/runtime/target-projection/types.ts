@@ -26,6 +26,12 @@ export type PrepareManagedProjectionInput = MaterializeManagedProjectionInput &
     cleanupPath?: string;
   }>;
 
+export type RepairManagedProjectionInput =
+  Omit<MaterializeManagedProjectionInput, "current"> &
+  Readonly<{
+    current: ManagedProjectionExpectation;
+  }>;
+
 export type VerifyManagedProjectionInput = Readonly<{
   home: SkiloomHomePaths;
   targetRoot: string;

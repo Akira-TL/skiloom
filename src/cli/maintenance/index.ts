@@ -54,6 +54,7 @@ export type CliMaintenanceResult = Readonly<{
     classification: string;
   }>>;
   repairedPackages: ReadonlyArray<string>;
+  repairedProjections: ReadonlyArray<string>;
 }>;
 
 export type ParseCliSyncResult =
@@ -222,6 +223,10 @@ async function executeMaintenanceWhileLocked(
         repairedPackages:
           "repairedPackages" in maintained.value
             ? maintained.value.repairedPackages
+            : [],
+        repairedProjections:
+          "repairedProjections" in maintained.value
+            ? maintained.value.repairedProjections
             : []
       }
     };
@@ -256,6 +261,14 @@ export function formatCliMaintenanceResult(
     lines.push("- none");
   } else {
     for (const packageCoordinate of result.repairedPackages) {
+      lines.push("- " + packageCoordinate);
+    }
+  }
+  lines.push("Repaired Projections:");
+  if (result.repairedProjections.length === 0) {
+    lines.push("- none");
+  } else {
+    for (const packageCoordinate of result.repairedProjections) {
       lines.push("- " + packageCoordinate);
     }
   }

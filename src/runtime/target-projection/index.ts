@@ -8,5 +8,6 @@ export { removeManagedProjection } from "./remove.js";
 export {
   managedProjectionMaterializationCandidates,
   materializeManagedProjection,
-  prepareManagedProjection
+  prepareManagedProjection,
+  repairManagedProjection
 } from "./materialize.js";

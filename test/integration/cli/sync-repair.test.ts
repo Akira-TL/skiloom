@@ -31,6 +31,7 @@ type ParsedMaintenanceOutput = Readonly<{
     targetId: string;
     generation: number;
     repairedPackages: ReadonlyArray<string>;
+    repairedProjections: ReadonlyArray<string>;
   }>;
 }>;
 
@@ -58,44 +59,59 @@ test("sync human output distinguishes exact no-op state without approval", async
   });
 });
 
-test("sync and repair fail closed on foreign replacement bytes instead of adopting them", async () => {
-  for (const command of ["sync", "repair"] as const) {
-    await withCliRuntime(async ({ home, cwd, target }) => {
-      const installed = await runCli(
-        ["install", "acme/app/app", "--yes", "--json"],
-        { home, cwd, mode: "base" }
-      );
-      assert.equal(installed.code, 0);
-      await rm(join(target, "app"), {
-        recursive: true,
-        force: true
-      });
-      await mkdir(join(target, "app"));
-      await writeFile(
-        join(target, "app", "KEEP"),
-        "user-owned replacement bytes\n"
-      );
-
-      const maintained = await runCli(
-        [command, "--json"],
-        { home, cwd, mode: "forbid-network" }
-      );
-
-      assert.equal(maintained.code, 1);
-      const output = parseMaintenanceOutput(
-        maintained.stdout
-      );
-      assert.equal(output.ok, false);
-      assert.equal(
-        output.error?.code,
-        "ManagedProjectionMaterializationMismatch"
-      );
-      assert.equal(
-        await readFile(join(target, "app", "KEEP"), "utf8"),
-        "user-owned replacement bytes\n"
-      );
+test("sync fails closed on managed drift while repair reconstructs the Registry-owned projection", async () => {
+  await withCliRuntime(async ({ home, cwd, target }) => {
+    const installed = await runCli(
+      ["install", "acme/app/app", "--yes", "--json"],
+      { home, cwd, mode: "base" }
+    );
+    assert.equal(installed.code, 0);
+    await rm(join(target, "app"), {
+      recursive: true,
+      force: true
     });
-  }
+    await mkdir(join(target, "app"));
+    await writeFile(
+      join(target, "app", "DRIFT"),
+      "modified managed bytes\n"
+    );
+
+    const synced = await runCli(
+      ["sync", "--json"],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(synced.code, 1);
+    const syncOutput = parseMaintenanceOutput(synced.stdout);
+    assert.equal(
+      syncOutput.error?.code,
+      "ManagedProjectionMaterializationMismatch"
+    );
+    assert.equal(
+      await readFile(join(target, "app", "DRIFT"), "utf8"),
+      "modified managed bytes\n"
+    );
+
+    const repaired = await runCli(
+      ["repair", "--json"],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(repaired.code, 0);
+    const repairOutput = parseMaintenanceOutput(
+      repaired.stdout
+    );
+    assert.equal(repairOutput.result.status, "repaired");
+    assert.deepEqual(
+      repairOutput.result.repairedProjections,
+      ["acme/app/app"]
+    );
+    await assert.rejects(
+      readFile(join(target, "app", "DRIFT"))
+    );
+    assert.match(
+      await readFile(join(target, "app", "SKILL.md"), "utf8"),
+      /Baseline application\./u
+    );
+  });
 });
 
 test("repair reconstructs missing Store and Target bytes from the accepted exact commit only", async () => {
@@ -152,6 +168,10 @@ test("repair reconstructs missing Store and Target bytes from the accepted exact
       output.result.repairedPackages,
       ["acme/app/app"]
     );
+    assert.deepEqual(
+      output.result.repairedProjections,
+      []
+    );
     assert.match(
       await readFile(join(target, "app", "SKILL.md"), "utf8"),
       /Baseline application\./u
@@ -178,6 +198,7 @@ test("repair is a no-op for exact Store Target and marker state without network"
     assert.equal(output.result.status, "no-op");
     assert.equal(output.result.generation, 1);
     assert.deepEqual(output.result.repairedPackages, []);
+    assert.deepEqual(output.result.repairedProjections, []);
   });
 });
 

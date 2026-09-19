@@ -31,6 +31,9 @@ import {
   syncAcceptedTargetState
 } from "../../../../src/runtime/orchestration/local-lifecycle.js";
 import {
+  repairExactAcceptedTarget
+} from "../../../../src/runtime/orchestration/exact-state-maintenance.js";
+import {
   resolveSkiloomHomePaths,
   type SkiloomHomePaths
 } from "../../../../src/runtime/home.js";
@@ -270,6 +273,92 @@ test("sync completes a detach that was interrupted after the Registry became aut
       await readFile(join(targetRoot, "demo", "SKILL.md"), "utf8"),
       /detach recovery bytes/u
     );
+  });
+});
+
+test("exact repair preserves detached ownership and user bytes without network access", async () => {
+  await withRuntime(async ({ paths, targetRoot }) => {
+    const snapshot = snapshotFor("detached repair baseline\n");
+    const published = await publishPackageSnapshot(paths, snapshot);
+    assert.equal(published.ok, true);
+    if (!published.ok) {
+      return;
+    }
+
+    const projection = projectionFor(snapshot.contentDigest);
+    const materialized = await materializeManagedProjection({
+      home: paths,
+      targetRoot,
+      projection,
+      materialization: "copy"
+    });
+    assert.equal(materialized.ok, true);
+
+    const acceptedState = registryState(
+      targetRoot,
+      snapshot.contentDigest,
+      "copy"
+    );
+    seedRawState(paths, acceptedState);
+
+    await withRealLock(paths, async (lock) => {
+      const registry = await requireLockedRegistry(paths, lock);
+      try {
+        const detached = await detachTargetProjection({
+          home: paths,
+          targetRoot,
+          operationId: "detach-before-exact-repair",
+          lock,
+          registry,
+          acceptedState,
+          packageCoordinate,
+          current: {
+            projection,
+            ownership: "managed",
+            materialization: "copy"
+          }
+        });
+        assert.equal(detached.ok, true);
+        if (!detached.ok) {
+          return;
+        }
+
+        const userBytes =
+          "---\nname: demo\ndescription: lifecycle safety fixture\n---\nuser-owned repair bytes\n";
+        await writeFile(
+          join(targetRoot, "demo", "SKILL.md"),
+          userBytes,
+          "utf8"
+        );
+
+        const repaired = await repairExactAcceptedTarget({
+          home: paths,
+          targetId: detached.value.targetId,
+          targetRoot,
+          lock,
+          registry,
+          transport: async () => {
+            throw new Error("detached repair must not use network");
+          }
+        });
+        assert.equal(repaired.ok, true);
+        if (!repaired.ok) {
+          return;
+        }
+        assert.deepEqual(repaired.value.repairedPackages, []);
+        assert.deepEqual(repaired.value.repairedProjections, []);
+        assert.equal(
+          repaired.value.state.projections[0]?.ownership,
+          "detached"
+        );
+        assert.equal(
+          await readFile(join(targetRoot, "demo", "SKILL.md"), "utf8"),
+          userBytes
+        );
+      } finally {
+        registry.close();
+      }
+    });
   });
 });
 

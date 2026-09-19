@@ -46,6 +46,7 @@ import {
   type GitHubJsonTransport
 } from "../source/github/index.js";
 import {
+  repairManagedProjection,
   verifyManagedProjection
 } from "../target-projection/index.js";
 import {
@@ -125,6 +126,7 @@ export type RepairExactAcceptedTargetResult = Readonly<{
   state: RegistryTargetState;
   actions: ReadonlyArray<TargetOwnershipAction>;
   repairedPackages: ReadonlyArray<string>;
+  repairedProjections: ReadonlyArray<string>;
 }>;
 
 export async function syncExactAcceptedTarget(
@@ -222,6 +224,12 @@ export async function repairExactAcceptedTarget(
     repairedPackages.push(packageFact.packageCoordinate);
   }
 
+  const repairedProjections =
+    await repairManagedTargetDrift(input, read.value);
+  if (!repairedProjections.ok) {
+    return repairedProjections;
+  }
+
   const prepared = await prepareAcceptedTarget(input);
   if (!prepared.ok) {
     return prepared;
@@ -239,13 +247,15 @@ export async function repairExactAcceptedTarget(
     value: {
       status:
         repairedPackages.length > 0 ||
+        repairedProjections.value.length > 0 ||
         requiresConvergence(prepared.value.preflight.actions) ||
         !prepared.value.markerCurrent
           ? "repaired"
           : "no-op",
       state: synced.value,
       actions: prepared.value.preflight.actions,
-      repairedPackages
+      repairedPackages,
+      repairedProjections: repairedProjections.value
     }
   };
 }
@@ -265,6 +275,70 @@ async function syncPreparedTarget(
     currentProjections: prepared.currentProjections,
     acceptedState: registryStateInput(prepared.state)
   });
+}
+
+async function repairManagedTargetDrift(
+  input: RepairExactAcceptedTargetInput,
+  state: RegistryTargetState
+): Promise<Result<ReadonlyArray<string>, ProductError>> {
+  const plan = acceptedTargetPlan(state);
+  if (!plan.ok) {
+    return plan;
+  }
+  const current = currentOwnedProjections(
+    state,
+    plan.value
+  );
+  if (!current.ok) {
+    return current;
+  }
+
+  const repaired: string[] = [];
+  for (const owned of current.value) {
+    if (owned.ownership === "detached") {
+      continue;
+    }
+
+    const verified = await verifyManagedProjection({
+      home: input.home,
+      targetRoot: resolve(input.targetRoot),
+      expected: {
+        projection: owned.projection,
+        materialization: owned.materialization
+      }
+    });
+    if (verified.ok) {
+      continue;
+    }
+    if (verified.error.code === "ManagedProjectionMissing") {
+      continue;
+    }
+
+    const stillHeld = input.lock.checkHeld();
+    if (!stillHeld.ok) {
+      return stillHeld;
+    }
+    const repairedProjection =
+      await repairManagedProjection({
+        home: input.home,
+        targetRoot: resolve(input.targetRoot),
+        projection: owned.projection,
+        materialization: owned.materialization,
+        current: {
+          projection: owned.projection,
+          materialization: owned.materialization
+        }
+      });
+    if (!repairedProjection.ok) {
+      return repairedProjection;
+    }
+    repaired.push(owned.projection.packageCoordinate);
+  }
+
+  return {
+    ok: true,
+    value: repaired.sort(compareUtf8)
+  };
 }
 
 async function acquireAcceptedPackageSnapshot(
@@ -613,6 +687,13 @@ async function pathExists(path: string): Promise<boolean> {
     }
     throw error;
   }
+}
+
+function compareUtf8(left: string, right: string): number {
+  return Buffer.compare(
+    Buffer.from(left, "utf8"),
+    Buffer.from(right, "utf8")
+  );
 }
 
 function unavailable(

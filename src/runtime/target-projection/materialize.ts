@@ -43,6 +43,7 @@ import type {
   MaterializeManagedProjectionInput,
   PreparedManagedProjection,
   PrepareManagedProjectionInput,
+  RepairManagedProjectionInput,
   TargetPathOccupied
 } from "./types.js";
 
@@ -75,6 +76,30 @@ export async function materializeManagedProjection(
 
 export async function prepareManagedProjection(
   input: PrepareManagedProjectionInput
+): Promise<Result<PreparedManagedProjection, ManagedProjectionRuntimeError>> {
+  return prepareManagedProjectionInternal(input, false);
+}
+
+export async function repairManagedProjection(
+  input: RepairManagedProjectionInput
+): Promise<Result<MaterializedManagedProjection, ManagedProjectionRuntimeError>> {
+  const prepared = await prepareManagedProjectionInternal(
+    input,
+    true
+  );
+  if (!prepared.ok) {
+    return prepared;
+  }
+  try {
+    return await prepared.value.activate();
+  } finally {
+    await prepared.value.discard();
+  }
+}
+
+async function prepareManagedProjectionInternal(
+  input: PrepareManagedProjectionInput,
+  replaceUnverifiedCurrent: boolean
 ): Promise<Result<PreparedManagedProjection, ManagedProjectionRuntimeError>> {
   if (!isAbsolute(input.targetRoot)) {
     return invalidProjection("target-root-not-absolute", input.targetRoot);
@@ -132,7 +157,8 @@ export async function prepareManagedProjection(
   const currentCheck = await verifyCurrentBeforeStaging(
     input,
     activationPath,
-    existsInitially
+    existsInitially,
+    replaceUnverifiedCurrent
   );
   if (!currentCheck.ok) {
     return currentCheck;
@@ -186,7 +212,8 @@ export async function prepareManagedProjection(
           cleanupPath: stagingContainer.value,
           stagingPath,
           materialization: candidate,
-          storePayloadPath: store.value.payloadPath
+          storePayloadPath: store.value.payloadPath,
+          replaceUnverifiedCurrent
         })
       };
     } catch (error) {
@@ -244,6 +271,7 @@ function preparedProjectionHandle(input: Readonly<{
   stagingPath: string;
   materialization: ManagedProjectionMaterialization;
   storePayloadPath: string;
+  replaceUnverifiedCurrent: boolean;
 }>): PreparedManagedProjection {
   let lifecycle: "prepared" | "activated" | "discarded" = "prepared";
   let cleanupSafe = true;
@@ -270,13 +298,15 @@ function preparedProjectionHandle(input: Readonly<{
           );
         }
 
-        const stillCurrent = await verifyManagedProjection({
-          home: input.input.home,
-          targetRoot: input.input.targetRoot,
-          expected: input.input.current
-        });
-        if (!stillCurrent.ok) {
-          return stillCurrent;
+        if (!input.replaceUnverifiedCurrent) {
+          const stillCurrent = await verifyManagedProjection({
+            home: input.input.home,
+            targetRoot: input.input.targetRoot,
+            expected: input.input.current
+          });
+          if (!stillCurrent.ok) {
+            return stillCurrent;
+          }
         }
 
         const retiredPath = join(input.cleanupPath, "retired");
@@ -336,7 +366,8 @@ function preparedProjectionHandle(input: Readonly<{
 async function verifyCurrentBeforeStaging(
   input: MaterializeManagedProjectionInput,
   activationPath: string,
-  existsInitially: boolean
+  existsInitially: boolean,
+  replaceUnverifiedCurrent: boolean
 ): Promise<Result<true, ManagedProjectionRuntimeError>> {
   if (existsInitially) {
     if (input.current === undefined) {
@@ -351,6 +382,9 @@ async function verifyCurrentBeforeStaging(
         input.current.projection.activationName
       );
     }
+    if (replaceUnverifiedCurrent) {
+      return { ok: true, value: true };
+    }
     const currentVerified = await verifyManagedProjection({
       home: input.home,
       targetRoot: input.targetRoot,
@@ -361,7 +395,10 @@ async function verifyCurrentBeforeStaging(
       : currentVerified;
   }
 
-  if (input.current !== undefined) {
+  if (
+    input.current !== undefined &&
+    !replaceUnverifiedCurrent
+  ) {
     const currentVerified = await verifyManagedProjection({
       home: input.home,
       targetRoot: input.targetRoot,
