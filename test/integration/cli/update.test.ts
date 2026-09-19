@@ -41,6 +41,37 @@ type ParsedUpdateOutput = Readonly<{
   }>;
 }>;
 
+test("update --plan human output presents the complete candidate surface", async () => {
+  await withCliRuntime(async ({ home, cwd, target }) => {
+    const installed = await runCli(
+      ["install", "acme/app/app", "--yes", "--json"],
+      { home, cwd, mode: "base" }
+    );
+    assert.equal(installed.code, 0);
+
+    const planned = await runCli(
+      ["update", "--plan"],
+      { home, cwd, mode: "versions" }
+    );
+
+    assert.equal(planned.code, 0);
+    assert.equal(planned.stderr, "");
+    assert.match(planned.stdout, new RegExp("Target: " + escapeRegExp(target)));
+    assert.match(planned.stdout, /Status: planned/u);
+    assert.match(planned.stdout, /Direct Install Requirements:/u);
+    assert.match(planned.stdout, /Sources:/u);
+    assert.match(planned.stdout, /Packages:/u);
+    assert.match(planned.stdout, /Projections \/ Ownership:/u);
+    assert.match(planned.stdout, /acme\/app\/app -> app \(managed\)/u);
+    assert.match(planned.stdout, /Changes:/u);
+    assert.match(planned.stdout, /Warnings \/ Special Risks:/u);
+    assert.match(
+      await readFile(join(target, "app", "SKILL.md"), "utf8"),
+      /Baseline application\./u
+    );
+  });
+});
+
 test("update --plan returns candidate projection ownership without mutating accepted state", async () => {
   await withCliRuntime(async ({ home, cwd, target }) => {
     const installed = await runCli(
@@ -184,4 +215,8 @@ function runCli(
 
 function parseUpdateOutput(source: string): ParsedUpdateOutput {
   return JSON.parse(source) as ParsedUpdateOutput;
+}
+
+function escapeRegExp(source: string): string {
+  return source.replace(/[.*+?^(){}$|[\]\\]/gu, "\\$&");
 }

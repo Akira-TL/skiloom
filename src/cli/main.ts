@@ -24,6 +24,7 @@ import {
 } from "./target-selector.js";
 import {
   executeCliUpdate,
+  formatCliUpdateResult,
   parseCliUpdateArguments,
   type CliUpdateInvocation,
   type CliUpdateResult
@@ -742,9 +743,8 @@ function renderSuccess(
     return;
   }
   if (command === "update") {
-    const update = result as CliUpdateResult;
     process.stdout.write(
-      `Update status: ${update.status}\n`
+      formatCliUpdateResult(result as CliUpdateResult)
     );
     return;
   }

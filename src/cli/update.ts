@@ -357,6 +357,93 @@ function presentDirectRequirement(
       };
 }
 
+export function formatCliUpdateResult(
+  result: CliUpdateResult
+): string {
+  const lines = [
+    "Target: " + result.target.path,
+    "Status: " + result.status,
+    "Direct Install Requirements:"
+  ];
+  for (const requirement of result.directRequirements) {
+    const source =
+      requirement.sourceKind === "git"
+        ? "git " + requirement.requestedRef
+        : "github-release" +
+          (requirement.versionRequirement === undefined
+            ? ""
+            : " " + requirement.versionRequirement);
+    lines.push(
+      "- " + requirement.kind + " " +
+      requirement.coordinate + " " + source
+    );
+  }
+
+  lines.push("Sources:");
+  for (const source of result.sources) {
+    lines.push(
+      source.sourceKind === "git"
+        ? "- " + source.repositoryCoordinate +
+          " git " + source.requestedRef +
+          " @ " + source.exactCommit
+        : "- " + source.repositoryCoordinate +
+          " github-release " + source.version +
+          " (" + source.actualTag + ") @ " +
+          source.exactCommit
+    );
+  }
+
+  lines.push("Packages:");
+  for (const packageFact of result.packages) {
+    lines.push(
+      "- " + packageFact.packageCoordinate +
+      " " + packageFact.contentDigest
+    );
+  }
+
+  lines.push("Projections / Ownership:");
+  for (const projection of result.projections) {
+    lines.push(
+      "- " + projection.packageCoordinate +
+      " -> " + projection.activationName +
+      " (" + projection.ownership + ")"
+    );
+  }
+
+  lines.push("Changes:");
+  const deltas = [
+    ...result.comparison.sourceDeltas.map((delta) => delta.kind),
+    ...result.comparison.packageDeltas.map((delta) => delta.kind),
+    ...result.comparison.dependencyEdgeDeltas.map(
+      (delta) => delta.kind
+    )
+  ];
+  if (deltas.length === 0) {
+    lines.push("- none");
+  } else {
+    for (const delta of deltas) {
+      lines.push("- " + delta);
+    }
+  }
+
+  lines.push("Warnings / Special Risks:");
+  const retargets = result.comparison.sourceDeltas.filter(
+    (delta) => delta.kind === "release-retarget"
+  );
+  if (retargets.length === 0) {
+    lines.push("- none");
+  } else {
+    for (const retarget of retargets) {
+      lines.push(
+        "- release-retarget " +
+        retarget.repositoryCoordinate
+      );
+    }
+  }
+
+  return lines.join("\n") + "\n";
+}
+
 function currentUserHome(): string {
   return process.env.HOME ??
     process.env.USERPROFILE ??
