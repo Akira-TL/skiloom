@@ -41,6 +41,10 @@ import {
   type CliTargetedCandidateOptions
 } from "./candidate/options.js";
 import {
+  formatCliCandidatePresentation,
+  type CliCandidatePresentationFacts
+} from "./candidate/presentation.js";
+import {
   readCliStatus
 } from "./status.js";
 import type {
@@ -53,29 +57,21 @@ export type CliUpdateInvocation =
 export type CliUpdateDirectRequirement =
   CliPresentedDirectRequirement;
 
-export type CliUpdateResult = Readonly<{
-  status: "planned" | "declined" | "updated" | "no-op";
-  target: ResolvedCliTarget;
-  directRequirements: ReadonlyArray<CliUpdateDirectRequirement>;
-  sources: LifecycleCandidatePlan["candidate"]["sourceBindings"];
-  packages: LifecycleCandidatePlan["candidate"]["packages"];
-  dependencyEdges: LifecycleCandidatePlan["candidate"]["dependencyEdges"];
-  comparison: LifecycleCandidatePlan["comparison"];
-  projections: ReadonlyArray<Readonly<{
-    packageCoordinate: string;
-    activationName: string;
-    ownership: "managed" | "detached";
-  }>>;
-  acceptedState: Readonly<{
-    targetId: string;
-    generation: number;
-    projections: ReadonlyArray<Readonly<{
-      packageCoordinate: string;
-      activationName: string;
-      ownership: string;
-    }>>;
+export type CliUpdateResult =
+  CliCandidatePresentationFacts<
+    "planned" | "declined" | "updated" | "no-op"
+  > &
+  Readonly<{
+    acceptedState: Readonly<{
+      targetId: string;
+      generation: number;
+      projections: ReadonlyArray<Readonly<{
+        packageCoordinate: string;
+        activationName: string;
+        ownership: string;
+      }>>;
+    }>;
   }>;
-}>;
 
 export type CliUpdateExecution = Readonly<{
   result: CliUpdateResult;
@@ -238,16 +234,17 @@ function formatUpdateCandidate(
   plan: LifecycleCandidatePlan,
   projections: CliUpdateResult["projections"]
 ): string {
-  return formatUpdatePresentation(
+  return formatCliCandidatePresentation({
     target,
-    "candidate",
-    plan.directRequirements.map(presentDirectRequirement),
-    plan.candidate.sourceBindings,
-    plan.candidate.packages,
-    plan.candidate.dependencyEdges,
-    plan.comparison,
+    status: "candidate",
+    directRequirements:
+      plan.directRequirements.map(presentDirectRequirement),
+    sources: plan.candidate.sourceBindings,
+    packages: plan.candidate.packages,
+    dependencyEdges: plan.candidate.dependencyEdges,
+    comparison: plan.comparison,
     projections
-  );
+  });
 }
 
 function lifecycleResult(
@@ -282,121 +279,5 @@ function lifecycleResult(
 export function formatCliUpdateResult(
   result: CliUpdateResult
 ): string {
-  return formatUpdatePresentation(
-    result.target,
-    result.status,
-    result.directRequirements,
-    result.sources,
-    result.packages,
-    result.dependencyEdges,
-    result.comparison,
-    result.projections
-  );
-}
-
-function formatUpdatePresentation(
-  target: ResolvedCliTarget,
-  status: string,
-  requirements: ReadonlyArray<CliUpdateDirectRequirement>,
-  sources: LifecycleCandidatePlan["candidate"]["sourceBindings"],
-  packages: LifecycleCandidatePlan["candidate"]["packages"],
-  dependencyEdges:
-    LifecycleCandidatePlan["candidate"]["dependencyEdges"],
-  comparison: LifecycleCandidatePlan["comparison"],
-  projections: CliUpdateResult["projections"]
-): string {
-  const lines = [
-    "Target: " + target.path,
-    "Status: " + status,
-    "Direct Install Requirements:"
-  ];
-  for (const requirement of requirements) {
-    const source =
-      requirement.sourceKind === "git"
-        ? "git " + requirement.requestedRef
-        : "github-release" +
-          (requirement.versionRequirement === undefined
-            ? ""
-            : " " + requirement.versionRequirement);
-    lines.push(
-      "- " + requirement.kind + " " +
-      requirement.coordinate + " " + source
-    );
-  }
-
-  lines.push("Sources:");
-  for (const source of sources) {
-    lines.push(
-      source.sourceKind === "git"
-        ? "- " + source.repositoryCoordinate +
-          " git " + source.requestedRef +
-          " @ " + source.exactCommit
-        : "- " + source.repositoryCoordinate +
-          " github-release " + source.version +
-          " (" + source.actualTag + ") @ " +
-          source.exactCommit
-    );
-  }
-
-  lines.push("Packages:");
-  for (const packageFact of packages) {
-    lines.push(
-      "- " + packageFact.packageCoordinate +
-      " " + packageFact.contentDigest
-    );
-  }
-
-  lines.push("Dependency Edges:");
-  if (dependencyEdges.length === 0) {
-    lines.push("- none");
-  } else {
-    for (const edge of dependencyEdges) {
-      lines.push(
-        "- " + edge.sourcePackageCoordinate +
-        " -> " + edge.targetPackageCoordinate
-      );
-    }
-  }
-
-  lines.push("Projections / Ownership:");
-  for (const projection of projections) {
-    lines.push(
-      "- " + projection.packageCoordinate +
-      " -> " + projection.activationName +
-      " (" + projection.ownership + ")"
-    );
-  }
-
-  lines.push("Changes:");
-  const deltas = [
-    ...comparison.sourceDeltas.map((delta) => delta.kind),
-    ...comparison.packageDeltas.map((delta) => delta.kind),
-    ...comparison.dependencyEdgeDeltas.map(
-      (delta) => delta.kind
-    )
-  ];
-  if (deltas.length === 0) {
-    lines.push("- none");
-  } else {
-    for (const delta of deltas) {
-      lines.push("- " + delta);
-    }
-  }
-
-  lines.push("Warnings / Special Risks:");
-  const retargets = comparison.sourceDeltas.filter(
-    (delta) => delta.kind === "release-retarget"
-  );
-  if (retargets.length === 0) {
-    lines.push("- none");
-  } else {
-    for (const retarget of retargets) {
-      lines.push(
-        "- release-retarget " +
-        retarget.repositoryCoordinate
-      );
-    }
-  }
-
-  return lines.join("\n") + "\n";
+  return formatCliCandidatePresentation(result);
 }
