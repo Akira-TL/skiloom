@@ -13,7 +13,8 @@ import type {
   ExactExportPackage
 } from "../../domain/export-package/index.js";
 import {
-  admitSkillPackage
+  admitSkillPackage,
+  parsePackageMetadata
 } from "../../domain/package/index.js";
 import type {
   ResolverCandidateGraph
@@ -63,6 +64,7 @@ export type InvalidExactImportPackageFacts = ProductError<
       | "managed-skill-missing"
       | "managed-skill-invalid-utf8"
       | "managed-skill-invalid"
+      | "managed-dependency-mismatch"
       | "user-skill-missing"
       | "user-skill-invalid-utf8"
       | "user-skill-invalid";
@@ -405,6 +407,58 @@ function buildManagedSnapshots(
     if (!admitted.ok) {
       return invalid(
         "managed-skill-invalid",
+        packageFact.packageCoordinate
+      );
+    }
+
+    const metadata = snapshot.value.entries.find(
+      (entry) => entry.path === "skiloom-package.toml"
+    );
+    let declaredDependencies: string[] = [];
+    if (metadata !== undefined) {
+      let metadataText: string;
+      try {
+        metadataText = UTF8_DECODER.decode(
+          metadata.content
+        );
+      } catch {
+        return invalid(
+          "managed-skill-invalid",
+          packageFact.packageCoordinate
+        );
+      }
+      const parsedMetadata =
+        parsePackageMetadata(metadataText);
+      if (!parsedMetadata.ok) {
+        return invalid(
+          "managed-skill-invalid",
+          packageFact.packageCoordinate
+        );
+      }
+      declaredDependencies = Object.keys(
+        parsedMetadata.value.dependencies
+      ).sort(compareUtf8);
+    }
+    const exactDependencies =
+      parsed.manifest.dependencies
+        .filter(
+          (edge) =>
+            edge.fromPackageCoordinate ===
+            packageFact.packageCoordinate
+        )
+        .map((edge) => edge.toPackageCoordinate)
+        .sort(compareUtf8);
+    if (
+      declaredDependencies.length !==
+        exactDependencies.length ||
+      declaredDependencies.some(
+        (coordinateValue, index) =>
+          coordinateValue !==
+          exactDependencies[index]
+      )
+    ) {
+      return invalid(
+        "managed-dependency-mismatch",
         packageFact.packageCoordinate
       );
     }

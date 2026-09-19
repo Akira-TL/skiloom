@@ -18,6 +18,9 @@ import {
   type UserPayload
 } from "../../../../src/domain/user-payload/index.js";
 import {
+  createPackageSnapshot
+} from "../../../../src/domain/snapshot/index.js";
+import {
   importExactPackage
 } from "../../../../src/runtime/import/index.js";
 import type {
@@ -209,6 +212,54 @@ test("shared managed payloads are re-admitted for every Package coordinate befor
             assert.equal(
               imported.error.facts.subject,
               "acme/demo/other"
+            );
+          }
+        }
+        assert.equal(acceptanceCalls, 0);
+        assert.equal(existsSync(paths.storePath), false);
+        assert.deepEqual(readdirSync(targetRoot), []);
+      } finally {
+        registry.close();
+      }
+    });
+  });
+});
+
+test("managed package metadata dependency coordinates must match the recorded exact graph before acceptance", async () => {
+  const bytes = await metadataMismatchBytes();
+
+  await withRuntime(async ({ paths, targetRoot }) => {
+    await withRealLock(paths, async (lock) => {
+      const registry = await requireRegistry(paths, lock);
+      let acceptanceCalls = 0;
+      try {
+        const imported = await importExactPackage({
+          home: paths,
+          targetRoot,
+          lock,
+          registry,
+          bytes,
+          acceptSources: () => {
+            acceptanceCalls += 1;
+            return true;
+          },
+          createTargetId: () => importedTargetId,
+          createOperationId: () => "metadata-graph-mismatch"
+        });
+
+        assert.equal(imported.ok, false);
+        if (!imported.ok) {
+          assert.equal(
+            imported.error.code,
+            "InvalidExactImportPackageFacts"
+          );
+          if (
+            imported.error.code ===
+            "InvalidExactImportPackageFacts"
+          ) {
+            assert.equal(
+              imported.error.facts.reason,
+              "managed-dependency-mismatch"
             );
           }
         }
@@ -430,6 +481,65 @@ async function mismatchedSharedPayloadBytes(): Promise<Uint8Array> {
   });
   if (!written.ok) {
     throw new Error("mismatched shared-payload fixture did not encode");
+  }
+  return written.value;
+}
+
+async function metadataMismatchBytes(): Promise<Uint8Array> {
+  const base = parseExactExportPackage(
+    await dependenciesFixtureBytes()
+  );
+  if (!base.ok) {
+    throw new Error("base exact-export fixture did not parse");
+  }
+
+  const snapshot = createPackageSnapshot([
+    {
+      path: "SKILL.md",
+      executable: false,
+      content: Uint8Array.from(
+        Buffer.from(
+          "---\nname: demo\ndescription: metadata mismatch fixture\n---\n",
+          "utf8"
+        )
+      )
+    },
+    {
+      path: "skiloom-package.toml",
+      executable: false,
+      content: Uint8Array.from(
+        Buffer.from(
+          'schema = 1\n\n[dependencies]\n"acme/missing/missing" = "^1.0.0"\n',
+          "utf8"
+        )
+      )
+    }
+  ]);
+  if (!snapshot.ok) {
+    throw new Error("metadata mismatch snapshot failed");
+  }
+  const payloadId = `package:${snapshot.value.contentDigest}`;
+  const packageFact = base.value.manifest.packages[0]!;
+  const written = writeExactExportPackage({
+    manifest: {
+      ...base.value.manifest,
+      packages: [
+        {
+          ...packageFact,
+          contentDigest: snapshot.value.contentDigest,
+          payloadId
+        }
+      ]
+    },
+    frames: snapshot.value.entries.map((entry) => ({
+      payloadId,
+      path: entry.path,
+      executable: entry.executable,
+      content: entry.content
+    }))
+  });
+  if (!written.ok) {
+    throw new Error("metadata mismatch fixture did not encode");
   }
   return written.value;
 }
