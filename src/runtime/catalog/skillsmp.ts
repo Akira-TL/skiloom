@@ -296,8 +296,14 @@ function normalizeGithubNomination(
     return undefined;
   }
 
+  const owner = decodeGithubPathSegment(segments[0]!);
+  const repo = decodeGithubPathSegment(segments[1]!);
+  if (owner === undefined || repo === undefined) {
+    return undefined;
+  }
+
   const repository = parseRepositoryCoordinate(
-    `${segments[0]}/${segments[1]}`
+    `${owner}/${repo}`
   );
   if (!repository.ok) {
     return undefined;
@@ -305,6 +311,9 @@ function normalizeGithubNomination(
 
   const packagePathHint =
     packagePathHintFromGithubSegments(segments);
+  if (packagePathHint === undefined) {
+    return undefined;
+  }
 
   return {
     repository: repository.value.canonical,
@@ -314,7 +323,7 @@ function normalizeGithubNomination(
 
 function packagePathHintFromGithubSegments(
   segments: ReadonlyArray<string>
-): string | null {
+): string | null | undefined {
   if (
     segments.length < 5 ||
     (segments[2] !== "tree" &&
@@ -323,16 +332,20 @@ function packagePathHintFromGithubSegments(
     return null;
   }
 
-  const pathSegments = segments.slice(4);
-  if (
-    pathSegments.some(
-      (segment) =>
-        segment.length === 0 ||
-        segment === "." ||
-        segment === ".."
-    )
-  ) {
-    return null;
+  const pathSegments: string[] = [];
+  for (const rawSegment of segments.slice(4)) {
+    const segment = decodeGithubPathSegment(rawSegment);
+    if (
+      segment === undefined ||
+      segment.length === 0 ||
+      segment === "." ||
+      segment === ".." ||
+      segment.includes("/") ||
+      segment.includes("\\")
+    ) {
+      return undefined;
+    }
+    pathSegments.push(segment);
   }
 
   if (
@@ -343,9 +356,17 @@ function packagePathHintFromGithubSegments(
   }
   return pathSegments.length === 0
     ? null
-    : pathSegments
-        .map((segment) => decodeURIComponent(segment))
-        .join("/");
+    : pathSegments.join("/");
+}
+
+function decodeGithubPathSegment(
+  segment: string
+): string | undefined {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return undefined;
+  }
 }
 
 function nullableString(

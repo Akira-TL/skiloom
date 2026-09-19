@@ -65,6 +65,44 @@ test("search --json normalizes SkillsMP discovery candidates without provider au
   });
 });
 
+test("malformed GitHub path hints remain display-only instead of escaping structured search results", async () => {
+  const result = await runCli(
+    ["search", "malformed", "--json"],
+    "malformed-github-url"
+  );
+
+  assert.equal(result.code, 0);
+  assert.equal(result.stderr, "");
+  const output = JSON.parse(result.stdout) as {
+    result: {
+      candidates: Array<{
+        githubRepository: string | null;
+        githubPackagePathHint: string | null;
+        installable: boolean;
+      }>;
+    };
+  };
+  assert.deepEqual(output.result.candidates[0], {
+    provider: "skillsmp",
+    providerEntryId: "skill-malformed",
+    name: "malformed-github-url",
+    description: "Malformed path hint must stay display-only.",
+    displayUrl: "https://skillsmp.com/skills/malformed",
+    githubRepository: null,
+    githubPackagePathHint: null,
+    installable: false,
+    signals: [
+      { provider: "skillsmp", kind: "stars", value: 1 },
+      { provider: "skillsmp", kind: "language", value: "en" },
+      {
+        provider: "skillsmp",
+        kind: "updated-at",
+        value: "2026-09-19T00:00:00Z"
+      }
+    ]
+  });
+});
+
 test("search failures stay structured and secret-safe", async () => {
   const cases = [
     ["authentication", "authentication", 401],

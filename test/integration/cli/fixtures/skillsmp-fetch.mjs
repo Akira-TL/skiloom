@@ -39,6 +39,26 @@ globalThis.fetch = async (input) => {
     });
   }
 
+  if (mode === "malformed-github-url") {
+    return new Response(JSON.stringify({
+      success: true,
+      data: {
+        skills: [
+          {
+            id: "skill-malformed",
+            name: "malformed-github-url",
+            description: "Malformed path hint must stay display-only.",
+            githubUrl: "https://github.com/acme/repo/tree/main/%E0%A4%A",
+            skillUrl: "https://skillsmp.com/skills/malformed",
+            stars: 1,
+            contentLanguage: "en",
+            updatedAt: "2026-09-19T00:00:00Z"
+          }
+        ]
+      }
+    }), { status: 200 });
+  }
+
   if (mode === "authentication") {
     return new Response(
       JSON.stringify({
