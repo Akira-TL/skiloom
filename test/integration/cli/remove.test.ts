@@ -52,7 +52,7 @@ test("remove --plan reports the exact candidate without mutating accepted state"
     );
 
     assert.equal(planned.code, 0);
-    assert.equal(planned.stderr, "");
+    assertNoUnexpectedStderr(planned.stderr);
     const output = parseRemoveOutput(planned.stdout);
     assert.equal(output.result.status, "planned");
     assert.deepEqual(output.result.directRequirements, []);
@@ -109,7 +109,7 @@ test("noninteractive remove without --yes requires approval before mutation", as
     );
 
     assert.equal(blocked.code, 3);
-    assert.equal(blocked.stderr, "");
+    assertNoUnexpectedStderr(blocked.stderr);
     const output = parseRemoveOutput(blocked.stdout);
     assert.equal(output.ok, false);
     assert.equal(output.error?.code, "InteractionRequired");
@@ -135,7 +135,7 @@ test("remove rejects coordinates that are not accepted direct requirements", asy
     );
 
     assert.equal(unknown.code, 1);
-    assert.equal(unknown.stderr, "");
+    assertNoUnexpectedStderr(unknown.stderr);
     const output = parseRemoveOutput(unknown.stdout);
     assert.equal(output.ok, false);
     assert.equal(
@@ -347,6 +347,14 @@ function runInteractiveCli(
 
 function parseRemoveOutput(source: string): ParsedRemoveOutput {
   return JSON.parse(source) as ParsedRemoveOutput;
+}
+
+function assertNoUnexpectedStderr(stderr: string): void {
+  const normalized = stderr.replace(
+    /^\(node:\d+\) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n\(Use `node --trace-warnings \.\.\.` to show where the warning was created\)\n/u,
+    ""
+  );
+  assert.equal(normalized, "");
 }
 
 function shellQuote(source: string): string {
