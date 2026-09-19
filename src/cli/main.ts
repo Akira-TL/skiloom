@@ -93,6 +93,15 @@ type ParsedCommand =
   | ParsedInstall
   | ParsedUpdate;
 
+type CandidateCliResult =
+  | CliInstallResult
+  | CliUpdateResult;
+
+type CandidateCliExecution = Readonly<{
+  result: CandidateCliResult;
+  presentationRendered: boolean;
+}>;
+
 type CliTargetOption =
   | "--target"
   | "--host"
@@ -183,61 +192,61 @@ async function runSearch(
   return 0;
 }
 
-async function runInstall(
-  command: ParsedInstall
-): Promise<number> {
+async function runInstall(command: ParsedInstall): Promise<number> {
   const installed = await executeCliInstall(command);
-  if (!installed.ok) {
-    const exitCode =
-      installed.error.code === "InteractionRequired"
-        ? 3
-        : 1;
-    renderFailure(
-      command.command,
-      installed.error,
-      command.json,
-      exitCode
-    );
-    return exitCode;
-  }
-
-  const exitCode =
-    installed.value.result.status === "declined"
-      ? 3
-      : 0;
-  if (
-    installed.value.presentationRendered &&
-    !command.json
-  ) {
-    process.stdout.write(
-      "Status: " + installed.value.result.status + "\n"
-    );
-  } else {
-    renderSuccess(
-      command.command,
-      installed.value.result,
-      command.json
-    );
-  }
-  return exitCode;
+  return installed.ok
+    ? renderCandidateSuccess(
+        command.command,
+        command.json,
+        installed.value
+      )
+    : renderCandidateFailure(
+        command.command,
+        command.json,
+        installed.error
+      );
 }
 
 async function runUpdate(command: ParsedUpdate): Promise<number> {
   const updated = await executeCliUpdate(command);
-  if (!updated.ok) {
-    const exitCode =
-      updated.error.code === "InteractionRequired" ? 3 : 1;
-    renderFailure(command.command, updated.error, command.json, exitCode);
-    return exitCode;
-  }
+  return updated.ok
+    ? renderCandidateSuccess(
+        command.command,
+        command.json,
+        updated.value
+      )
+    : renderCandidateFailure(
+        command.command,
+        command.json,
+        updated.error
+      );
+}
 
-  const { result, presentationRendered } = updated.value;
-  const exitCode = result.status === "declined" ? 3 : 0;
-  if (presentationRendered && !command.json) {
-    process.stdout.write("Status: " + result.status + "\n");
+function renderCandidateSuccess(
+  command: string,
+  json: boolean,
+  execution: CandidateCliExecution
+): number {
+  const exitCode =
+    execution.result.status === "declined" ? 3 : 0;
+  if (execution.presentationRendered && !json) {
+    process.stdout.write(
+      "Status: " + execution.result.status + "\n"
+    );
   } else {
-    renderSuccess(command.command, result, command.json);
+    renderSuccess(command, execution.result, json);
   }
+  return exitCode;
+}
+
+function renderCandidateFailure(
+  command: string,
+  json: boolean,
+  error: ProductError
+): number {
+  const exitCode =
+    error.code === "InteractionRequired" ? 3 : 1;
+  renderFailure(command, error, json, exitCode);
   return exitCode;
 }
 
