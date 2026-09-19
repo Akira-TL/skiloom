@@ -407,6 +407,71 @@ test("reinstall applies a requested activation rename even when resolver state i
   });
 });
 
+test("plan validates requested rename against the complete Target projection before acceptance", async () => {
+  await withRuntime(async ({ paths, targetRoot }) => {
+    await withRealLock(paths, async (lock) => {
+      const opened = await openMachineRegistry(paths, lock);
+      assert.equal(opened.ok, true);
+      if (!opened.ok) {
+        return;
+      }
+      const fixture = sourceFixture([
+        releaseRepository("acme/app", [
+          release("v1.0.0", "c", [
+            skillPackage(
+              ".",
+              "app",
+              "Conflicting rename application.",
+              { "acme/lib/lib": "^1.0.0" }
+            )
+          ])
+        ]),
+        releaseRepository("acme/lib", [
+          release("v1.0.0", "d", [
+            skillPackage(".", "lib", "Conflicting rename library.")
+          ])
+        ])
+      ]);
+      let acceptanceCalls = 0;
+
+      try {
+        const result = await executeFirstAcceptedInstall({
+          home: paths,
+          targetRoot,
+          lock,
+          registry: opened.value,
+          directRequirements: [
+            releasePackageRequirement("acme/app/app")
+          ],
+          repositoryTransport: fixture.repositoryTransport,
+          transport: fixture.transport,
+          requestedProjectionRename: {
+            packageCoordinate: "acme/app/app",
+            activationName: "lib"
+          },
+          acceptCandidate: () => {
+            acceptanceCalls += 1;
+            return { kind: "plan" } as const;
+          },
+          createTargetId: () => targetId,
+          syncMarker: () => {}
+        });
+
+        assert.equal(result.ok, false);
+        if (result.ok) {
+          return;
+        }
+        assert.equal(result.error.code, "ActivationNameConflict");
+        assert.equal(acceptanceCalls, 0);
+        assert.equal(existsSync(join(targetRoot, "app")), false);
+        assert.equal(existsSync(join(targetRoot, "lib")), false);
+      } finally {
+        opened.value.close();
+      }
+    });
+  });
+});
+
 test("declined first install performs no Store publication Registry replacement Target mutation or marker handoff", async () => {
   await withRuntime(async ({ paths, targetRoot }) => {
     await withRealLock(paths, async (lock) => {

@@ -178,6 +178,16 @@ export async function executeFirstAcceptedInstall(
   if (!heldAfterPlanning.ok) {
     return heldAfterPlanning;
   }
+  const desiredPlan = planLifecycleTarget(
+    planned.value.directRequirements,
+    planned.value.candidate,
+    input.requestedProjectionRename === undefined
+      ? []
+      : [input.requestedProjectionRename]
+  );
+  if (!desiredPlan.ok) {
+    return desiredPlan;
+  }
 
   let acceptance;
   try {
@@ -241,17 +251,6 @@ export async function executeFirstAcceptedInstall(
         targetId
       })
     };
-  }
-
-  const desiredPlan = planLifecycleTarget(
-    planned.value.directRequirements,
-    planned.value.candidate,
-    input.requestedProjectionRename === undefined
-      ? []
-      : [input.requestedProjectionRename]
-  );
-  if (!desiredPlan.ok) {
-    return desiredPlan;
   }
 
   const observed = await observeFreshTarget(

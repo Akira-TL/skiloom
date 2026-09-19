@@ -223,6 +223,19 @@ export async function applyAcceptedRequirementChange(
     current,
     input.requestedProjectionRename
   );
+  const renames = requestedRenames(
+    current,
+    candidatePlan.candidate,
+    input.requestedProjectionRename
+  );
+  const desiredPlan = planLifecycleTarget(
+    candidatePlan.directRequirements,
+    candidatePlan.candidate,
+    renames
+  );
+  if (!desiredPlan.ok) {
+    return desiredPlan;
+  }
   if (candidatePlan.noChange) {
     return {
       ok: true,
@@ -297,20 +310,6 @@ export async function applyAcceptedRequirementChange(
   );
   if (!currentOwned.ok) {
     return currentOwned;
-  }
-
-  const renames = requestedRenames(
-    current,
-    candidatePlan.candidate,
-    input.requestedProjectionRename
-  );
-  const desiredPlan = planLifecycleTarget(
-    candidatePlan.directRequirements,
-    candidatePlan.candidate,
-    renames
-  );
-  if (!desiredPlan.ok) {
-    return desiredPlan;
   }
 
   const observed = await observeAcceptedTarget(
