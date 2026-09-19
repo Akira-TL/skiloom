@@ -8,9 +8,9 @@ import {
   type SkillsMpSearchResult
 } from "../runtime/catalog/skillsmp.js";
 import {
-  buildCliInstallIntent,
   executeCliInstall,
   formatCliInstallResult,
+  parseCliInstallArguments,
   type CliInstallIntent,
   type CliInstallResult
 } from "./install.js";
@@ -22,13 +22,22 @@ import {
   type CliRemoveResult
 } from "./remove/index.js";
 import {
+  executeCliRepair,
+  executeCliSync,
+  formatCliMaintenanceResult,
+  parseCliRepairArguments,
+  parseCliSyncArguments,
+  type CliMaintenanceResult,
+  type CliRepairInvocation,
+  type CliSyncInvocation
+} from "./maintenance/index.js";
+import {
   parseCliStatusArguments,
   readCliStatus,
   type CliStatusResult
 } from "./status.js";
-import {
-  resolveCliTarget,
-  type ResolvedCliTarget
+import type {
+  ResolvedCliTarget
 } from "./target-selector.js";
 import {
   executeCliUpdate,
@@ -95,6 +104,8 @@ type ParsedUpdate = CliUpdateInvocation &
   Readonly<{ command: "update" }>;
 
 type ParsedRemove = CliRemoveInvocation & Readonly<{ command: "remove" }>;
+type ParsedSync = CliSyncInvocation & Readonly<{ command: "sync" }>;
+type ParsedRepair = CliRepairInvocation & Readonly<{ command: "repair" }>;
 
 type ParsedCommand =
   | ParsedValidate
@@ -102,7 +113,9 @@ type ParsedCommand =
   | ParsedSearch
   | ParsedInstall
   | ParsedUpdate
-  | ParsedRemove;
+  | ParsedRemove
+  | ParsedSync
+  | ParsedRepair;
 
 type CandidateCliResult =
   | CliInstallResult
@@ -112,17 +125,6 @@ type CandidateCliResult =
 type CandidateCliExecution = Readonly<{
   result: CandidateCliResult;
   presentationRendered: boolean;
-}>;
-
-type CliTargetOption =
-  | "--target"
-  | "--host"
-  | "--scope";
-
-type CliTargetOptions = Readonly<{
-  target?: string;
-  host?: string;
-  scope?: string;
 }>;
 
 type UsageFailure = Readonly<{
@@ -159,6 +161,10 @@ async function main(): Promise<number> {
       return runUpdate(parsed.value);
     case "remove":
       return runRemove(parsed.value);
+    case "sync":
+      return runSync(parsed.value);
+    case "repair":
+      return runRepair(parsed.value);
   }
 }
 
@@ -233,6 +239,43 @@ async function runRemove(command: ParsedRemove): Promise<number> {
         command.json,
         removed.error
       );
+}
+
+async function runSync(command: ParsedSync): Promise<number> {
+  return runMaintenance(
+    command.command,
+    command.json,
+    executeCliSync(command)
+  );
+}
+
+async function runRepair(command: ParsedRepair): Promise<number> {
+  return runMaintenance(
+    command.command,
+    command.json,
+    executeCliRepair(command)
+  );
+}
+
+async function runMaintenance(
+  command: "sync" | "repair",
+  json: boolean,
+  pending: Promise<
+    | Readonly<{ ok: true; value: CliMaintenanceResult }>
+    | Readonly<{ ok: false; error: ProductError }>
+  >
+): Promise<number> {
+  const maintained = await pending;
+  if (!maintained.ok) {
+    return renderOperationFailure(
+      command,
+      json,
+      maintained.error,
+      1
+    );
+  }
+  renderSuccess(command, maintained.value, json);
+  return 0;
 }
 
 function renderCandidateSuccess(
@@ -332,6 +375,10 @@ function parseArguments(
       return parseUpdate(withoutJson.slice(1), json);
     case "remove":
       return parseRemove(withoutJson.slice(1), json);
+    case "sync":
+      return parseSync(withoutJson.slice(1), json);
+    case "repair":
+      return parseRepair(withoutJson.slice(1), json);
     default:
       return usage(
         command,
@@ -417,162 +464,15 @@ function parseInstall(
 ):
   | Readonly<{ ok: true; value: ParsedInstall }>
   | Readonly<{ ok: false; value: UsageFailure }> {
-  const coordinate = argv[0];
-  if (
-    coordinate === undefined ||
-    coordinate.startsWith("-")
-  ) {
-    return usage(
-      "install",
-      json,
-      "install requires exactly one coordinate"
-    );
+  const parsed = parseCliInstallArguments(argv, json);
+  if (!parsed.ok) {
+    return usage("install", json, parsed.reason);
   }
-
-  let targetOptions: CliTargetOptions = {};
-  let version: string | undefined;
-  let gitRef: string | undefined;
-  let name: string | undefined;
-  let plan = false;
-  let yes = false;
-  let allowReleaseRetarget = false;
-  let nonInteractive = false;
-  const seenFlags = new Set<string>();
-
-  for (let index = 1; index < argv.length; index += 1) {
-    const option = argv[index]!;
-    if (
-      option === "--plan" ||
-      option === "--yes" ||
-      option === "--allow-release-retarget" ||
-      option === "--non-interactive"
-    ) {
-      if (seenFlags.has(option)) {
-        return usage(
-          "install",
-          json,
-          "duplicate " + option
-        );
-      }
-      seenFlags.add(option);
-      if (option === "--plan") {
-        plan = true;
-      } else if (option === "--yes") {
-        yes = true;
-      } else if (option === "--allow-release-retarget") {
-        allowReleaseRetarget = true;
-      } else {
-        nonInteractive = true;
-      }
-      continue;
-    }
-
-    if (
-      !isCliTargetOption(option) &&
-      option !== "--version" &&
-      option !== "--git" &&
-      option !== "--name"
-    ) {
-      return usage(
-        "install",
-        json,
-        "unknown option: " + option
-      );
-    }
-
-    const value = argv[index + 1];
-    if (
-      value === undefined ||
-      value.startsWith("--")
-    ) {
-      return usage(
-        "install",
-        json,
-        "missing value for " + option
-      );
-    }
-    index += 1;
-
-    if (isCliTargetOption(option)) {
-      const updated = addCliTargetOption(
-        targetOptions,
-        option,
-        value
-      );
-      if (!updated.ok) {
-        return usage(
-          "install",
-          json,
-          updated.reason
-        );
-      }
-      targetOptions = updated.value;
-    } else if (option === "--version") {
-      if (version !== undefined) {
-        return usage(
-          "install",
-          json,
-          "duplicate --version"
-        );
-      }
-      version = value;
-    } else if (option === "--git") {
-      if (gitRef !== undefined) {
-        return usage(
-          "install",
-          json,
-          "duplicate --git"
-        );
-      }
-      gitRef = value;
-    } else {
-      if (name !== undefined) {
-        return usage(
-          "install",
-          json,
-          "duplicate --name"
-        );
-      }
-      name = value;
-    }
-  }
-
-  const intent = buildCliInstallIntent({
-    coordinate,
-    ...(version === undefined ? {} : { version }),
-    ...(gitRef === undefined ? {} : { gitRef }),
-    ...(name === undefined ? {} : { name })
-  });
-  if (!intent.ok) {
-    return usage(
-      "install",
-      json,
-      intent.reason
-    );
-  }
-
-  const resolved = resolveCliTargetOptions(
-    targetOptions
-  );
-  if (!resolved.ok) {
-    return usage(
-      "install",
-      json,
-      resolved.reason
-    );
-  }
-
   return {
     ok: true,
     value: {
       command: "install",
-      intent: intent.value,
-      target: resolved.value,
-      plan,
-      yes,
-      allowReleaseRetarget,
-      nonInteractive,
-      json
+      ...parsed.value
     }
   };
 }
@@ -612,6 +512,44 @@ function parseRemove(argv: ReadonlyArray<string>, json: boolean):
   };
 }
 
+function parseSync(
+  argv: ReadonlyArray<string>,
+  json: boolean
+):
+  | Readonly<{ ok: true; value: ParsedSync }>
+  | Readonly<{ ok: false; value: UsageFailure }> {
+  const parsed = parseCliSyncArguments(argv, json);
+  if (!parsed.ok) {
+    return usage("sync", json, parsed.reason);
+  }
+  return {
+    ok: true,
+    value: {
+      command: "sync",
+      ...parsed.value
+    }
+  };
+}
+
+function parseRepair(
+  argv: ReadonlyArray<string>,
+  json: boolean
+):
+  | Readonly<{ ok: true; value: ParsedRepair }>
+  | Readonly<{ ok: false; value: UsageFailure }> {
+  const parsed = parseCliRepairArguments(argv, json);
+  if (!parsed.ok) {
+    return usage("repair", json, parsed.reason);
+  }
+  return {
+    ok: true,
+    value: {
+      command: "repair",
+      ...parsed.value
+    }
+  };
+}
+
 function parseStatus(
   argv: ReadonlyArray<string>,
   json: boolean
@@ -633,53 +571,6 @@ function parseStatus(
       json
     }
   };
-}
-
-function isCliTargetOption(
-  option: string
-): option is CliTargetOption {
-  return (
-    option === "--target" ||
-    option === "--host" ||
-    option === "--scope"
-  );
-}
-
-function addCliTargetOption(
-  current: CliTargetOptions,
-  option: CliTargetOption,
-  value: string
-):
-  | Readonly<{ ok: true; value: CliTargetOptions }>
-  | Readonly<{ ok: false; reason: string }> {
-  const key =
-    option === "--target"
-      ? "target"
-      : option === "--host"
-        ? "host"
-        : "scope";
-  if (current[key] !== undefined) {
-    return {
-      ok: false,
-      reason: "duplicate " + option
-    };
-  }
-  return {
-    ok: true,
-    value: {
-      ...current,
-      [key]: value
-    }
-  };
-}
-
-function resolveCliTargetOptions(
-  options: CliTargetOptions
-): ReturnType<typeof resolveCliTarget> {
-  return resolveCliTarget({
-    cwd: process.cwd(),
-    ...options
-  });
 }
 
 function usage(
@@ -708,7 +599,8 @@ function renderSuccess(
     | SkillsMpSearchResult
     | CliInstallResult
     | CliUpdateResult
-    | CliRemoveResult,
+    | CliRemoveResult
+    | CliMaintenanceResult,
   json: boolean
 ): void {
   if (json) {
@@ -740,6 +632,14 @@ function renderSuccess(
   if (command === "remove") {
     process.stdout.write(
       formatCliRemoveResult(result as CliRemoveResult)
+    );
+    return;
+  }
+  if (command === "sync" || command === "repair") {
+    process.stdout.write(
+      formatCliMaintenanceResult(
+        result as CliMaintenanceResult
+      )
     );
     return;
   }

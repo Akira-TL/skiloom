@@ -56,8 +56,9 @@ import {
 import {
   readCliStatus
 } from "./status.js";
-import type {
-  ResolvedCliTarget
+import {
+  resolveCliTarget,
+  type ResolvedCliTarget
 } from "./target-selector.js";
 
 export type CliInstallIntent = Readonly<{
@@ -111,6 +112,182 @@ type BuildCliInstallIntentInput = Readonly<{
   gitRef?: string;
   name?: string;
 }>;
+
+type CliInstallTargetOptions = Readonly<{
+  target?: string;
+  host?: string;
+  scope?: string;
+}>;
+
+export type ParseCliInstallResult =
+  | Readonly<{ ok: true; value: CliInstallInvocation }>
+  | Readonly<{ ok: false; reason: string }>;
+
+export function parseCliInstallArguments(
+  argv: ReadonlyArray<string>,
+  json: boolean
+): ParseCliInstallResult {
+  const coordinate = argv[0];
+  if (
+    coordinate === undefined ||
+    coordinate.startsWith("-")
+  ) {
+    return {
+      ok: false,
+      reason: "install requires exactly one coordinate"
+    };
+  }
+
+  let targetOptions: CliInstallTargetOptions = {};
+  let version: string | undefined;
+  let gitRef: string | undefined;
+  let name: string | undefined;
+  let plan = false;
+  let yes = false;
+  let allowReleaseRetarget = false;
+  let nonInteractive = false;
+  const seenFlags = new Set<string>();
+
+  for (let index = 1; index < argv.length; index += 1) {
+    const option = argv[index]!;
+    if (
+      option === "--plan" ||
+      option === "--yes" ||
+      option === "--allow-release-retarget" ||
+      option === "--non-interactive"
+    ) {
+      if (seenFlags.has(option)) {
+        return {
+          ok: false,
+          reason: "duplicate " + option
+        };
+      }
+      seenFlags.add(option);
+      if (option === "--plan") {
+        plan = true;
+      } else if (option === "--yes") {
+        yes = true;
+      } else if (option === "--allow-release-retarget") {
+        allowReleaseRetarget = true;
+      } else {
+        nonInteractive = true;
+      }
+      continue;
+    }
+
+    if (
+      option !== "--target" &&
+      option !== "--host" &&
+      option !== "--scope" &&
+      option !== "--version" &&
+      option !== "--git" &&
+      option !== "--name"
+    ) {
+      return {
+        ok: false,
+        reason: "unknown option: " + option
+      };
+    }
+    const value = argv[index + 1];
+    if (value === undefined || value.startsWith("--")) {
+      return {
+        ok: false,
+        reason: "missing value for " + option
+      };
+    }
+    index += 1;
+
+    if (
+      option === "--target" ||
+      option === "--host" ||
+      option === "--scope"
+    ) {
+      const updated = addInstallTargetOption(
+        targetOptions,
+        option,
+        value
+      );
+      if (!updated.ok) {
+        return updated;
+      }
+      targetOptions = updated.value;
+    } else if (option === "--version") {
+      if (version !== undefined) {
+        return { ok: false, reason: "duplicate --version" };
+      }
+      version = value;
+    } else if (option === "--git") {
+      if (gitRef !== undefined) {
+        return { ok: false, reason: "duplicate --git" };
+      }
+      gitRef = value;
+    } else {
+      if (name !== undefined) {
+        return { ok: false, reason: "duplicate --name" };
+      }
+      name = value;
+    }
+  }
+
+  const intent = buildCliInstallIntent({
+    coordinate,
+    ...(version === undefined ? {} : { version }),
+    ...(gitRef === undefined ? {} : { gitRef }),
+    ...(name === undefined ? {} : { name })
+  });
+  if (!intent.ok) {
+    return intent;
+  }
+
+  const target = resolveCliTarget({
+    cwd: process.cwd(),
+    ...targetOptions
+  });
+  if (!target.ok) {
+    return { ok: false, reason: target.reason };
+  }
+
+  return {
+    ok: true,
+    value: {
+      intent: intent.value,
+      target: target.value,
+      plan,
+      yes,
+      allowReleaseRetarget,
+      nonInteractive,
+      json
+    }
+  };
+}
+
+function addInstallTargetOption(
+  current: CliInstallTargetOptions,
+  option: "--target" | "--host" | "--scope",
+  value: string
+):
+  | Readonly<{ ok: true; value: CliInstallTargetOptions }>
+  | Readonly<{ ok: false; reason: string }> {
+  const key =
+    option === "--target"
+      ? "target"
+      : option === "--host"
+        ? "host"
+        : "scope";
+  if (current[key] !== undefined) {
+    return {
+      ok: false,
+      reason: "duplicate " + option
+    };
+  }
+  return {
+    ok: true,
+    value: {
+      ...current,
+      [key]: value
+    }
+  };
+}
 
 export function buildCliInstallIntent(
   input: BuildCliInstallIntentInput

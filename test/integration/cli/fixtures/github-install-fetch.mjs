@@ -171,6 +171,9 @@ globalThis.fetch = async (input, init) => {
   if (url.origin !== "https://api.github.com") {
     return originalFetch(input, init);
   }
+  if (mode === "forbid-network") {
+    throw new Error("GitHub network access forbidden by test fixture");
+  }
 
   const match = /^\/repos\/([^/]+)\/([^/]+)(\/.*)?$/u.exec(
     url.pathname
@@ -186,6 +189,18 @@ globalThis.fetch = async (input, init) => {
     return json({ message: "missing fixture" }, 404);
   }
   const suffix = match[3] ?? "";
+  if (
+    mode === "exact-only" &&
+    (
+      suffix === "" ||
+      suffix === "/releases" ||
+      suffix.startsWith("/commits/")
+    )
+  ) {
+    throw new Error(
+      "version/ref resolution forbidden by exact-only fixture"
+    );
+  }
 
   if (suffix === "") {
     return json({ full_name: fixture.repository });
