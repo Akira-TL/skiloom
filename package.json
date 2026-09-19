@@ -25,7 +25,7 @@
     "test:target-projection": "npm run test:compile --silent && node --test .test-dist/test/integration/runtime/target/projection.test.js",
     "test": "npm run test:compile --silent && node scripts/run-tests.mjs all && node --test .test-dist/test/integration/runtime/source/github-repository.test.js .test-dist/test/integration/runtime/source/github-transport.test.js .test-dist/test/integration/runtime/source/github-release.test.js .test-dist/test/integration/runtime/source/github-git-ref.test.js .test-dist/test/integration/runtime/source/github-snapshot.test.js .test-dist/test/integration/runtime/source/github-pipeline.test.js .test-dist/test/integration/runtime/lifecycle/candidate.test.js .test-dist/test/integration/runtime/target-state-marker.test.js .test-dist/test/integration/runtime/target-state-recovery.test.js .test-dist/test/integration/runtime/user-payload.test.js",
     "benchmark:github-source": "npm run build --silent && node --expose-gc benchmarks/github-source/run.mjs",
-    "check": "npm run typecheck && npm run build && npm test",
+    "check": "npm run typecheck && npm run build && npm test && npm run test:cli",
     "test:target-state-marker": "npm run test:compile --silent && node --test .test-dist/test/integration/runtime/target-state-marker.test.js .test-dist/test/integration/runtime/target-state-recovery.test.js",
     "test:export-package": "npm run test:compile --silent && node --test .test-dist/test/behavior/domain/export/package-v1.test.js",
     "test:user-payload": "npm run test:compile --silent && node --test .test-dist/test/behavior/domain/export/user-payload-v1.test.js .test-dist/test/behavior/domain/export/package-v1.test.js .test-dist/test/integration/runtime/user-payload.test.js",
