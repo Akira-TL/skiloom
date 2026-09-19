@@ -76,6 +76,8 @@ export function validateExactExportManifestCrossRecords(
     }
   }
 
+  const gitRefByRepository = new Map<string, string>();
+
   for (let index = 0; index < manifest.requirements.length; index += 1) {
     const requirement = manifest.requirements[index]!;
     if (
@@ -103,6 +105,22 @@ export function validateExactExportManifestCrossRecords(
       return invalidExportPackage(
         "source-conflict",
         `requirements[${index}].source`
+      );
+    }
+    if (requirement.sourceKind === "git") {
+      const previousRef = gitRefByRepository.get(repository);
+      if (
+        previousRef !== undefined &&
+        previousRef !== requirement.requestedRef
+      ) {
+        return invalidExportPackage(
+          "source-conflict",
+          `requirements[${index}].ref`
+        );
+      }
+      gitRefByRepository.set(
+        repository,
+        requirement.requestedRef
       );
     }
     if (
@@ -188,12 +206,21 @@ export function validateExactExportManifestCrossRecords(
     );
   }
   for (let index = 0; index < manifest.sources.length; index += 1) {
-    const repository =
-      manifest.sources[index]!.repositoryCoordinate;
+    const source = manifest.sources[index]!;
+    const repository = source.repositoryCoordinate;
     if (!usedRepositories.has(repository)) {
       return invalidExportPackage(
         "unused-source",
         `sources[${index}].repository`
+      );
+    }
+    if (
+      source.sourceKind === "git" &&
+      !gitRefByRepository.has(repository)
+    ) {
+      return invalidExportPackage(
+        "source-conflict",
+        `sources[${index}].kind`
       );
     }
   }

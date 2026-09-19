@@ -115,6 +115,81 @@ test("strict export manifest fixtures reject future, unknown, duplicate and cros
   }
 });
 
+test("Git exact source requirements for one repository must preserve one requested ref", async () => {
+  const fixture = await readFixture();
+  const parsed = parseExactExportManifest(
+    fixture.valid.manifest
+  );
+  assert.equal(parsed.ok, true);
+  if (!parsed.ok) {
+    return;
+  }
+  const packageFact = parsed.value.packages[0]!;
+  const gitManifest: ExactExportManifest = {
+    ...parsed.value,
+    requirements: [
+      {
+        kind: "package",
+        coordinate: "acme/demo/demo",
+        sourceKind: "git",
+        requestedRef: "main"
+      },
+      {
+        kind: "package",
+        coordinate: "acme/demo/other",
+        sourceKind: "git",
+        requestedRef: "dev"
+      }
+    ],
+    sources: [
+      {
+        repositoryCoordinate: "acme/demo",
+        sourceKind: "git",
+        exactCommit:
+          "0123456789abcdef0123456789abcdef01234567"
+      }
+    ],
+    packages: [
+      packageFact,
+      {
+        ...packageFact,
+        packageCoordinate: "acme/demo/other"
+      }
+    ],
+    projections: [
+      {
+        packageCoordinate: "acme/demo/demo",
+        activationName: "demo"
+      },
+      {
+        packageCoordinate: "acme/demo/other",
+        activationName: "other"
+      }
+    ]
+  };
+
+  const reparsed = parseExactExportManifest(
+    writeExactExportManifest(gitManifest)
+  );
+  assert.equal(reparsed.ok, false);
+  if (!reparsed.ok) {
+    assert.equal(
+      reparsed.error.code,
+      "InvalidExportPackage"
+    );
+    if (reparsed.error.code === "InvalidExportPackage") {
+      assert.equal(
+        reparsed.error.facts.reason,
+        "source-conflict"
+      );
+      assert.equal(
+        reparsed.error.facts.path,
+        "requirements[1].ref"
+      );
+    }
+  }
+});
+
 test("full manifest accepts detached and user-skill records but dependencies mode forbids them", async () => {
   const fixture = await readFixture();
   const digest = "sha256:" + "0".repeat(64);
