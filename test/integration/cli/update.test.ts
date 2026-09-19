@@ -66,7 +66,7 @@ test("update --plan human output presents the complete candidate surface", async
     );
 
     assert.equal(planned.code, 0);
-    assert.equal(planned.stderr, "");
+    assertNoUnexpectedStderr(planned.stderr);
     assert.match(planned.stdout, new RegExp("Target: " + escapeRegExp(target)));
     assert.match(planned.stdout, /Status: planned/u);
     assert.match(planned.stdout, /Direct Install Requirements:/u);
@@ -98,7 +98,7 @@ test("update --plan returns candidate projection ownership without mutating acce
     );
 
     assert.equal(planned.code, 0);
-    assert.equal(planned.stderr, "");
+    assertNoUnexpectedStderr(planned.stderr);
     const output = parseUpdateOutput(planned.stdout);
     assert.equal(output.result.status, "planned");
     assert.equal(output.result.sources[0]?.version, "2.0.0");
@@ -166,7 +166,7 @@ test("noninteractive update without --yes requires approval before mutation", as
     );
 
     assert.equal(blocked.code, 3);
-    assert.equal(blocked.stderr, "");
+    assertNoUnexpectedStderr(blocked.stderr);
     const output = parseUpdateOutput(blocked.stdout);
     assert.equal(output.ok, false);
     assert.equal(output.error?.code, "InteractionRequired");
@@ -205,7 +205,7 @@ test("identical update is a no-op without approval or generation change", async 
     );
 
     assert.equal(noOp.code, 0);
-    assert.equal(noOp.stderr, "");
+    assertNoUnexpectedStderr(noOp.stderr);
     const output = parseUpdateOutput(noOp.stdout);
     assert.equal(output.result.status, "no-op");
     assert.equal(output.result.acceptedState.generation, 1);
@@ -292,7 +292,7 @@ test("update re-resolves the whole accepted Target and commits the new candidate
     );
 
     assert.equal(updated.code, 0);
-    assert.equal(updated.stderr, "");
+    assertNoUnexpectedStderr(updated.stderr);
     const output = parseUpdateOutput(updated.stdout);
     assert.equal(output.result.status, "updated");
     assert.equal(output.result.acceptedState.generation, 2);
@@ -442,6 +442,14 @@ function runInteractiveCli(
 
 function parseUpdateOutput(source: string): ParsedUpdateOutput {
   return JSON.parse(source) as ParsedUpdateOutput;
+}
+
+function assertNoUnexpectedStderr(stderr: string): void {
+  const normalized = stderr.replace(
+    /^\(node:\d+\) ExperimentalWarning: SQLite is an experimental feature and might change at any time\n\(Use `node --trace-warnings \.\.\.` to show where the warning was created\)\n/u,
+    ""
+  );
+  assert.equal(normalized, "");
 }
 
 function shellQuote(source: string): string {
