@@ -38,10 +38,8 @@ export async function addAcceptedTargetRoots(
     registry: input.registry,
     repositoryTransport: input.repositoryTransport,
     transport: input.transport,
-    mutateRequirements: (current) => [
-      ...current,
-      ...input.additions
-    ],
+    mutateRequirements: (current) =>
+      upsertDirectRequirements(current, input.additions),
     acceptCandidate: input.acceptCandidate,
     ...(input.syncMarker === undefined
       ? {}
@@ -59,4 +57,27 @@ export async function addAcceptedTargetRoots(
       ? {}
       : { createOperationId: input.createOperationId })
   });
+}
+
+function upsertDirectRequirements(
+  current: ReadonlyArray<DirectInstallRequirement>,
+  additions: ReadonlyArray<DirectInstallRequirement>
+): ReadonlyArray<DirectInstallRequirement> {
+  const next = [...current];
+
+  for (const addition of additions) {
+    const existingIndex = next.findIndex(
+      (requirement) =>
+        requirement.kind === addition.kind &&
+        requirement.coordinate.canonical ===
+          addition.coordinate.canonical
+    );
+    if (existingIndex === -1) {
+      next.push(addition);
+      continue;
+    }
+    next[existingIndex] = addition;
+  }
+
+  return next;
 }

@@ -158,6 +158,78 @@ test("adding a Package root recomputes the complete graph and keeps one shared d
   });
 });
 
+test("reinstalling the same direct requirement identity replaces the accepted requirement", async () => {
+  await withRuntime(async ({ paths, targetRoot }) => {
+    await withRealLock(paths, async (lock) => {
+      const registry = await requireRegistry(paths, lock);
+      const fixture = sourceFixture([
+        releaseRepository("acme/app", [
+          release("v1.0.0", "1", [skillPackage(".", "app", "Application v1.")]),
+          release("v2.0.0", "2", [skillPackage(".", "app", "Application v2.")])
+        ])
+      ]);
+
+      try {
+        const installed = await executeFirstAcceptedInstall({
+          home: paths,
+          targetRoot,
+          lock,
+          registry,
+          directRequirements: [releasePackageRequirement("acme/app/app", "^1.0.0")],
+          repositoryTransport: fixture.repositoryTransport,
+          transport: fixture.transport,
+          acceptCandidate: () => true,
+          createTargetId: () => targetId,
+          createOperationId: () => "initial-versioned-install",
+          syncMarker: () => {}
+        });
+        assert.equal(installed.ok, true);
+        if (!installed.ok || installed.value.status !== "installed") {
+          return;
+        }
+
+        const result = await addAcceptedTargetRoots({
+          home: paths,
+          targetId,
+          targetRoot,
+          lock,
+          registry,
+          additions: [releasePackageRequirement("acme/app/app", "^2.0.0")],
+          repositoryTransport: fixture.repositoryTransport,
+          transport: fixture.transport,
+          acceptCandidate: () => true,
+          createOperationId: () => "replace-versioned-root",
+          syncMarker: () => {}
+        });
+
+        assert.equal(result.ok, true);
+        if (!result.ok || result.value.status !== "applied") {
+          return;
+        }
+        assert.deepEqual(result.value.state.directRequirements, [
+          {
+            kind: "package",
+            coordinate: "acme/app/app",
+            sourceKind: "github-release",
+            versionRequirement: "^2.0.0"
+          }
+        ]);
+        const source = result.value.state.resolvedSources[0];
+        assert.equal(
+          source?.sourceKind === "github-release" ? source.version : undefined,
+          "2.0.0"
+        );
+        assert.match(
+          await readFile(join(targetRoot, "app", "SKILL.md"), "utf8"),
+          /Application v2\./u
+        );
+      } finally {
+        registry.close();
+      }
+    });
+  });
+});
+
 test("adding a repository-wide root rediscovers all selected snapshot Packages as roots", async () => {
   await withRuntime(async ({ paths, targetRoot }) => {
     await withRealLock(paths, async (lock) => {
