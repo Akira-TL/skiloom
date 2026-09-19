@@ -30,7 +30,8 @@
     "test:import-locked": "npm run test:compile --silent && node --test .test-dist/test/integration/runtime/import/exact.test.js",
     "test:import-merge-locked": "npm run test:compile --silent && node --test .test-dist/test/integration/runtime/import/exact.test.js .test-dist/test/integration/runtime/import/merge.test.js",
     "test:reproduction-locked": "npm run test:compile --silent && node --test .test-dist/test/integration/runtime/export/dependencies.test.js .test-dist/test/integration/runtime/export/full.test.js .test-dist/test/integration/runtime/import/exact.test.js .test-dist/test/integration/runtime/import/merge.test.js .test-dist/test/integration/runtime/reproduction/e2e.test.js",
-    "test:import-recovery-locked": "npm run test:compile --silent && node --test .test-dist/test/integration/runtime/export/dependencies.test.js .test-dist/test/integration/runtime/import/exact.test.js .test-dist/test/integration/runtime/import/merge.test.js .test-dist/test/integration/runtime/import/recovery/exact.test.js .test-dist/test/integration/runtime/import/recovery/merge.test.js"
+    "test:import-recovery-locked": "npm run test:compile --silent && node --test .test-dist/test/integration/runtime/export/dependencies.test.js .test-dist/test/integration/runtime/import/exact.test.js .test-dist/test/integration/runtime/import/merge.test.js .test-dist/test/integration/runtime/import/recovery/exact.test.js .test-dist/test/integration/runtime/import/recovery/merge.test.js",
+    "benchmark:exact-export": "npm run build --silent && node --expose-gc benchmarks/exact-export/run.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.20.3",

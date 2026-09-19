@@ -1,0 +1,40 @@
+{
+  "format": "SKILOOM-EXACT-EXPORT-BENCH-V1",
+  "fixtureVersion": 1,
+  "warmupIterations": 1,
+  "measureIterations": 3,
+  "cases": [
+    {
+      "id": "small-managed-64x1k",
+      "managedFileCount": 64,
+      "managedBytesPerFile": 1024,
+      "userFileCount": 0,
+      "userBytesPerFile": 0,
+      "executableEvery": 8
+    },
+    {
+      "id": "wide-managed-4096x512",
+      "managedFileCount": 4096,
+      "managedBytesPerFile": 512,
+      "userFileCount": 0,
+      "userBytesPerFile": 0,
+      "executableEvery": 16
+    },
+    {
+      "id": "large-managed-128x256k",
+      "managedFileCount": 128,
+      "managedBytesPerFile": 262144,
+      "userFileCount": 0,
+      "userBytesPerFile": 0,
+      "executableEvery": 16
+    },
+    {
+      "id": "mixed-256x32k-plus-256x32k",
+      "managedFileCount": 256,
+      "managedBytesPerFile": 32768,
+      "userFileCount": 256,
+      "userBytesPerFile": 32768,
+      "executableEvery": 16
+    }
+  ]
+}
