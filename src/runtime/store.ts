@@ -278,6 +278,23 @@ function validateContentDigest(
   return { ok: true, value: contentDigest };
 }
 
+export function packageStorePayloadPath(
+  paths: SkiloomHomePaths,
+  contentDigest: string
+): Result<string, InvalidPackageContentDigest> {
+  const validated = validateContentDigest(contentDigest);
+  if (!validated.ok) {
+    return validated;
+  }
+  return {
+    ok: true,
+    value: join(
+      storeEntryPath(paths, validated.value),
+      "payload"
+    )
+  };
+}
+
 function storeEntryPath(paths: SkiloomHomePaths, contentDigest: string): string {
   const hex = contentDigest.slice("sha256:".length);
   return join(paths.storePath, `sha256-${hex}`);

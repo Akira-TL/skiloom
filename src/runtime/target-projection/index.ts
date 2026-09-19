@@ -2,7 +2,8 @@ export * from "./types.js";
 export { buildManagedProjectionTree } from "./transform.js";
 export {
   verifyManagedProjection,
-  verifyManagedProjectionAtPath
+  verifyManagedProjectionAtPath,
+  verifyProjectionAtPath
 } from "./verify.js";
 export { removeManagedProjection } from "./remove.js";
 export {

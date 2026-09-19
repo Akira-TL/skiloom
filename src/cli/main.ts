@@ -22,6 +22,13 @@ import {
   type CliRemoveResult
 } from "./remove/index.js";
 import {
+  executeCliRecovery,
+  formatCliRecoveryResult,
+  parseCliRecoveryArguments,
+  type CliRecoveryInvocation,
+  type CliRecoveryResult
+} from "./recovery/index.js";
+import {
   executeCliRepair,
   executeCliSync,
   formatCliMaintenanceResult,
@@ -112,6 +119,7 @@ type ParsedUpdate = CliUpdateInvocation &
   Readonly<{ command: "update" }>;
 
 type ParsedRemove = CliRemoveInvocation & Readonly<{ command: "remove" }>;
+type ParsedRecovery = CliRecoveryInvocation & Readonly<{ command: "recover" | "fork" }>;
 type ParsedSync = CliSyncInvocation & Readonly<{ command: "sync" }>;
 type ParsedRepair = CliRepairInvocation & Readonly<{ command: "repair" }>;
 type ParsedLocal = CliLocalInvocation &
@@ -124,14 +132,22 @@ type ParsedCommand =
   | ParsedInstall
   | ParsedUpdate
   | ParsedRemove
+  | ParsedRecovery
   | ParsedSync
   | ParsedRepair
   | ParsedLocal;
 
+type ParsedCandidate =
+  | ParsedInstall
+  | ParsedUpdate
+  | ParsedRemove
+  | ParsedRecovery;
+
 type CandidateCliResult =
   | CliInstallResult
   | CliUpdateResult
-  | CliRemoveResult;
+  | CliRemoveResult
+  | CliRecoveryResult;
 
 type CandidateCliExecution = Readonly<{
   result: CandidateCliResult;
@@ -167,11 +183,11 @@ async function main(): Promise<number> {
     case "search":
       return runSearch(parsed.value);
     case "install":
-      return runInstall(parsed.value);
     case "update":
-      return runUpdate(parsed.value);
     case "remove":
-      return runRemove(parsed.value);
+    case "recover":
+    case "fork":
+      return runCandidate(parsed.value);
     case "sync":
       return runSync(parsed.value);
     case "repair":
@@ -212,48 +228,27 @@ async function runSearch(command: ParsedSearch): Promise<number> {
   return 0;
 }
 
-async function runInstall(command: ParsedInstall): Promise<number> {
-  const installed = await executeCliInstall(command);
-  return installed.ok
+async function runCandidate(
+  command: ParsedCandidate
+): Promise<number> {
+  const executed =
+    command.command === "install"
+      ? await executeCliInstall(command)
+      : command.command === "update"
+        ? await executeCliUpdate(command)
+        : command.command === "remove"
+          ? await executeCliRemove(command)
+          : await executeCliRecovery(command);
+  return executed.ok
     ? renderCandidateSuccess(
         command.command,
         command.json,
-        installed.value
+        executed.value
       )
     : renderCandidateFailure(
         command.command,
         command.json,
-        installed.error
-      );
-}
-
-async function runUpdate(command: ParsedUpdate): Promise<number> {
-  const updated = await executeCliUpdate(command);
-  return updated.ok
-    ? renderCandidateSuccess(
-        command.command,
-        command.json,
-        updated.value
-      )
-    : renderCandidateFailure(
-        command.command,
-        command.json,
-        updated.error
-      );
-}
-
-async function runRemove(command: ParsedRemove): Promise<number> {
-  const removed = await executeCliRemove(command);
-  return removed.ok
-    ? renderCandidateSuccess(
-        command.command,
-        command.json,
-        removed.value
-      )
-    : renderCandidateFailure(
-        command.command,
-        command.json,
-        removed.error
+        executed.error
       );
 }
 
@@ -405,6 +400,18 @@ function parseArguments(
       return parseUpdate(withoutJson.slice(1), json);
     case "remove":
       return parseRemove(withoutJson.slice(1), json);
+    case "recover":
+      return parseRecovery(
+        "recover",
+        withoutJson.slice(1),
+        json
+      );
+    case "fork":
+      return parseRecovery(
+        "fork",
+        withoutJson.slice(1),
+        json
+      );
     case "sync":
       return parseSync(withoutJson.slice(1), json);
     case "repair":
@@ -551,6 +558,19 @@ function parseRemove(argv: ReadonlyArray<string>, json: boolean):
   };
 }
 
+function parseRecovery(
+  command: "recover" | "fork",
+  argv: ReadonlyArray<string>,
+  json: boolean
+):
+  | Readonly<{ ok: true; value: ParsedRecovery }>
+  | Readonly<{ ok: false; value: UsageFailure }> {
+  const parsed = parseCliRecoveryArguments(command, argv, json);
+  return parsed.ok
+    ? { ok: true, value: { command, ...parsed.value } }
+    : usage(command, json, parsed.reason);
+}
+
 function parseSync(
   argv: ReadonlyArray<string>,
   json: boolean
@@ -663,6 +683,7 @@ function renderSuccess(
     | CliInstallResult
     | CliUpdateResult
     | CliRemoveResult
+    | CliRecoveryResult
     | CliMaintenanceResult
     | CliLocalResult,
   json: boolean
@@ -696,6 +717,12 @@ function renderSuccess(
   if (command === "remove") {
     process.stdout.write(
       formatCliRemoveResult(result as CliRemoveResult)
+    );
+    return;
+  }
+  if (command === "recover" || command === "fork") {
+    process.stdout.write(
+      formatCliRecoveryResult(result as CliRecoveryResult)
     );
     return;
   }
