@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Agent Skill package manager and installer",
   "type": "module",
+  "bin": {
+    "skiloom": "./dist/cli/main.js"
+  },
   "engines": {
     "node": ">=22"
   },
@@ -12,6 +15,7 @@
     "test:compile": "tsc -p tsconfig.test.json",
     "test:unit": "npm run test:compile --silent && node scripts/run-tests.mjs unit",
     "test:behavior": "npm run test:compile --silent && node scripts/run-tests.mjs behavior",
+    "test:cli": "npm run test:compile --silent && node --test .test-dist/test/integration/cli/validate.test.js",
     "test:lock-bridge": "npm run test:compile --silent && node --test .test-dist/test/integration/native/operation-lock.test.js",
     "test:github-source": "npm run test:compile --silent && node --test .test-dist/test/integration/runtime/source/github-repository.test.js .test-dist/test/integration/runtime/source/github-transport.test.js .test-dist/test/integration/runtime/source/github-release.test.js .test-dist/test/integration/runtime/source/github-git-ref.test.js .test-dist/test/integration/runtime/source/github-snapshot.test.js .test-dist/test/integration/runtime/source/github-pipeline.test.js",
     "test:github-source-live": "npm run test:compile --silent && node --test --test-concurrency=1 .test-dist/test/integration/runtime/source/github-live.test.js .test-dist/test/integration/runtime/source/github-git-ref-live.test.js",
