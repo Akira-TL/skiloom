@@ -1,0 +1,7 @@
+schema = 1
+
+[dependencies]
+"akira-tl/skiloom/skiloom-author" = "*"
+"akira-tl/skiloom/skiloom-discover" = "*"
+"akira-tl/skiloom/skiloom-doctor" = "*"
+"akira-tl/skiloom/skiloom-manage" = "*"
