@@ -3,12 +3,16 @@ import {
   type ChildProcessWithoutNullStreams
 } from "node:child_process";
 import { isAbsolute } from "node:path";
+import process from "node:process";
 
 import {
   productError,
   type ProductError,
   type Result
 } from "../domain/errors/index.js";
+import {
+  restrictedChildProcessEnvironment
+} from "../runtime/child-process/environment.js";
 
 const ACQUIRED_LINE = "SKILOOM-LOCK-V1 ACQUIRED\n";
 const CONTENDED_LINE = "SKILOOM-LOCK-V1 CONTENDED\n";
@@ -233,6 +237,7 @@ export async function acquireOperationLock(
         shell: false,
         detached: false,
         windowsHide: true,
+        env: restrictedChildProcessEnvironment(process.env),
         stdio: ["pipe", "pipe", "pipe"]
       }
     );

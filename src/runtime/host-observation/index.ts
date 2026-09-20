@@ -9,6 +9,9 @@ import {
 import {
   parsePackageMetadata
 } from "../../domain/package/index.js";
+import {
+  restrictedChildProcessEnvironment
+} from "../child-process/environment.js";
 import type {
   PackageSnapshot
 } from "../../domain/snapshot/index.js";
@@ -409,6 +412,7 @@ async function executeHostProbe(
           shell: false,
           detached: false,
           windowsHide: true,
+          env: restrictedChildProcessEnvironment(process.env),
           stdio: ["ignore", "pipe", "pipe"]
         }
       );
