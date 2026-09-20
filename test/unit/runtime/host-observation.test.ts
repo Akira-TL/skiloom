@@ -6,6 +6,20 @@ import {
   type HostProbeExecutor
 } from "../../../src/runtime/host-observation/index.js";
 
+test("real npm Host Observation probe is satisfied on the development runtime", async () => {
+  const observed = await probeHostSoftware({
+    name: "npm",
+    requirement: "*"
+  });
+
+  assert.equal(observed.status, "satisfied");
+  assert.match(
+    observed.detectedVersion ?? "",
+    /^\d+(?:\.\d+)*$/u
+  );
+  assert.notEqual(observed.location, null);
+});
+
 test("built-in software probes use fixed executable and argv", async () => {
   const calls: Array<Readonly<{
     executable: string;

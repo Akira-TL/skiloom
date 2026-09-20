@@ -30,11 +30,8 @@ test("restricted child environment preserves only process-startup lookup temp an
 
   assert.deepEqual(restricted, {
     PATH: "/bin:/usr/bin",
-    PaTh: "host-casing-path",
     PATHEXT: ".EXE;.CMD",
-    SystemRoot: "C:\\Windows",
     WINDIR: "C:\\Windows",
-    ComSpec: "C:\\Windows\\System32\\cmd.exe",
     TEMP: "/tmp/temp",
     TMP: "/tmp/tmp",
     TMPDIR: "/tmp/tmpdir",
@@ -97,4 +94,25 @@ test("a real child process cannot observe credentials or arbitrary inherited sec
     }
   );
   assert.notEqual(observed.path, null);
+});
+
+test("Windows restricted child environment collapses case-insensitive duplicate keys", () => {
+  const restricted = restrictedChildProcessEnvironment(
+    {
+      Path: "C:\\preferred",
+      PATH: "C:\\discarded",
+      pathext: ".EXE;.CMD",
+      PATHEXT: ".EXE",
+      SystemRoot: "C:\\Windows",
+      SYSTEMROOT: "C:\\discarded-root",
+      GH_TOKEN: "secret"
+    },
+    "win32"
+  );
+
+  assert.deepEqual(restricted, {
+    Path: "C:\\preferred",
+    pathext: ".EXE;.CMD",
+    SystemRoot: "C:\\Windows"
+  });
 });

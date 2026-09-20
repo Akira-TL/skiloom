@@ -18,6 +18,10 @@ import type {
 import type {
   RegistryDependencyObservation
 } from "../registry/model.js";
+import {
+  resolveNpmProbeCommands,
+  type HostProbeCommand
+} from "./npm.js";
 
 export type HostObservationStatus =
   | "unknown"
@@ -94,42 +98,42 @@ export type HostSoftwareProbeResult = Readonly<{
 }>;
 
 type HostProbeSpec = Readonly<{
-  executables: () => ReadonlyArray<string>;
-  args: ReadonlyArray<string>;
+  commands: () => Promise<ReadonlyArray<HostProbeCommand>>;
   parseVersion: (output: string) => string | undefined;
 }>;
 
 const PROBES: Readonly<Record<HostProbeId, HostProbeSpec>> = {
   node: {
-    executables: () => [process.execPath],
-    args: ["--version"],
+    commands: () =>
+      fixedProbeCommands([process.execPath], ["--version"]),
     parseVersion: (output) =>
       firstVersion(output, /(?:^|\s)v(\d+(?:\.\d+)*)/u)
   },
   npm: {
-    executables: () => ["npm"],
-    args: ["--version"],
+    commands: resolveNpmProbeCommands,
     parseVersion: (output) =>
       firstVersion(output, /(?:^|\s)(\d+(?:\.\d+)*)(?:\s|$)/u)
   },
   git: {
-    executables: () => ["git"],
-    args: ["--version"],
+    commands: () =>
+      fixedProbeCommands(["git"], ["--version"]),
     parseVersion: (output) =>
       firstVersion(output, /git version (\d+(?:\.\d+)*)/iu)
   },
   gh: {
-    executables: () => ["gh"],
-    args: ["--version"],
+    commands: () =>
+      fixedProbeCommands(["gh"], ["--version"]),
     parseVersion: (output) =>
       firstVersion(output, /gh version (\d+(?:\.\d+)*)/iu)
   },
   python: {
-    executables: () =>
-      process.platform === "win32"
-        ? ["python", "py"]
-        : ["python3", "python"],
-    args: ["--version"],
+    commands: () =>
+      fixedProbeCommands(
+        process.platform === "win32"
+          ? ["python", "py"]
+          : ["python3", "python"],
+        ["--version"]
+      ),
     parseVersion: (output) =>
       firstVersion(output, /Python (\d+(?:\.\d+)*)/iu)
   }
@@ -276,10 +280,10 @@ async function executeBuiltInProbe(
   spec: HostProbeSpec,
   execute: HostProbeExecutor
 ): Promise<HostSoftwareProbeResult> {
-  for (const executable of spec.executables()) {
+  for (const command of await spec.commands()) {
     const result = await execute({
-      executable,
-      args: spec.args
+      executable: command.executable,
+      args: command.args
     });
     if (result.kind === "missing") {
       continue;
@@ -304,7 +308,7 @@ async function executeBuiltInProbe(
         input,
         "satisfied",
         version ?? null,
-        executable,
+        command.location,
         null
       );
     }
@@ -313,7 +317,7 @@ async function executeBuiltInProbe(
         input,
         "unknown",
         null,
-        executable,
+        command.location,
         {
           code: "UnparseableHostSoftwareVersion",
           facts: {
@@ -333,7 +337,7 @@ async function executeBuiltInProbe(
         input,
         "unknown",
         version,
-        executable,
+        command.location,
         {
           code: "UnparseableHostSoftwareVersion",
           facts: {
@@ -349,7 +353,7 @@ async function executeBuiltInProbe(
       input,
       matched.value ? "satisfied" : "incompatible",
       version,
-      executable,
+      command.location,
       null
     );
   }
@@ -383,6 +387,17 @@ function observation(
 
 function isHostProbeId(value: string): value is HostProbeId {
   return Object.prototype.hasOwnProperty.call(PROBES, value);
+}
+
+async function fixedProbeCommands(
+  executables: ReadonlyArray<string>,
+  args: ReadonlyArray<string>
+): Promise<ReadonlyArray<HostProbeCommand>> {
+  return executables.map((executable) => ({
+    executable,
+    args,
+    location: executable
+  }));
 }
 
 function compareUtf8(left: string, right: string): number {

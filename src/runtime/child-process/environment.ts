@@ -1,3 +1,5 @@
+import process from "node:process";
+
 const ALLOWED_CHILD_ENVIRONMENT_KEYS = new Set([
   "PATH",
   "PATHEXT",
@@ -13,18 +15,28 @@ const ALLOWED_CHILD_ENVIRONMENT_KEYS = new Set([
 ]);
 
 export function restrictedChildProcessEnvironment(
-  environment: NodeJS.ProcessEnv
+  environment: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform = process.platform
 ): NodeJS.ProcessEnv {
   const restricted: NodeJS.ProcessEnv = {};
+  const seen = new Set<string>();
+
   for (const [key, value] of Object.entries(environment)) {
-    if (
-      value !== undefined &&
-      ALLOWED_CHILD_ENVIRONMENT_KEYS.has(
-        key.toUpperCase()
-      )
-    ) {
-      restricted[key] = value;
+    if (value === undefined) {
+      continue;
     }
+    const lookup =
+      platform === "win32"
+        ? key.toUpperCase()
+        : key;
+    if (
+      !ALLOWED_CHILD_ENVIRONMENT_KEYS.has(lookup) ||
+      seen.has(lookup)
+    ) {
+      continue;
+    }
+    seen.add(lookup);
+    restricted[key] = value;
   }
   return restricted;
 }

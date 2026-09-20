@@ -45,6 +45,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:target-projection
+      - run: npm run test:host-observation-platform
 
   native-lock:
     name: Rust lock (${{ matrix.os }})
