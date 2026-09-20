@@ -58,10 +58,8 @@ import {
   parseCliObserveArguments,
   type CliObserveInvocation
 } from "./observe/index.js";
-import {
-  renderFailure,
-  renderSuccess
-} from "./output/index.js";
+import { runCliMeta } from "./meta/index.js";
+import { renderFailure, renderSuccess } from "./output/index.js";
 import {
   parseCliSearchArguments
 } from "./search/index.js";
@@ -743,4 +741,4 @@ function usage(
   };
 }
 
-process.exitCode = await main();
+process.exitCode = (await runCliMeta(process.argv.slice(2))) ?? (await main());

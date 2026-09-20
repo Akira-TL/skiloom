@@ -9,6 +9,9 @@ import { spawn } from "node:child_process";
 import test from "node:test";
 
 import {
+  CANONICAL_CLI_COMMANDS
+} from "../../../../src/cli/meta/index.js";
+import {
   assertNoUnexpectedStderr,
   assertSingleJsonDocument,
   CLI_ENTRY,
@@ -18,7 +21,7 @@ import {
   withGateRuntime
 } from "./fixture.js";
 
-const CANONICAL_COMMANDS = [
+const EXPECTED_CANONICAL_COMMANDS = [
   "search",
   "status",
   "doctor",
@@ -39,6 +42,13 @@ const CANONICAL_COMMANDS = [
   "import",
   "bootstrap"
 ] as const;
+
+assert.deepEqual(
+  CANONICAL_CLI_COMMANDS,
+  EXPECTED_CANONICAL_COMMANDS
+);
+
+const CANONICAL_COMMANDS = EXPECTED_CANONICAL_COMMANDS;
 
 const HANG_PRELOAD = resolve(
   "test/integration/cli/gate/hanging-fetch.mjs"
