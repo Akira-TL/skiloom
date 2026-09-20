@@ -153,6 +153,86 @@ export function completePendingOperationRows(
   }
 }
 
+export type RegistryLocationConflictReason =
+  | "target-missing"
+  | "generation-ahead"
+  | "path-conflict";
+
+export class RegistryLocationConflictError extends Error {
+  constructor(
+    readonly reason: RegistryLocationConflictReason
+  ) {
+    super("registry target location conflict: " + reason);
+    this.name = "RegistryLocationConflictError";
+  }
+}
+
+export function observeTargetLocationRows(
+  database: DatabaseSync,
+  targetId: string,
+  path: string,
+  observedGeneration: number
+): void {
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const target = database
+      .prepare(
+        "SELECT generation FROM targets WHERE target_id = ?"
+      )
+      .get(targetId);
+    if (
+      target === undefined ||
+      typeof target.generation !== "number"
+    ) {
+      throw new RegistryLocationConflictError(
+        "target-missing"
+      );
+    }
+    if (observedGeneration > target.generation) {
+      throw new RegistryLocationConflictError(
+        "generation-ahead"
+      );
+    }
+
+    const existing = database
+      .prepare(
+        "SELECT target_id FROM target_locations WHERE path = ?"
+      )
+      .get(path);
+    if (
+      existing !== undefined &&
+      existing.target_id !== targetId
+    ) {
+      throw new RegistryLocationConflictError(
+        "path-conflict"
+      );
+    }
+
+    database
+      .prepare(
+        `INSERT INTO target_locations (
+           path,
+           target_id,
+           observed_generation
+         )
+         VALUES (?, ?, ?)
+         ON CONFLICT(path) DO UPDATE SET
+           target_id = excluded.target_id,
+           observed_generation = excluded.observed_generation`
+      )
+      .run(path, targetId, observedGeneration);
+
+    database.exec("COMMIT");
+  } catch (error) {
+    try {
+      database.exec("ROLLBACK");
+    } catch {
+      // Preserve the original transaction failure.
+    }
+    throw error;
+  }
+}
+
 export function replaceDependencyObservationRows(
   database: DatabaseSync,
   targetId: string,

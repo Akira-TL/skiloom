@@ -37,6 +37,7 @@ export function planOnlyInstallRegistry(): MachineRegistry {
     beginPendingOperation: unexpected,
     beginPendingReconciliation: unexpected,
     completePendingOperation: unexpected,
+    observeTargetLocation: unexpected,
     replaceDependencyObservations: unexpected,
     replaceTargetState: unexpected
   };

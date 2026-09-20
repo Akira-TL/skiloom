@@ -28,10 +28,13 @@ import {
   beginPendingOperationRows,
   beginPendingReconciliationRows,
   completePendingOperationRows,
+  RegistryLocationConflictError,
   RegistryObservationConflictError,
   RegistryPendingOperationConflictError,
+  observeTargetLocationRows,
   replaceDependencyObservationRows,
-  replaceTargetRows
+  replaceTargetRows,
+  type RegistryLocationConflictReason
 } from "./write.js";
 
 export type RegistrySchemaUnsupported = ProductError<
@@ -61,6 +64,16 @@ export type RegistryPendingOperationRejected = ProductError<
 export type RegistryReplaceError =
   | RegistryStateRejected
   | RegistryPendingOperationRejected;
+
+export type RegistryLocationRejected = ProductError<
+  "RegistryLocationRejected",
+  Readonly<{
+    targetId: string;
+    path: string;
+    observedGeneration: number;
+    reason: RegistryLocationConflictReason;
+  }>
+>;
 
 export type RegistryObservationRejected = ProductError<
   "RegistryObservationRejected",
@@ -177,6 +190,45 @@ export class MachineRegistry {
 
   completePendingOperation(operationId: string): void {
     completePendingOperationRows(this.#database, operationId);
+  }
+
+  observeTargetLocation(
+    targetId: string,
+    path: string,
+    observedGeneration: number
+  ): Result<RegistryTargetState, RegistryLocationRejected> {
+    try {
+      observeTargetLocationRows(
+        this.#database,
+        targetId,
+        path,
+        observedGeneration
+      );
+    } catch (error) {
+      if (error instanceof RegistryLocationConflictError) {
+        return {
+          ok: false,
+          error: productError("RegistryLocationRejected", {
+            targetId,
+            path,
+            observedGeneration,
+            reason: error.reason
+          })
+        };
+      }
+      throw error;
+    }
+
+    const readback = withRegistryReadSnapshot(
+      this.#database,
+      () => readTargetRows(this.#database, targetId)
+    );
+    if (readback === undefined) {
+      throw new Error(
+        "registry target disappeared after location observation"
+      );
+    }
+    return { ok: true, value: readback };
   }
 
   replaceDependencyObservations(

@@ -190,6 +190,96 @@ test("Machine Registry read snapshot does not mix rows across a concurrent commi
   });
 });
 
+test("Machine Registry target-location observation is generation-neutral and fails closed on ahead or foreign ownership", async () => {
+  await withTempHome(async (paths) => {
+    const fixture = await readFixture();
+    const registry = requireRegistry(paths);
+
+    try {
+      const initial = registry.replaceTargetState(fixture.state);
+      assert.equal(initial.ok, true);
+      if (!initial.ok) {
+        return;
+      }
+      assert.equal(initial.value.generation, 1);
+
+      const copiedPath = "/tmp/copied-target";
+      const observed = registry.observeTargetLocation(
+        fixture.state.targetId,
+        copiedPath,
+        1
+      );
+      assert.equal(observed.ok, true);
+      if (!observed.ok) {
+        return;
+      }
+      assert.equal(observed.value.generation, 1);
+      assert.deepEqual(
+        observed.value.locations.find(
+          (entry) => entry.path === copiedPath
+        ),
+        {
+          path: copiedPath,
+          observedGeneration: 1
+        }
+      );
+
+      const ahead = registry.observeTargetLocation(
+        fixture.state.targetId,
+        copiedPath,
+        2
+      );
+      assert.deepEqual(ahead, {
+        ok: false,
+        error: {
+          code: "RegistryLocationRejected",
+          facts: {
+            targetId: fixture.state.targetId,
+            path: copiedPath,
+            observedGeneration: 2,
+            reason: "generation-ahead"
+          }
+        }
+      });
+
+      const secondTargetId =
+        "22222222-2222-4222-8222-222222222222";
+      const second = registry.replaceTargetState({
+        ...fixture.state,
+        targetId: secondTargetId,
+        locations: []
+      });
+      assert.equal(second.ok, true);
+      const conflict = registry.observeTargetLocation(
+        secondTargetId,
+        copiedPath,
+        1
+      );
+      assert.deepEqual(conflict, {
+        ok: false,
+        error: {
+          code: "RegistryLocationRejected",
+          facts: {
+            targetId: secondTargetId,
+            path: copiedPath,
+            observedGeneration: 1,
+            reason: "path-conflict"
+          }
+        }
+      });
+
+      assert.equal(
+        registry.readTargetState(
+          fixture.state.targetId
+        )?.generation,
+        1
+      );
+    } finally {
+      registry.close();
+    }
+  });
+});
+
 test("Machine Registry observation refresh is generation-neutral and preserves the other observation kind", async () => {
   await withTempHome(async (paths) => {
     const fixture = await readFixture();

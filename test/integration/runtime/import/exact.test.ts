@@ -413,6 +413,16 @@ function observeRegistry(
       registry.beginPendingReconciliation(id, pending),
     completePendingOperation: (operationId) =>
       registry.completePendingOperation(operationId),
+    observeTargetLocation: (
+      targetId,
+      path,
+      observedGeneration
+    ) =>
+      registry.observeTargetLocation(
+        targetId,
+        path,
+        observedGeneration
+      ),
     replaceDependencyObservations: (
       targetId,
       kind,

@@ -138,6 +138,16 @@ export function countRegistryWrites(
       counters.completePending += 1;
       return registry.completePendingOperation(operationId);
     },
+    observeTargetLocation: (
+      targetId,
+      path,
+      observedGeneration
+    ) =>
+      registry.observeTargetLocation(
+        targetId,
+        path,
+        observedGeneration
+      ),
     replaceDependencyObservations: (
       targetId,
       kind,
@@ -170,6 +180,16 @@ export function failBeforeCommitRegistry(
       registry.beginPendingReconciliation(id, pending),
     completePendingOperation: (operationId) =>
       registry.completePendingOperation(operationId),
+    observeTargetLocation: () => ({
+      ok: false,
+      error: {
+        code: "OperationLockLost",
+        facts: {
+          lockPath,
+          reason: "session-not-held"
+        }
+      }
+    }),
     replaceDependencyObservations: () => ({
       ok: false,
       error: {
@@ -208,6 +228,16 @@ export function afterSuccessfulReplaceRegistry(
       registry.beginPendingReconciliation(id, pending),
     completePendingOperation: (operationId) =>
       registry.completePendingOperation(operationId),
+    observeTargetLocation: (
+      targetId,
+      path,
+      observedGeneration
+    ) =>
+      registry.observeTargetLocation(
+        targetId,
+        path,
+        observedGeneration
+      ),
     replaceDependencyObservations: (
       targetId,
       kind,

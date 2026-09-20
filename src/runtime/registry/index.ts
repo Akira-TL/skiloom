@@ -1,6 +1,7 @@
 export {
   openMachineRegistry,
   type MachineRegistry,
+  type RegistryLocationLockedError,
   type RegistryObservationLockedError,
   type RegistryOpenError,
   type RegistryPendingLockedError,
