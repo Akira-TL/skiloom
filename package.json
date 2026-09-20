@@ -1,6 +1,6 @@
 {
   "name": "skiloom",
-  "version": "0.8.5",
+  "version": "0.8.6",
   "description": "Agent Skill package manager and installer",
   "type": "module",
   "bin": {
