@@ -57,6 +57,10 @@ import {
   type LifecycleCandidateAcceptanceCallback
 } from "./acceptance.js";
 import {
+  freshLifecycleCandidateProjections,
+  type LifecycleCandidateProjection
+} from "./projection/plan.js";
+import {
   syncLifecycleMarker,
   type LifecycleMarkerSyncCallback,
   type LifecycleMarkerSyncFailed
@@ -122,14 +126,17 @@ export type FirstAcceptedInstallResult =
   | Readonly<{
       status: "planned";
       plan: LifecycleCandidatePlan;
+      projections: ReadonlyArray<LifecycleCandidateProjection>;
     }>
   | Readonly<{
       status: "declined";
       plan: LifecycleCandidatePlan;
+      projections: ReadonlyArray<LifecycleCandidateProjection>;
     }>
   | Readonly<{
       status: "installed";
       plan: LifecycleCandidatePlan;
+      projections: ReadonlyArray<LifecycleCandidateProjection>;
       state: RegistryTargetState;
       marker: TargetRecoveryMarkerFacts;
     }>;
@@ -188,11 +195,16 @@ export async function executeFirstAcceptedInstall(
   if (!desiredPlan.ok) {
     return desiredPlan;
   }
+  const candidateProjections =
+    freshLifecycleCandidateProjections(desiredPlan.value);
 
   let acceptance;
   try {
     acceptance = resolveLifecycleCandidateAcceptance(
-      await input.acceptCandidate(planned.value)
+      await input.acceptCandidate(
+        planned.value,
+        candidateProjections
+      )
     );
   } catch {
     return {
@@ -211,7 +223,8 @@ export async function executeFirstAcceptedInstall(
       ok: true,
       value: {
         status: "planned",
-        plan: planned.value
+        plan: planned.value,
+        projections: candidateProjections
       }
     };
   }
@@ -220,7 +233,8 @@ export async function executeFirstAcceptedInstall(
       ok: true,
       value: {
         status: "declined",
-        plan: planned.value
+        plan: planned.value,
+        projections: candidateProjections
       }
     };
   }
@@ -362,6 +376,7 @@ export async function executeFirstAcceptedInstall(
     value: {
       status: "installed",
       plan: planned.value,
+      projections: candidateProjections,
       state: reconciled.value,
       marker
     }

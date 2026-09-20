@@ -43,6 +43,15 @@ type ParsedCliOutput = Readonly<{
     packages: ReadonlyArray<Readonly<{
       packageCoordinate: string;
     }>>;
+    dependencyEdges: ReadonlyArray<Readonly<{
+      sourcePackageCoordinate: string;
+      targetPackageCoordinate: string;
+    }>>;
+    projections: ReadonlyArray<Readonly<{
+      packageCoordinate: string;
+      activationName: string;
+      ownership: "managed" | "detached";
+    }>>;
     projectionRenames: ReadonlyArray<Readonly<{
       packageCoordinate: string;
       activationName: string;
@@ -67,7 +76,7 @@ test("install --plan renders a complete human candidate without committing Regis
         "app-local",
         "--plan"
       ],
-      { home, cwd }
+      { home, cwd, mode: "shared-remove" }
     );
 
     assert.equal(result.code, 0);
@@ -78,9 +87,19 @@ test("install --plan renders a complete human candidate without committing Regis
     assert.match(result.stdout, /acme\/app\/app/u);
     assert.match(result.stdout, /Sources:/u);
     assert.match(result.stdout, /Packages:/u);
+    assert.match(result.stdout, /Dependency Edges:/u);
     assert.match(
       result.stdout,
-      /acme\/app\/app -> app-local/u
+      /acme\/app\/app -> acme\/shared\/shared/u
+    );
+    assert.match(result.stdout, /Projections \/ Ownership:/u);
+    assert.match(
+      result.stdout,
+      /acme\/app\/app -> app-local \(managed\)/u
+    );
+    assert.match(
+      result.stdout,
+      /acme\/shared\/shared -> shared \(managed\)/u
     );
     await assert.rejects(
       stat(join(home, ".skiloom", "registry.sqlite3"))
@@ -120,10 +139,87 @@ test("install --plan --json keeps the SKILOOM-CLI-V1 envelope and does not imply
       output.result.packages[0]?.packageCoordinate,
       "acme/app/app"
     );
+    assert.deepEqual(output.result.projections, [
+      {
+        packageCoordinate: "acme/app/app",
+        activationName: "app",
+        ownership: "managed"
+      }
+    ]);
+    assert.equal(output.result.acceptedState, null);
     await assert.rejects(
       stat(join(home, ".skiloom", "registry.sqlite3"))
     );
   });
+});
+
+test("existing-Target install plan preserves detached ownership in complete candidate projections", async () => {
+  await withCliRuntime(
+    "detached-plan",
+    async ({ home, cwd }) => {
+      const installed = await runCli(
+        [
+          "install",
+          "acme/app/app",
+          "--yes",
+          "--json"
+        ],
+        { home, cwd, mode: "shared-remove" }
+      );
+      assert.equal(installed.code, 0);
+
+      const detached = await runCli(
+        [
+          "detach",
+          "acme/shared/shared",
+          "--json"
+        ],
+        { home, cwd, mode: "forbid-network" }
+      );
+      assert.equal(detached.code, 0);
+
+      const planned = await runCli(
+        [
+          "install",
+          "acme/tool/tool",
+          "--plan",
+          "--json"
+        ],
+        { home, cwd, mode: "shared-remove" }
+      );
+      assert.equal(planned.code, 0);
+      const output = parseJson(planned.stdout);
+      assert.equal(output.result.status, "planned");
+      assert.equal(
+        output.result.acceptedState.generation,
+        2
+      );
+      assert.deepEqual(
+        output.result.projections.map((projection) => ({
+          packageCoordinate: projection.packageCoordinate,
+          activationName: projection.activationName,
+          ownership: projection.ownership
+        })),
+        [
+          {
+            packageCoordinate: "acme/app/app",
+            activationName: "app",
+            ownership: "managed"
+          },
+          {
+            packageCoordinate: "acme/shared/shared",
+            activationName: "shared",
+            ownership: "detached"
+          },
+          {
+            packageCoordinate: "acme/tool/tool",
+            activationName: "tool",
+            ownership: "managed"
+          }
+        ]
+      );
+    }
+  );
 });
 
 test("noninteractive install without --yes returns InteractionRequired exit 3 without accepted mutation", async () => {

@@ -79,6 +79,16 @@ export function projectionRenames(
   });
 }
 
+export function freshLifecycleCandidateProjections(
+  targetPlan: TargetPlan
+): ReadonlyArray<LifecycleCandidateProjection> {
+  return targetPlan.projections.map((projection) => ({
+    packageCoordinate: projection.packageCoordinate,
+    activationName: projection.activationName,
+    ownership: "managed" as const
+  }));
+}
+
 export function lifecycleCandidateProjections(
   current: RegistryTargetState,
   targetPlan: TargetPlan

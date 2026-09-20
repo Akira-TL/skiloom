@@ -39,6 +39,9 @@ import {
   executeFirstAcceptedInstall
 } from "../runtime/orchestration/lifecycle/first-install.js";
 import type {
+  LifecycleCandidateProjection
+} from "../runtime/orchestration/lifecycle/projection/plan.js";
+import type {
   MachineRegistry,
   RegistryTargetState
 } from "../runtime/registry/index.js";
@@ -58,6 +61,9 @@ import {
   presentDirectRequirement,
   type CliPresentedDirectRequirement
 } from "./candidate-acceptance.js";
+import {
+  formatCliCandidatePresentation
+} from "./candidate/presentation.js";
 import {
   readCliStatus
 } from "./status.js";
@@ -102,6 +108,7 @@ export type CliInstallResult = Readonly<{
   packages: LifecycleCandidatePlan["candidate"]["packages"];
   dependencyEdges: LifecycleCandidatePlan["candidate"]["dependencyEdges"];
   comparison: LifecycleCandidatePlan["comparison"];
+  projections: ReadonlyArray<LifecycleCandidateProjection>;
   projectionRenames: ReadonlyArray<TargetProjectionRename>;
   acceptedState: CliInstallAcceptedState | null;
 }>;
@@ -515,6 +522,9 @@ async function executeWhileLocked(
               input.intent,
               "no-op",
               noOp.value.plan,
+              candidateProjectionsFromState(
+                noOp.value.state
+              ),
               noOp.value.state
             ),
             presentationRendered: false
@@ -530,13 +540,13 @@ async function executeWhileLocked(
     const acceptance = createCliCandidateAcceptance(
       input,
       {
-        presentCandidate: (plan) => {
+        presentCandidate: (plan, projections) => {
           presentationRendered = true;
           process.stdout.write(
             formatInstallCandidate(
               input.target,
-              input.intent,
               plan,
+              projections,
               "candidate"
             )
           );
@@ -605,6 +615,7 @@ async function executeWhileLocked(
           input.intent,
           lifecycle.value.status,
           lifecycle.value.plan,
+          lifecycle.value.projections,
           "state" in lifecycle.value
             ? lifecycle.value.state
             : undefined
@@ -639,6 +650,7 @@ function lifecycleResult(
   intent: CliInstallIntent,
   status: CliInstallResult["status"],
   plan: LifecycleCandidatePlan,
+  projections: ReadonlyArray<LifecycleCandidateProjection>,
   state: RegistryTargetState | undefined
 ): CliInstallResult {
   return {
@@ -651,6 +663,7 @@ function lifecycleResult(
     packages: plan.candidate.packages,
     dependencyEdges: plan.candidate.dependencyEdges,
     comparison: plan.comparison,
+    projections,
     projectionRenames:
       intent.requestedProjectionRename === undefined
         ? []
@@ -673,128 +686,43 @@ function lifecycleResult(
 export function formatCliInstallResult(
   result: CliInstallResult
 ): string {
-  return formatInstallPresentation(
-    result.target,
-    result.status,
-    result.directRequirements,
-    result.sources,
-    result.packages,
-    result.comparison,
-    result.projectionRenames
-  );
+  return formatCliCandidatePresentation({
+    status: result.status,
+    target: result.target,
+    directRequirements: result.directRequirements,
+    sources: result.sources,
+    packages: result.packages,
+    dependencyEdges: result.dependencyEdges,
+    comparison: result.comparison,
+    projections: result.projections
+  });
 }
 
 function formatInstallCandidate(
   target: ResolvedCliTarget,
-  intent: CliInstallIntent,
   plan: LifecycleCandidatePlan,
+  projections: ReadonlyArray<LifecycleCandidateProjection>,
   status: string
 ): string {
-  return formatInstallPresentation(
-    target,
+  return formatCliCandidatePresentation({
     status,
-    plan.directRequirements.map(presentDirectRequirement),
-    plan.candidate.sourceBindings,
-    plan.candidate.packages,
-    plan.comparison,
-    intent.requestedProjectionRename === undefined
-      ? []
-      : [intent.requestedProjectionRename]
-  );
+    target,
+    directRequirements:
+      plan.directRequirements.map(presentDirectRequirement),
+    sources: plan.candidate.sourceBindings,
+    packages: plan.candidate.packages,
+    dependencyEdges: plan.candidate.dependencyEdges,
+    comparison: plan.comparison,
+    projections
+  });
 }
 
-function formatInstallPresentation(
-  target: ResolvedCliTarget,
-  status: string,
-  requirements: ReadonlyArray<CliInstallDirectRequirement>,
-  sources: LifecycleCandidatePlan["candidate"]["sourceBindings"],
-  packages: LifecycleCandidatePlan["candidate"]["packages"],
-  comparison: LifecycleCandidatePlan["comparison"],
-  renames: ReadonlyArray<TargetProjectionRename>
-): string {
-  const lines = [
-    "Target: " + target.path,
-    "Status: " + status,
-    "Direct Install Requirements:"
-  ];
-  for (const requirement of requirements) {
-    const source =
-      requirement.sourceKind === "git"
-        ? "git " + requirement.requestedRef
-        : "github-release" +
-          (requirement.versionRequirement === undefined
-            ? ""
-            : " " + requirement.versionRequirement);
-    lines.push(
-      "- " + requirement.kind + " " +
-      requirement.coordinate + " " + source
-    );
-  }
-
-  lines.push("Sources:");
-  for (const source of sources) {
-    lines.push(
-      source.sourceKind === "git"
-        ? "- " + source.repositoryCoordinate +
-          " git " + source.requestedRef +
-          " @ " + source.exactCommit
-        : "- " + source.repositoryCoordinate +
-          " github-release " + source.version +
-          " (" + source.actualTag + ") @ " +
-          source.exactCommit
-    );
-  }
-
-  lines.push("Packages:");
-  for (const packageFact of packages) {
-    lines.push(
-      "- " + packageFact.packageCoordinate +
-      " " + packageFact.contentDigest
-    );
-  }
-
-  lines.push("Projection Renames:");
-  if (renames.length === 0) {
-    lines.push("- none");
-  } else {
-    for (const rename of renames) {
-      lines.push(
-        "- " + rename.packageCoordinate +
-        " -> " + rename.activationName
-      );
-    }
-  }
-
-  lines.push("Changes:");
-  const deltas = [
-    ...comparison.sourceDeltas.map((delta) => delta.kind),
-    ...comparison.packageDeltas.map((delta) => delta.kind),
-    ...comparison.dependencyEdgeDeltas.map(
-      (delta) => delta.kind
-    )
-  ];
-  if (deltas.length === 0) {
-    lines.push("- none");
-  } else {
-    for (const delta of deltas) {
-      lines.push("- " + delta);
-    }
-  }
-
-  const retargets = comparison.sourceDeltas.filter(
-    (delta) => delta.kind === "release-retarget"
-  );
-  lines.push("Warnings / Special Risks:");
-  if (retargets.length === 0) {
-    lines.push("- none");
-  } else {
-    for (const retarget of retargets) {
-      lines.push(
-        "- release-retarget " +
-        retarget.repositoryCoordinate
-      );
-    }
-  }
-
-  return lines.join("\n") + "\n";
+function candidateProjectionsFromState(
+  state: RegistryTargetState
+): ReadonlyArray<LifecycleCandidateProjection> {
+  return state.projections.map((projection) => ({
+    packageCoordinate: projection.packageCoordinate,
+    activationName: projection.activationName,
+    ownership: projection.ownership
+  }));
 }
