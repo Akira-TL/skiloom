@@ -29,7 +29,8 @@ import {
 import type { SkiloomHomePaths } from "../home.js";
 import type {
   MachineRegistry,
-  RegistryTargetState
+  RegistryTargetState,
+  RegistryTargetStateInput
 } from "../registry/index.js";
 import type { PackageStoreError } from "../store.js";
 import {
@@ -105,11 +106,13 @@ export type MergeExactPackageResult =
   | Readonly<{
       status: "declined";
       manifest: ExactExportManifest;
+      candidate: RegistryTargetStateInput;
       state: RegistryTargetState;
     }>
   | Readonly<{
       status: "merged";
       manifest: ExactExportManifest;
+      candidate: RegistryTargetStateInput;
       state: RegistryTargetState;
     }>;
 
@@ -237,6 +240,7 @@ export async function mergeExactPackage(
       value: {
         status: "declined",
         manifest: parsed.value.manifest,
+        candidate: merged.value.nextState,
         state: current.value.state
       }
     };
@@ -364,6 +368,7 @@ export async function mergeExactPackage(
     value: {
       status: "merged",
       manifest: parsed.value.manifest,
+      candidate: merged.value.nextState,
       state: reconciled.value
     }
   };

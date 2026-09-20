@@ -67,11 +67,7 @@ export function createCliCandidateAcceptance(
   input: CliCandidateInvocation,
   presentation: CliCandidatePresentation
 ): CliCandidateAcceptance {
-  const interactive =
-    !input.json &&
-    !input.nonInteractive &&
-    process.stdin.isTTY === true &&
-    process.stdout.isTTY === true;
+  const interactive = isInteractiveCli(input);
 
   if (!interactive || input.plan || input.yes) {
     const nonInteractive =
@@ -94,7 +90,7 @@ export function createCliCandidateAcceptance(
     ): Promise<LifecycleCandidateAcceptanceResponse> => {
       presentation.presentRetargets(retargets);
       if (
-        await confirm(
+        await confirmCliQuestion(
           "Accept release tag retarget risk? [y/N] "
         )
       ) {
@@ -115,7 +111,9 @@ export function createCliCandidateAcceptance(
     LifecycleCandidateAcceptanceCallback =
     async (plan, projections = []) => {
       presentation.presentCandidate(plan, projections);
-      return confirm("Apply this complete state? [y/N] ");
+      return confirmCliQuestion(
+        "Apply this complete state? [y/N] "
+      );
     };
 
   const acceptCandidateWithRetarget:
@@ -207,7 +205,23 @@ function releaseRetargets(
     );
 }
 
-async function confirm(question: string): Promise<boolean> {
+export function isInteractiveCli(
+  input: Readonly<{
+    json: boolean;
+    nonInteractive: boolean;
+  }>
+): boolean {
+  return (
+    !input.json &&
+    !input.nonInteractive &&
+    process.stdin.isTTY === true &&
+    process.stdout.isTTY === true
+  );
+}
+
+export async function confirmCliQuestion(
+  question: string
+): Promise<boolean> {
   const terminal = createInterface({
     input: process.stdin,
     output: process.stdout

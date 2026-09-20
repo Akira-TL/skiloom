@@ -4,6 +4,7 @@ import {
   mkdir,
   mkdtemp,
   readFile,
+  readdir,
   rm,
   writeFile
 } from "node:fs/promises";
@@ -27,8 +28,10 @@ const LOCK_HELPER =
 type ParsedCliOutput = Readonly<{
   ok: boolean;
   result: Readonly<{
-    mode: string;
+    mode?: string;
     file: string;
+    status?: string;
+    generation?: number;
   }>;
   error?: Readonly<{
     code: string;
@@ -39,6 +42,324 @@ type ParsedCliOutput = Readonly<{
     facts: Readonly<Record<string, unknown>>;
   }>>;
 }>;
+
+test("import restores a full export offline with a fresh Target identity", async () => {
+  await withCliRuntime(async ({ home, cwd, target }) => {
+    const installed = await runCli(
+      ["install", "acme/app/app", "--yes", "--json"],
+      { home, cwd, mode: "base" }
+    );
+    assert.equal(installed.code, 0);
+    const manual = join(target, "manual");
+    await mkdir(manual);
+    await writeFile(
+      join(manual, "SKILL.md"),
+      [
+        "---",
+        "name: manual",
+        "description: Offline import user skill.",
+        "---",
+        "manual offline bytes",
+        ""
+      ].join("\n"),
+      "utf8"
+    );
+
+    const exportFile = "offline-full.skiloom-export";
+    const exported = await runCli(
+      ["export", exportFile, "--full", "--json"],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(exported.code, 0);
+
+    const restoredTarget = join(cwd, "restored-skills");
+    await mkdir(restoredTarget);
+    const imported = await runCli(
+      [
+        "import",
+        exportFile,
+        "--target",
+        restoredTarget,
+        "--yes",
+        "--json"
+      ],
+      { home, cwd, mode: "forbid-network" }
+    );
+
+    assert.equal(imported.code, 0);
+    assertNoUnexpectedStderr(imported.stderr);
+    const output = parseOutput(imported.stdout);
+    assert.equal(output.ok, true);
+    assert.equal(output.result.status, "imported");
+    assert.equal(output.result.file, exportFile);
+    assert.equal(output.result.generation, 1);
+    assert.equal(imported.stdout.includes(home), false);
+    assert.equal(imported.stdout.includes(target), false);
+    assert.equal(imported.stdout.includes(restoredTarget), false);
+    assert.match(
+      await readFile(
+        join(restoredTarget, "app", "SKILL.md"),
+        "utf8"
+      ),
+      /Baseline application\./u
+    );
+    assert.match(
+      await readFile(
+        join(restoredTarget, "manual", "SKILL.md"),
+        "utf8"
+      ),
+      /manual offline bytes/u
+    );
+  });
+});
+
+test("import --plan and missing approval validate the package without committing state", async () => {
+  await withCliRuntime(async ({ home, cwd }) => {
+    const installed = await runCli(
+      ["install", "acme/app/app", "--yes", "--json"],
+      { home, cwd, mode: "base" }
+    );
+    assert.equal(installed.code, 0);
+    const exportFile = "plan-import.skiloom-export";
+    const exported = await runCli(
+      ["export", exportFile, "--json"],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(exported.code, 0);
+
+    const plannedTarget = join(cwd, "planned-skills");
+    await mkdir(plannedTarget);
+    const planned = await runCli(
+      [
+        "import",
+        exportFile,
+        "--target",
+        plannedTarget,
+        "--plan",
+        "--json"
+      ],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(planned.code, 0);
+    const plannedOutput = parseOutput(planned.stdout);
+    assert.equal(plannedOutput.result.status, "planned");
+    assert.deepEqual(
+      await readDirectoryNames(plannedTarget),
+      []
+    );
+    const planStatus = await runCli(
+      ["status", "--target", plannedTarget, "--json"],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(planStatus.code, 0);
+    const planStatusOutput = JSON.parse(
+      planStatus.stdout
+    ) as Readonly<{
+      result: Readonly<{ registry: unknown }>;
+    }>;
+    assert.equal(planStatusOutput.result.registry, null);
+
+    const blocked = await runCli(
+      [
+        "import",
+        exportFile,
+        "--target",
+        plannedTarget,
+        "--json"
+      ],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(blocked.code, 3);
+    const blockedOutput = parseOutput(blocked.stdout);
+    assert.equal(blockedOutput.ok, false);
+    assert.equal(
+      blockedOutput.error?.code,
+      "InteractionRequired"
+    );
+    assert.deepEqual(
+      await readDirectoryNames(plannedTarget),
+      []
+    );
+    const blockedStatus = await runCli(
+      ["status", "--target", plannedTarget, "--json"],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(blockedStatus.code, 0);
+    const blockedStatusOutput = JSON.parse(
+      blockedStatus.stdout
+    ) as Readonly<{
+      result: Readonly<{ registry: unknown }>;
+    }>;
+    assert.equal(blockedStatusOutput.result.registry, null);
+  });
+});
+
+test("existing Target import requires --merge and merge conflicts never overwrite foreign bytes", async () => {
+  await withCliRuntime(async ({ home, cwd }) => {
+    const sourceTarget = join(cwd, "source-suite");
+    await mkdir(sourceTarget);
+    const source = await runCli(
+      [
+        "install",
+        "acme/suite",
+        "--target",
+        sourceTarget,
+        "--yes",
+        "--json"
+      ],
+      { home, cwd, mode: "base" }
+    );
+    assert.equal(source.code, 0);
+    const exportFile = "suite.skiloom-export";
+    const exported = await runCli(
+      [
+        "export",
+        exportFile,
+        "--target",
+        sourceTarget,
+        "--json"
+      ],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(exported.code, 0);
+
+    const existingTarget = join(cwd, "existing-skills");
+    await mkdir(existingTarget);
+    const existing = await runCli(
+      [
+        "install",
+        "acme/app/app",
+        "--target",
+        existingTarget,
+        "--yes",
+        "--json"
+      ],
+      { home, cwd, mode: "base" }
+    );
+    assert.equal(existing.code, 0);
+
+    const noMerge = await runCli(
+      [
+        "import",
+        exportFile,
+        "--target",
+        existingTarget,
+        "--yes",
+        "--json"
+      ],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(noMerge.code, 1);
+    const noMergeOutput = parseOutput(noMerge.stdout);
+    assert.equal(
+      noMergeOutput.error?.code,
+      "ExactImportMergeRequired"
+    );
+
+    const foreign = join(existingTarget, "alpha");
+    await mkdir(foreign);
+    await writeFile(
+      join(foreign, "KEEP"),
+      "foreign alpha bytes\n",
+      "utf8"
+    );
+    const conflict = await runCli(
+      [
+        "import",
+        exportFile,
+        "--target",
+        existingTarget,
+        "--merge",
+        "--yes",
+        "--json"
+      ],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(conflict.code, 1);
+    const conflictOutput = parseOutput(conflict.stdout);
+    assert.equal(conflictOutput.ok, false);
+    assert.equal(
+      await readFile(join(foreign, "KEEP"), "utf8"),
+      "foreign alpha bytes\n"
+    );
+    assert.equal(existsSync(join(existingTarget, "app")), true);
+  });
+});
+
+test("explicit --merge combines an exact import with the existing accepted Target", async () => {
+  await withCliRuntime(async ({ home, cwd }) => {
+    const sourceTarget = join(cwd, "merge-source");
+    await mkdir(sourceTarget);
+    const source = await runCli(
+      [
+        "install",
+        "acme/suite",
+        "--target",
+        sourceTarget,
+        "--yes",
+        "--json"
+      ],
+      { home, cwd, mode: "base" }
+    );
+    assert.equal(source.code, 0);
+    const exportFile = "merge.skiloom-export";
+    assert.equal(
+      (
+        await runCli(
+          [
+            "export",
+            exportFile,
+            "--target",
+            sourceTarget,
+            "--json"
+          ],
+          { home, cwd, mode: "forbid-network" }
+        )
+      ).code,
+      0
+    );
+
+    const existingTarget = join(cwd, "merge-existing");
+    await mkdir(existingTarget);
+    assert.equal(
+      (
+        await runCli(
+          [
+            "install",
+            "acme/app/app",
+            "--target",
+            existingTarget,
+            "--yes",
+            "--json"
+          ],
+          { home, cwd, mode: "base" }
+        )
+      ).code,
+      0
+    );
+
+    const merged = await runCli(
+      [
+        "import",
+        exportFile,
+        "--target",
+        existingTarget,
+        "--merge",
+        "--yes",
+        "--json"
+      ],
+      { home, cwd, mode: "forbid-network" }
+    );
+
+    assert.equal(merged.code, 0);
+    const output = parseOutput(merged.stdout);
+    assert.equal(output.result.status, "merged");
+    assert.equal(output.result.generation, 2);
+    assert.equal(existsSync(join(existingTarget, "app")), true);
+    assert.equal(existsSync(join(existingTarget, "alpha")), true);
+    assert.equal(existsSync(join(existingTarget, "beta")), true);
+  });
+});
 
 test("export defaults to dependencies, full includes user-owned payloads, and existing destinations never overwrite", async () => {
   await withCliRuntime(async ({ home, cwd, target }) => {
@@ -212,6 +533,12 @@ function runCli(
 
 function parseOutput(source: string): ParsedCliOutput {
   return JSON.parse(source) as ParsedCliOutput;
+}
+
+async function readDirectoryNames(
+  path: string
+): Promise<ReadonlyArray<string>> {
+  return (await readdir(path)).sort();
 }
 
 function assertNoUnexpectedStderr(stderr: string): void {

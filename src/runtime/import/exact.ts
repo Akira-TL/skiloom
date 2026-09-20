@@ -26,7 +26,8 @@ import type {
 import type { SkiloomHomePaths } from "../home.js";
 import type {
   MachineRegistry,
-  RegistryTargetState
+  RegistryTargetState,
+  RegistryTargetStateInput
 } from "../registry/index.js";
 import type {
   PackageStoreError
@@ -117,10 +118,12 @@ export type ExactImportResult =
   | Readonly<{
       status: "declined";
       manifest: ExactExportManifest;
+      candidate: RegistryTargetStateInput;
     }>
   | Readonly<{
       status: "imported";
       manifest: ExactExportManifest;
+      candidate: RegistryTargetStateInput;
       state: RegistryTargetState;
     }>;
 
@@ -212,7 +215,8 @@ export async function importExactPackage(
       ok: true,
       value: {
         status: "declined",
-        manifest: parsed.value.manifest
+        manifest: parsed.value.manifest,
+        candidate: prepared.value.nextState
       }
     };
   }
@@ -338,6 +342,7 @@ export async function importExactPackage(
     value: {
       status: "imported",
       manifest: parsed.value.manifest,
+      candidate: prepared.value.nextState,
       state: reconciled.value
     }
   };

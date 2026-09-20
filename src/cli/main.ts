@@ -11,7 +11,7 @@ import {
   executeCliInstall,
   formatCliInstallResult,
   parseCliInstallArguments,
-  type CliInstallIntent,
+  type CliInstallInvocation,
   type CliInstallResult
 } from "./install.js";
 import {
@@ -65,6 +65,13 @@ import {
   type CliExportResult
 } from "./transfer/index.js";
 import {
+  executeCliImport,
+  formatCliImportResult,
+  parseCliImportArguments,
+  type CliImportInvocation,
+  type CliImportResult
+} from "./transfer/import.js";
+import {
   executeCliUpdate,
   formatCliUpdateResult,
   parseCliUpdateArguments,
@@ -115,28 +122,24 @@ type ParsedSearch = Readonly<{
   json: boolean;
 }>;
 
-type ParsedInstall = Readonly<{
-  command: "install";
-  intent: CliInstallIntent;
-  target: ResolvedCliTarget;
-  plan: boolean;
-  yes: boolean;
-  allowReleaseRetarget: boolean;
-  nonInteractive: boolean;
-  json: boolean;
-}>;
-
-type ParsedUpdate = CliUpdateInvocation &
-  Readonly<{ command: "update" }>;
-
-type ParsedRemove = CliRemoveInvocation & Readonly<{ command: "remove" }>;
-type ParsedRecovery = CliRecoveryInvocation & Readonly<{ command: "recover" | "fork" }>;
-type ParsedSync = CliSyncInvocation & Readonly<{ command: "sync" }>;
-type ParsedRepair = CliRepairInvocation & Readonly<{ command: "repair" }>;
-type ParsedLocal = CliLocalInvocation &
-  Readonly<{ command: CliLocalOperation }>;
-type ParsedExport = CliExportInvocation &
-  Readonly<{ command: "export" }>;
+type ParsedInstall =
+  CliInstallInvocation & Readonly<{ command: "install" }>;
+type ParsedUpdate =
+  CliUpdateInvocation & Readonly<{ command: "update" }>;
+type ParsedRemove =
+  CliRemoveInvocation & Readonly<{ command: "remove" }>;
+type ParsedRecovery =
+  CliRecoveryInvocation & Readonly<{ command: "recover" | "fork" }>;
+type ParsedSync =
+  CliSyncInvocation & Readonly<{ command: "sync" }>;
+type ParsedRepair =
+  CliRepairInvocation & Readonly<{ command: "repair" }>;
+type ParsedLocal =
+  CliLocalInvocation & Readonly<{ command: CliLocalOperation }>;
+type ParsedExport =
+  CliExportInvocation & Readonly<{ command: "export" }>;
+type ParsedImport =
+  CliImportInvocation & Readonly<{ command: "import" }>;
 
 type ParsedCommand =
   | ParsedValidate
@@ -149,19 +152,22 @@ type ParsedCommand =
   | ParsedSync
   | ParsedRepair
   | ParsedLocal
-  | ParsedExport;
+  | ParsedExport
+  | ParsedImport;
 
 type ParsedCandidate =
   | ParsedInstall
   | ParsedUpdate
   | ParsedRemove
-  | ParsedRecovery;
+  | ParsedRecovery
+  | ParsedImport;
 
 type CandidateCliResult =
   | CliInstallResult
   | CliUpdateResult
   | CliRemoveResult
-  | CliRecoveryResult;
+  | CliRecoveryResult
+  | CliImportResult;
 
 type CandidateCliExecution = Readonly<{
   result: CandidateCliResult;
@@ -201,6 +207,7 @@ async function main(): Promise<number> {
     case "remove":
     case "recover":
     case "fork":
+    case "import":
       return runCandidate(parsed.value);
     case "sync":
     case "repair":
@@ -253,7 +260,9 @@ async function runCandidate(
         ? await executeCliUpdate(command)
         : command.command === "remove"
           ? await executeCliRemove(command)
-          : await executeCliRecovery(command);
+          : command.command === "import"
+            ? await executeCliImport(command)
+            : await executeCliRecovery(command);
   return executed.ok
     ? renderCandidateSuccess(
         command.command,
@@ -423,6 +432,8 @@ function parseArguments(
       return parseRepair(withoutJson.slice(1), json);
     case "export":
       return parseExport(withoutJson.slice(1), json);
+    case "import":
+      return parseImport(withoutJson.slice(1), json);
     case "rename":
     case "detach":
     case "rebind":
@@ -481,42 +492,22 @@ function parseSearch(
     : usage("search", json, parsed.reason);
 }
 
-function parseInstall(
-  argv: ReadonlyArray<string>,
-  json: boolean
-):
+function parseInstall(argv: ReadonlyArray<string>, json: boolean):
   | Readonly<{ ok: true; value: ParsedInstall }>
   | Readonly<{ ok: false; value: UsageFailure }> {
   const parsed = parseCliInstallArguments(argv, json);
-  if (!parsed.ok) {
-    return usage("install", json, parsed.reason);
-  }
-  return {
-    ok: true,
-    value: {
-      command: "install",
-      ...parsed.value
-    }
-  };
+  return parsed.ok
+    ? { ok: true, value: { command: "install", ...parsed.value } }
+    : usage("install", json, parsed.reason);
 }
 
-function parseUpdate(
-  argv: ReadonlyArray<string>,
-  json: boolean
-):
+function parseUpdate(argv: ReadonlyArray<string>, json: boolean):
   | Readonly<{ ok: true; value: ParsedUpdate }>
   | Readonly<{ ok: false; value: UsageFailure }> {
   const parsed = parseCliUpdateArguments(argv, json);
-  if (!parsed.ok) {
-    return usage("update", json, parsed.reason);
-  }
-  return {
-    ok: true,
-    value: {
-      command: "update",
-      ...parsed.value
-    }
-  };
+  return parsed.ok
+    ? { ok: true, value: { command: "update", ...parsed.value } }
+    : usage("update", json, parsed.reason);
 }
 
 function parseRemove(argv: ReadonlyArray<string>, json: boolean):
@@ -557,42 +548,34 @@ function parseExport(argv: ReadonlyArray<string>, json: boolean):
     : usage("export", json, parsed.reason);
 }
 
-function parseSync(
+function parseImport(
   argv: ReadonlyArray<string>,
   json: boolean
 ):
+  | Readonly<{ ok: true; value: ParsedImport }>
+  | Readonly<{ ok: false; value: UsageFailure }> {
+  const parsed = parseCliImportArguments(argv, json);
+  return parsed.ok
+    ? { ok: true, value: { command: "import", ...parsed.value } }
+    : usage("import", json, parsed.reason);
+}
+
+function parseSync(argv: ReadonlyArray<string>, json: boolean):
   | Readonly<{ ok: true; value: ParsedSync }>
   | Readonly<{ ok: false; value: UsageFailure }> {
   const parsed = parseCliSyncArguments(argv, json);
-  if (!parsed.ok) {
-    return usage("sync", json, parsed.reason);
-  }
-  return {
-    ok: true,
-    value: {
-      command: "sync",
-      ...parsed.value
-    }
-  };
+  return parsed.ok
+    ? { ok: true, value: { command: "sync", ...parsed.value } }
+    : usage("sync", json, parsed.reason);
 }
 
-function parseRepair(
-  argv: ReadonlyArray<string>,
-  json: boolean
-):
+function parseRepair(argv: ReadonlyArray<string>, json: boolean):
   | Readonly<{ ok: true; value: ParsedRepair }>
   | Readonly<{ ok: false; value: UsageFailure }> {
   const parsed = parseCliRepairArguments(argv, json);
-  if (!parsed.ok) {
-    return usage("repair", json, parsed.reason);
-  }
-  return {
-    ok: true,
-    value: {
-      command: "repair",
-      ...parsed.value
-    }
-  };
+  return parsed.ok
+    ? { ok: true, value: { command: "repair", ...parsed.value } }
+    : usage("repair", json, parsed.reason);
 }
 
 function parseLocal(
@@ -602,44 +585,22 @@ function parseLocal(
 ):
   | Readonly<{ ok: true; value: ParsedLocal }>
   | Readonly<{ ok: false; value: UsageFailure }> {
-  const parsed = parseCliLocalArguments(
-    command,
-    argv,
-    json
-  );
-  if (!parsed.ok) {
-    return usage(command, json, parsed.reason);
-  }
-  return {
-    ok: true,
-    value: {
-      command,
-      ...parsed.value
-    }
-  };
+  const parsed = parseCliLocalArguments(command, argv, json);
+  return parsed.ok
+    ? { ok: true, value: { command, ...parsed.value } }
+    : usage(command, json, parsed.reason);
 }
 
-function parseStatus(
-  argv: ReadonlyArray<string>,
-  json: boolean
-):
+function parseStatus(argv: ReadonlyArray<string>, json: boolean):
   | Readonly<{ ok: true; value: ParsedStatus }>
   | Readonly<{ ok: false; value: UsageFailure }> {
-  const parsed = parseCliStatusArguments(
-    argv,
-    process.cwd()
-  );
-  if (!parsed.ok) {
-    return usage("status", json, parsed.reason);
-  }
-  return {
-    ok: true,
-    value: {
-      command: "status",
-      target: parsed.value,
-      json
-    }
-  };
+  const parsed = parseCliStatusArguments(argv, process.cwd());
+  return parsed.ok
+    ? {
+        ok: true,
+        value: { command: "status", target: parsed.value, json }
+      }
+    : usage("status", json, parsed.reason);
 }
 
 function usage(
@@ -671,6 +632,7 @@ function renderSuccess(
     | CliRemoveResult
     | CliRecoveryResult
     | CliExportResult
+    | CliImportResult
     | CliMaintenanceResult
     | CliLocalResult,
   json: boolean,
@@ -715,6 +677,12 @@ function renderSuccess(
     for (const warning of warnings) {
       process.stdout.write("Warning: " + warning.code + "\n");
     }
+    return;
+  }
+  if (command === "import") {
+    process.stdout.write(
+      formatCliImportResult(result as CliImportResult)
+    );
     return;
   }
   if (command === "recover" || command === "fork") {
