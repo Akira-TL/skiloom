@@ -18,6 +18,9 @@ import {
 import type {
   LifecycleCandidatePlan
 } from "../runtime/orchestration/lifecycle-candidate.js";
+import type {
+  DetachedContentChangeRisk
+} from "../runtime/orchestration/lifecycle/projection/risk.js";
 import {
   updateAcceptedTarget
 } from "../runtime/orchestration/lifecycle/update.js";
@@ -65,6 +68,7 @@ export type CliUpdateResult =
     "planned" | "declined" | "updated" | "no-op"
   > &
   Readonly<{
+    detachedContentRisks: ReadonlyArray<DetachedContentChangeRisk>;
     acceptedState: Readonly<{
       targetId: string;
       generation: number;
@@ -178,13 +182,18 @@ async function executeWhileLocked(
     const authorization = createCliCandidateAcceptance(
       input,
       {
-        presentCandidate: (plan, projections) => {
+        presentCandidate: (
+          plan,
+          projections,
+          detachedContentRisks
+        ) => {
           presentationRendered = true;
           process.stdout.write(
             formatUpdateCandidate(
               input.target,
               plan,
-              projections
+              projections,
+              detachedContentRisks
             )
           );
         },
@@ -227,6 +236,7 @@ async function executeWhileLocked(
           lifecycle.value.status,
           lifecycle.value.plan,
           lifecycle.value.projections,
+          lifecycle.value.detachedContentRisks,
           lifecycle.value.state
         ),
         presentationRendered
@@ -240,7 +250,9 @@ async function executeWhileLocked(
 function formatUpdateCandidate(
   target: ResolvedCliTarget,
   plan: LifecycleCandidatePlan,
-  projections: CliUpdateResult["projections"]
+  projections: CliUpdateResult["projections"],
+  detachedContentRisks:
+    CliUpdateResult["detachedContentRisks"]
 ): string {
   return formatCliCandidatePresentation({
     target,
@@ -251,7 +263,8 @@ function formatUpdateCandidate(
     packages: plan.candidate.packages,
     dependencyEdges: plan.candidate.dependencyEdges,
     comparison: plan.comparison,
-    projections
+    projections,
+    detachedContentRisks
   });
 }
 
@@ -260,6 +273,8 @@ function lifecycleResult(
   status: CliUpdateResult["status"],
   plan: LifecycleCandidatePlan,
   projections: CliUpdateResult["projections"],
+  detachedContentRisks:
+    CliUpdateResult["detachedContentRisks"],
   state: RegistryTargetState
 ): CliUpdateResult {
   return {
@@ -272,6 +287,7 @@ function lifecycleResult(
     dependencyEdges: plan.candidate.dependencyEdges,
     comparison: plan.comparison,
     projections,
+    detachedContentRisks,
     acceptedState: {
       targetId: state.targetId,
       generation: state.generation,

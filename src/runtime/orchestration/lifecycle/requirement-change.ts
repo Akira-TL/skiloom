@@ -79,6 +79,10 @@ import {
   type LifecycleCandidateProjection
 } from "./projection/plan.js";
 import {
+  detachedContentChangeRisks,
+  type DetachedContentChangeRisk
+} from "./projection/risk.js";
+import {
   registryRequirementsToDomain
 } from "./requirements.js";
 import type {
@@ -123,24 +127,28 @@ export type AcceptedRequirementChangeResult =
       status: "no-op";
       plan: LifecycleCandidatePlan;
       projections: ReadonlyArray<LifecycleCandidateProjection>;
+      detachedContentRisks: ReadonlyArray<DetachedContentChangeRisk>;
       state: RegistryTargetState;
     }>
   | Readonly<{
       status: "planned";
       plan: LifecycleCandidatePlan;
       projections: ReadonlyArray<LifecycleCandidateProjection>;
+      detachedContentRisks: ReadonlyArray<DetachedContentChangeRisk>;
       state: RegistryTargetState;
     }>
   | Readonly<{
       status: "declined";
       plan: LifecycleCandidatePlan;
       projections: ReadonlyArray<LifecycleCandidateProjection>;
+      detachedContentRisks: ReadonlyArray<DetachedContentChangeRisk>;
       state: RegistryTargetState;
     }>
   | Readonly<{
       status: "applied";
       plan: LifecycleCandidatePlan;
       projections: ReadonlyArray<LifecycleCandidateProjection>;
+      detachedContentRisks: ReadonlyArray<DetachedContentChangeRisk>;
       state: RegistryTargetState;
       marker: TargetRecoveryMarkerFacts;
     }>;
@@ -247,6 +255,11 @@ export async function applyAcceptedRequirementChange(
     current,
     desiredPlan.value
   );
+  const detachedContentRisks = detachedContentChangeRisks(
+    current,
+    candidatePlan,
+    candidateProjections
+  );
   if (candidatePlan.noChange) {
     return {
       ok: true,
@@ -254,6 +267,7 @@ export async function applyAcceptedRequirementChange(
         status: "no-op",
         plan: candidatePlan,
         projections: candidateProjections,
+        detachedContentRisks,
         state: current
       }
     };
@@ -264,7 +278,8 @@ export async function applyAcceptedRequirementChange(
     acceptance = resolveLifecycleCandidateAcceptance(
       await input.acceptCandidate(
         candidatePlan,
-        candidateProjections
+        candidateProjections,
+        detachedContentRisks
       )
     );
   } catch {
@@ -283,6 +298,7 @@ export async function applyAcceptedRequirementChange(
         status: "no-op",
         plan: candidatePlan,
         projections: candidateProjections,
+        detachedContentRisks,
         state: current
       }
     };
@@ -294,6 +310,7 @@ export async function applyAcceptedRequirementChange(
         status: "planned",
         plan: candidatePlan,
         projections: candidateProjections,
+        detachedContentRisks,
         state: current
       }
     };
@@ -305,6 +322,7 @@ export async function applyAcceptedRequirementChange(
         status: "declined",
         plan: candidatePlan,
         projections: candidateProjections,
+        detachedContentRisks,
         state: current
       }
     };
@@ -432,6 +450,7 @@ export async function applyAcceptedRequirementChange(
       status: "applied",
       plan: candidatePlan,
       projections: candidateProjections,
+      detachedContentRisks,
       state: reconciled.value,
       marker
     }

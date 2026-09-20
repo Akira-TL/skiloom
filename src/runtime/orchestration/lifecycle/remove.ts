@@ -27,6 +27,9 @@ import type {
 import type {
   LifecycleCandidateProjection
 } from "./projection/plan.js";
+import type {
+  DetachedContentChangeRisk
+} from "./projection/risk.js";
 import {
   applyAcceptedRequirementChange,
   type AcceptedRequirementChangeError
@@ -56,24 +59,28 @@ export type RemoveAcceptedTargetRequirementResult =
       status: "planned";
       plan: LifecycleCandidatePlan;
       projections: ReadonlyArray<LifecycleCandidateProjection>;
+      detachedContentRisks: ReadonlyArray<DetachedContentChangeRisk>;
       state: RegistryTargetState;
     }>
   | Readonly<{
       status: "no-op";
       plan: LifecycleCandidatePlan;
       projections: ReadonlyArray<LifecycleCandidateProjection>;
+      detachedContentRisks: ReadonlyArray<DetachedContentChangeRisk>;
       state: RegistryTargetState;
     }>
   | Readonly<{
       status: "declined";
       plan: LifecycleCandidatePlan;
       projections: ReadonlyArray<LifecycleCandidateProjection>;
+      detachedContentRisks: ReadonlyArray<DetachedContentChangeRisk>;
       state: RegistryTargetState;
     }>
   | Readonly<{
       status: "removed";
       plan: LifecycleCandidatePlan;
       projections: ReadonlyArray<LifecycleCandidateProjection>;
+      detachedContentRisks: ReadonlyArray<DetachedContentChangeRisk>;
       state: RegistryTargetState;
       marker: TargetRecoveryMarkerFacts;
     }>;
@@ -184,6 +191,8 @@ export async function removeAcceptedTargetRequirement(
         status: "planned",
         plan: result.value.plan,
         projections: result.value.projections,
+        detachedContentRisks:
+          result.value.detachedContentRisks,
         state: result.value.state
       }
     };
@@ -195,6 +204,8 @@ export async function removeAcceptedTargetRequirement(
         status: "no-op",
         plan: result.value.plan,
         projections: result.value.projections,
+        detachedContentRisks:
+          result.value.detachedContentRisks,
         state: result.value.state
       }
     };
@@ -206,6 +217,8 @@ export async function removeAcceptedTargetRequirement(
         status: "declined",
         plan: result.value.plan,
         projections: result.value.projections,
+        detachedContentRisks:
+          result.value.detachedContentRisks,
         state: result.value.state
       }
     };
@@ -216,6 +229,8 @@ export async function removeAcceptedTargetRequirement(
       status: "removed",
       plan: result.value.plan,
       projections: result.value.projections,
+      detachedContentRisks:
+        result.value.detachedContentRisks,
       state: result.value.state,
       marker: result.value.marker
     }

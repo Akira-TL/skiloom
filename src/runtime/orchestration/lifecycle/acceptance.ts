@@ -13,6 +13,9 @@ import type {
 import type {
   LifecycleCandidateProjection
 } from "./projection/plan.js";
+import type {
+  DetachedContentChangeRisk
+} from "./projection/risk.js";
 
 export type LifecycleCandidateAcceptanceResponse =
   | boolean
@@ -20,7 +23,8 @@ export type LifecycleCandidateAcceptanceResponse =
 
 export type LifecycleCandidateAcceptanceCallback = (
   plan: LifecycleCandidatePlan,
-  projections?: ReadonlyArray<LifecycleCandidateProjection>
+  projections?: ReadonlyArray<LifecycleCandidateProjection>,
+  detachedContentRisks?: ReadonlyArray<DetachedContentChangeRisk>
 ) =>
   | LifecycleCandidateAcceptanceResponse
   | Promise<LifecycleCandidateAcceptanceResponse>;

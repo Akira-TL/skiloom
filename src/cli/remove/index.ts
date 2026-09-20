@@ -22,6 +22,9 @@ import {
 import type {
   LifecycleCandidatePlan
 } from "../../runtime/orchestration/lifecycle-candidate.js";
+import type {
+  DetachedContentChangeRisk
+} from "../../runtime/orchestration/lifecycle/projection/risk.js";
 import {
   removeAcceptedTargetRequirement,
   type RemoveDirectRequirementSelector
@@ -69,6 +72,7 @@ export type CliRemoveResult =
     "planned" | "declined" | "removed" | "no-op"
   > &
   Readonly<{
+    detachedContentRisks: ReadonlyArray<DetachedContentChangeRisk>;
     acceptedState: Readonly<{
       targetId: string;
       generation: number;
@@ -210,13 +214,18 @@ async function executeWhileLocked(
     const acceptance = createCliCandidateAcceptance(
       input,
       {
-        presentCandidate: (plan, projections) => {
+        presentCandidate: (
+          plan,
+          projections,
+          detachedContentRisks
+        ) => {
           presentationRendered = true;
           process.stdout.write(
             formatRemoveCandidate(
               input.target,
               plan,
-              projections
+              projections,
+              detachedContentRisks
             )
           );
         },
@@ -260,6 +269,7 @@ async function executeWhileLocked(
           lifecycle.value.status,
           lifecycle.value.plan,
           lifecycle.value.projections,
+          lifecycle.value.detachedContentRisks,
           lifecycle.value.state
         ),
         presentationRendered
@@ -317,7 +327,9 @@ function parseRemoveSelector(
 function formatRemoveCandidate(
   target: ResolvedCliTarget,
   plan: LifecycleCandidatePlan,
-  projections: CliRemoveResult["projections"]
+  projections: CliRemoveResult["projections"],
+  detachedContentRisks:
+    CliRemoveResult["detachedContentRisks"]
 ): string {
   return formatCliCandidatePresentation({
     target,
@@ -328,7 +340,8 @@ function formatRemoveCandidate(
     packages: plan.candidate.packages,
     dependencyEdges: plan.candidate.dependencyEdges,
     comparison: plan.comparison,
-    projections
+    projections,
+    detachedContentRisks
   });
 }
 
@@ -337,6 +350,8 @@ function lifecycleResult(
   status: CliRemoveResult["status"],
   plan: LifecycleCandidatePlan,
   projections: CliRemoveResult["projections"],
+  detachedContentRisks:
+    CliRemoveResult["detachedContentRisks"],
   state: RegistryTargetState
 ): CliRemoveResult {
   return {
@@ -349,6 +364,7 @@ function lifecycleResult(
     dependencyEdges: plan.candidate.dependencyEdges,
     comparison: plan.comparison,
     projections,
+    detachedContentRisks,
     acceptedState: {
       targetId: state.targetId,
       generation: state.generation,

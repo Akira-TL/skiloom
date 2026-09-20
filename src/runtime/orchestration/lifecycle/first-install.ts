@@ -60,6 +60,9 @@ import {
   freshLifecycleCandidateProjections,
   type LifecycleCandidateProjection
 } from "./projection/plan.js";
+import type {
+  DetachedContentChangeRisk
+} from "./projection/risk.js";
 import {
   syncLifecycleMarker,
   type LifecycleMarkerSyncCallback,
@@ -127,16 +130,19 @@ export type FirstAcceptedInstallResult =
       status: "planned";
       plan: LifecycleCandidatePlan;
       projections: ReadonlyArray<LifecycleCandidateProjection>;
+      detachedContentRisks: ReadonlyArray<DetachedContentChangeRisk>;
     }>
   | Readonly<{
       status: "declined";
       plan: LifecycleCandidatePlan;
       projections: ReadonlyArray<LifecycleCandidateProjection>;
+      detachedContentRisks: ReadonlyArray<DetachedContentChangeRisk>;
     }>
   | Readonly<{
       status: "installed";
       plan: LifecycleCandidatePlan;
       projections: ReadonlyArray<LifecycleCandidateProjection>;
+      detachedContentRisks: ReadonlyArray<DetachedContentChangeRisk>;
       state: RegistryTargetState;
       marker: TargetRecoveryMarkerFacts;
     }>;
@@ -203,7 +209,8 @@ export async function executeFirstAcceptedInstall(
     acceptance = resolveLifecycleCandidateAcceptance(
       await input.acceptCandidate(
         planned.value,
-        candidateProjections
+        candidateProjections,
+        []
       )
     );
   } catch {
@@ -224,7 +231,8 @@ export async function executeFirstAcceptedInstall(
       value: {
         status: "planned",
         plan: planned.value,
-        projections: candidateProjections
+        projections: candidateProjections,
+        detachedContentRisks: []
       }
     };
   }
@@ -234,7 +242,8 @@ export async function executeFirstAcceptedInstall(
       value: {
         status: "declined",
         plan: planned.value,
-        projections: candidateProjections
+        projections: candidateProjections,
+        detachedContentRisks: []
       }
     };
   }
@@ -377,6 +386,7 @@ export async function executeFirstAcceptedInstall(
       status: "installed",
       plan: planned.value,
       projections: candidateProjections,
+      detachedContentRisks: [],
       state: reconciled.value,
       marker
     }

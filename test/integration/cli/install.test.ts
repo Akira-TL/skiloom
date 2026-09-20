@@ -52,6 +52,18 @@ type ParsedCliOutput = Readonly<{
       activationName: string;
       ownership: "managed" | "detached";
     }>>;
+    detachedContentRisks: ReadonlyArray<Readonly<{
+      kind: "detached-content-change";
+      packageCoordinate: string;
+      previousPackage: Readonly<{
+        packageRoot: string;
+        contentDigest: string;
+      }>;
+      candidatePackage: Readonly<{
+        packageRoot: string;
+        contentDigest: string;
+      }>;
+    }>>;
     projectionRenames: ReadonlyArray<Readonly<{
       packageCoordinate: string;
       activationName: string;
@@ -217,6 +229,65 @@ test("existing-Target install plan preserves detached ownership in complete cand
             ownership: "managed"
           }
         ]
+      );
+    }
+  );
+});
+
+test("install upsert surfaces detached-content change risk for a detached direct Package", async () => {
+  await withCliRuntime(
+    "detached-upsert-risk",
+    async ({ home, cwd }) => {
+      const installed = await runCli(
+        [
+          "install",
+          "acme/app/app",
+          "--version",
+          "^1.0.0",
+          "--yes",
+          "--json"
+        ],
+        { home, cwd, mode: "versions" }
+      );
+      assert.equal(installed.code, 0);
+
+      const detached = await runCli(
+        ["detach", "acme/app/app", "--json"],
+        { home, cwd, mode: "forbid-network" }
+      );
+      assert.equal(detached.code, 0);
+
+      const planned = await runCli(
+        [
+          "install",
+          "acme/app/app",
+          "--version",
+          "^2.0.0",
+          "--plan",
+          "--json"
+        ],
+        { home, cwd, mode: "versions" }
+      );
+      assert.equal(planned.code, 0);
+      const output = parseJson(planned.stdout);
+      assert.equal(output.result.status, "planned");
+      assert.equal(
+        output.result.projections[0]?.ownership,
+        "detached"
+      );
+      assert.equal(
+        output.result.detachedContentRisks.length,
+        1
+      );
+      const risk =
+        output.result.detachedContentRisks[0]!;
+      assert.equal(
+        risk.packageCoordinate,
+        "acme/app/app"
+      );
+      assert.notEqual(
+        risk.previousPackage.contentDigest,
+        risk.candidatePackage.contentDigest
       );
     }
   );

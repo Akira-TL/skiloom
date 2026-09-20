@@ -42,6 +42,9 @@ import type {
   LifecycleCandidateProjection
 } from "../runtime/orchestration/lifecycle/projection/plan.js";
 import type {
+  DetachedContentChangeRisk
+} from "../runtime/orchestration/lifecycle/projection/risk.js";
+import type {
   MachineRegistry,
   RegistryTargetState
 } from "../runtime/registry/index.js";
@@ -109,6 +112,7 @@ export type CliInstallResult = Readonly<{
   dependencyEdges: LifecycleCandidatePlan["candidate"]["dependencyEdges"];
   comparison: LifecycleCandidatePlan["comparison"];
   projections: ReadonlyArray<LifecycleCandidateProjection>;
+  detachedContentRisks: ReadonlyArray<DetachedContentChangeRisk>;
   projectionRenames: ReadonlyArray<TargetProjectionRename>;
   acceptedState: CliInstallAcceptedState | null;
 }>;
@@ -525,6 +529,7 @@ async function executeWhileLocked(
               candidateProjectionsFromState(
                 noOp.value.state
               ),
+              [],
               noOp.value.state
             ),
             presentationRendered: false
@@ -540,13 +545,18 @@ async function executeWhileLocked(
     const acceptance = createCliCandidateAcceptance(
       input,
       {
-        presentCandidate: (plan, projections) => {
+        presentCandidate: (
+          plan,
+          projections,
+          detachedContentRisks
+        ) => {
           presentationRendered = true;
           process.stdout.write(
             formatInstallCandidate(
               input.target,
               plan,
               projections,
+              detachedContentRisks,
               "candidate"
             )
           );
@@ -616,6 +626,7 @@ async function executeWhileLocked(
           lifecycle.value.status,
           lifecycle.value.plan,
           lifecycle.value.projections,
+          lifecycle.value.detachedContentRisks,
           "state" in lifecycle.value
             ? lifecycle.value.state
             : undefined
@@ -651,6 +662,7 @@ function lifecycleResult(
   status: CliInstallResult["status"],
   plan: LifecycleCandidatePlan,
   projections: ReadonlyArray<LifecycleCandidateProjection>,
+  detachedContentRisks: ReadonlyArray<DetachedContentChangeRisk>,
   state: RegistryTargetState | undefined
 ): CliInstallResult {
   return {
@@ -664,6 +676,7 @@ function lifecycleResult(
     dependencyEdges: plan.candidate.dependencyEdges,
     comparison: plan.comparison,
     projections,
+    detachedContentRisks,
     projectionRenames:
       intent.requestedProjectionRename === undefined
         ? []
@@ -694,7 +707,8 @@ export function formatCliInstallResult(
     packages: result.packages,
     dependencyEdges: result.dependencyEdges,
     comparison: result.comparison,
-    projections: result.projections
+    projections: result.projections,
+    detachedContentRisks: result.detachedContentRisks
   });
 }
 
@@ -702,6 +716,7 @@ function formatInstallCandidate(
   target: ResolvedCliTarget,
   plan: LifecycleCandidatePlan,
   projections: ReadonlyArray<LifecycleCandidateProjection>,
+  detachedContentRisks: ReadonlyArray<DetachedContentChangeRisk>,
   status: string
 ): string {
   return formatCliCandidatePresentation({
@@ -713,7 +728,8 @@ function formatInstallCandidate(
     packages: plan.candidate.packages,
     dependencyEdges: plan.candidate.dependencyEdges,
     comparison: plan.comparison,
-    projections
+    projections,
+    detachedContentRisks
   });
 }
 

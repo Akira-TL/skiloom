@@ -4,7 +4,8 @@ import {
   mkdir,
   mkdtemp,
   readFile,
-  rm
+  rm,
+  writeFile
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -39,6 +40,28 @@ type ParsedUpdateOutput = Readonly<{
       packageCoordinate: string;
       activationName: string;
       ownership: string;
+    }>>;
+    detachedContentRisks: ReadonlyArray<Readonly<{
+      kind: "detached-content-change";
+      packageCoordinate: string;
+      previousPackage: Readonly<{
+        packageRoot: string;
+        contentDigest: string;
+      }>;
+      candidatePackage: Readonly<{
+        packageRoot: string;
+        contentDigest: string;
+      }>;
+      previousSource: Readonly<{
+        sourceKind: string;
+        version?: string;
+        exactCommit: string;
+      }> | null;
+      candidateSource: Readonly<{
+        sourceKind: string;
+        version?: string;
+        exactCommit: string;
+      }> | null;
     }>>;
     comparison: Readonly<{
       sourceDeltas: ReadonlyArray<Readonly<{
@@ -113,6 +136,129 @@ test("update --plan returns candidate projection ownership without mutating acce
     assert.match(
       await readFile(join(target, "app", "SKILL.md"), "utf8"),
       /Baseline application\./u
+    );
+  });
+});
+
+test("detached Package content changes surface structured and human compatibility risk without touching user bytes", async () => {
+  await withCliRuntime(async ({ home, cwd, target }) => {
+    const installed = await runCli(
+      ["install", "acme/app/app", "--yes", "--json"],
+      { home, cwd, mode: "base" }
+    );
+    assert.equal(installed.code, 0);
+
+    const detached = await runCli(
+      ["detach", "acme/app/app", "--json"],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(detached.code, 0);
+    await writeFile(
+      join(target, "app", "USER-NOTE"),
+      "keep detached user bytes\n",
+      "utf8"
+    );
+
+    const humanPlan = await runCli(
+      ["update", "--plan"],
+      { home, cwd, mode: "versions" }
+    );
+    assert.equal(humanPlan.code, 0);
+    assert.match(
+      humanPlan.stdout,
+      /acme\/app\/app -> app \(detached\)/u
+    );
+    assert.match(
+      humanPlan.stdout,
+      /detached-content-change acme\/app\/app/u
+    );
+    assert.match(
+      humanPlan.stdout,
+      /user-owned bytes are preserved; review compatibility manually/u
+    );
+    assert.equal(
+      await readFile(
+        join(target, "app", "USER-NOTE"),
+        "utf8"
+      ),
+      "keep detached user bytes\n"
+    );
+
+    const jsonPlan = await runCli(
+      ["update", "--plan", "--json"],
+      { home, cwd, mode: "versions" }
+    );
+    assert.equal(jsonPlan.code, 0);
+    const planned = parseUpdateOutput(jsonPlan.stdout);
+    assert.equal(planned.result.status, "planned");
+    assert.equal(planned.result.acceptedState.generation, 2);
+    assert.equal(
+      planned.result.detachedContentRisks.length,
+      1
+    );
+    const risk = planned.result.detachedContentRisks[0]!;
+    assert.equal(
+      risk.kind,
+      "detached-content-change"
+    );
+    assert.equal(
+      risk.packageCoordinate,
+      "acme/app/app"
+    );
+    assert.notEqual(
+      risk.previousPackage.contentDigest,
+      risk.candidatePackage.contentDigest
+    );
+    assert.equal(
+      risk.previousSource?.version,
+      "1.0.0"
+    );
+    assert.equal(
+      risk.candidateSource?.version,
+      "2.0.0"
+    );
+
+    const unchanged = await runCli(
+      ["update", "--json"],
+      { home, cwd, mode: "base" }
+    );
+    assert.equal(unchanged.code, 0);
+    const unchangedOutput =
+      parseUpdateOutput(unchanged.stdout);
+    assert.equal(
+      unchangedOutput.result.status,
+      "no-op"
+    );
+    assert.deepEqual(
+      unchangedOutput.result.detachedContentRisks,
+      []
+    );
+
+    const accepted = await runCli(
+      ["update", "--yes", "--json"],
+      { home, cwd, mode: "versions" }
+    );
+    assert.equal(accepted.code, 0);
+    const acceptedOutput =
+      parseUpdateOutput(accepted.stdout);
+    assert.equal(
+      acceptedOutput.result.status,
+      "updated"
+    );
+    assert.equal(
+      acceptedOutput.result.acceptedState.generation,
+      3
+    );
+    assert.equal(
+      acceptedOutput.result.detachedContentRisks.length,
+      1
+    );
+    assert.equal(
+      await readFile(
+        join(target, "app", "USER-NOTE"),
+        "utf8"
+      ),
+      "keep detached user bytes\n"
     );
   });
 });

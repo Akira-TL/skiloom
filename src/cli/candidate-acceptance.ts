@@ -19,6 +19,9 @@ import type {
 import type {
   LifecycleCandidateProjection
 } from "../runtime/orchestration/lifecycle/projection/plan.js";
+import type {
+  DetachedContentChangeRisk
+} from "../runtime/orchestration/lifecycle/projection/risk.js";
 
 export type CliCandidateInvocation = Readonly<{
   plan: boolean;
@@ -56,7 +59,8 @@ export type CliCandidateAcceptance = Readonly<{
 export type CliCandidatePresentation = Readonly<{
   presentCandidate: (
     plan: LifecycleCandidatePlan,
-    projections: ReadonlyArray<LifecycleCandidateProjection>
+    projections: ReadonlyArray<LifecycleCandidateProjection>,
+    detachedContentRisks: ReadonlyArray<DetachedContentChangeRisk>
   ) => void;
   presentRetargets: (
     retargets: ReadonlyArray<ReleaseRetargetFact>
@@ -109,8 +113,16 @@ export function createCliCandidateAcceptance(
 
   const acceptCandidate:
     LifecycleCandidateAcceptanceCallback =
-    async (plan, projections = []) => {
-      presentation.presentCandidate(plan, projections);
+    async (
+      plan,
+      projections = [],
+      detachedContentRisks = []
+    ) => {
+      presentation.presentCandidate(
+        plan,
+        projections,
+        detachedContentRisks
+      );
       return confirmCliQuestion(
         "Apply this complete state? [y/N] "
       );
@@ -118,7 +130,11 @@ export function createCliCandidateAcceptance(
 
   const acceptCandidateWithRetarget:
     LifecycleCandidateAcceptanceCallback =
-    async (plan, projections = []) => {
+    async (
+      plan,
+      projections = [],
+      detachedContentRisks = []
+    ) => {
       const retargets = releaseRetargets(plan);
       if (retargets.length > 0) {
         const authorization =
@@ -133,7 +149,11 @@ export function createCliCandidateAcceptance(
           return false;
         }
       }
-      return acceptCandidate(plan, projections);
+      return acceptCandidate(
+        plan,
+        projections,
+        detachedContentRisks
+      );
     };
 
   return {

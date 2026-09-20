@@ -5,6 +5,9 @@ import type {
   LifecycleCandidateProjection
 } from "../../runtime/orchestration/lifecycle/projection/plan.js";
 import type {
+  DetachedContentChangeRisk
+} from "../../runtime/orchestration/lifecycle/projection/risk.js";
+import type {
   CliPresentedDirectRequirement
 } from "../candidate-acceptance.js";
 import type {
@@ -26,6 +29,7 @@ export type CliCandidatePresentationFacts<
     LifecycleCandidatePlan["candidate"]["dependencyEdges"];
   comparison: LifecycleCandidatePlan["comparison"];
   projections: ReadonlyArray<LifecycleCandidateProjection>;
+  detachedContentRisks?: ReadonlyArray<DetachedContentChangeRisk>;
 }>;
 
 export function formatCliCandidatePresentation(
@@ -117,13 +121,26 @@ export function formatCliCandidatePresentation(
   const retargets = facts.comparison.sourceDeltas.filter(
     (delta) => delta.kind === "release-retarget"
   );
-  if (retargets.length === 0) {
+  const detachedContentRisks =
+    facts.detachedContentRisks ?? [];
+  if (
+    retargets.length === 0 &&
+    detachedContentRisks.length === 0
+  ) {
     lines.push("- none");
   } else {
     for (const retarget of retargets) {
       lines.push(
         "- release-retarget " +
         retarget.repositoryCoordinate
+      );
+    }
+    for (const risk of detachedContentRisks) {
+      lines.push(
+        "- detached-content-change " +
+        risk.packageCoordinate +
+        " — user-owned bytes are preserved; " +
+        "review compatibility manually"
       );
     }
   }

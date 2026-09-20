@@ -32,6 +32,7 @@ type ParsedRemoveOutput = Readonly<{
     directRequirements: ReadonlyArray<unknown>;
     packages: ReadonlyArray<unknown>;
     projections: ReadonlyArray<unknown>;
+    detachedContentRisks: ReadonlyArray<unknown>;
     acceptedState: Readonly<{
       generation: number;
     }>;
@@ -194,6 +195,54 @@ test("remove keeps a shared transitive dependency until the final direct root is
     assert.equal(secondOutput.result.acceptedState.generation, 4);
     assert.equal(existsSync(join(target, "tool")), false);
     assert.equal(existsSync(join(target, "shared")), false);
+  });
+});
+
+test("remove keeps unchanged detached Package risk-free when it remains reachable", async () => {
+  await withCliRuntime(async ({ home, cwd }) => {
+    assert.equal(
+      (
+        await runCli(
+          ["install", "acme/app/app", "--yes", "--json"],
+          { home, cwd, mode: "shared-remove" }
+        )
+      ).code,
+      0
+    );
+    assert.equal(
+      (
+        await runCli(
+          ["detach", "acme/shared/shared", "--json"],
+          { home, cwd, mode: "forbid-network" }
+        )
+      ).code,
+      0
+    );
+    assert.equal(
+      (
+        await runCli(
+          ["install", "acme/tool/tool", "--yes", "--json"],
+          { home, cwd, mode: "shared-remove" }
+        )
+      ).code,
+      0
+    );
+
+    const planned = await runCli(
+      [
+        "remove",
+        "acme/app/app",
+        "--plan",
+        "--json"
+      ],
+      { home, cwd, mode: "shared-remove" }
+    );
+    assert.equal(planned.code, 0);
+    const output = parseRemoveOutput(planned.stdout);
+    assert.deepEqual(
+      output.result.detachedContentRisks,
+      []
+    );
   });
 });
 

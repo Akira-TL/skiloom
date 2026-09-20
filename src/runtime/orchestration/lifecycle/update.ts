@@ -31,6 +31,9 @@ import {
 import type {
   LifecycleCandidateProjection
 } from "./projection/plan.js";
+import type {
+  DetachedContentChangeRisk
+} from "./projection/risk.js";
 
 export type ReleaseRetargetFact = Extract<
   SourceAuthorizationDelta,
@@ -66,24 +69,28 @@ export type UpdateAcceptedTargetResult =
       status: "planned";
       plan: LifecycleCandidatePlan;
       projections: ReadonlyArray<LifecycleCandidateProjection>;
+      detachedContentRisks: ReadonlyArray<DetachedContentChangeRisk>;
       state: RegistryTargetState;
     }>
   | Readonly<{
       status: "no-op";
       plan: LifecycleCandidatePlan;
       projections: ReadonlyArray<LifecycleCandidateProjection>;
+      detachedContentRisks: ReadonlyArray<DetachedContentChangeRisk>;
       state: RegistryTargetState;
     }>
   | Readonly<{
       status: "declined";
       plan: LifecycleCandidatePlan;
       projections: ReadonlyArray<LifecycleCandidateProjection>;
+      detachedContentRisks: ReadonlyArray<DetachedContentChangeRisk>;
       state: RegistryTargetState;
     }>
   | Readonly<{
       status: "updated";
       plan: LifecycleCandidatePlan;
       projections: ReadonlyArray<LifecycleCandidateProjection>;
+      detachedContentRisks: ReadonlyArray<DetachedContentChangeRisk>;
       state: RegistryTargetState;
       marker: TargetRecoveryMarkerFacts;
     }>;
@@ -140,7 +147,11 @@ export async function updateAcceptedTarget(
     ...(input.sourceCachePath === undefined
       ? {}
       : { sourceCachePath: input.sourceCachePath }),
-    acceptCandidate: async (plan, projections) => {
+    acceptCandidate: async (
+      plan,
+      projections,
+      detachedContentRisks
+    ) => {
       const retargets = releaseRetargets(plan);
       if (retargets.length > 0) {
         if (input.authorizeReleaseRetarget === undefined) {
@@ -179,7 +190,8 @@ export async function updateAcceptedTarget(
 
       return await input.acceptCandidate(
         plan,
-        projections
+        projections,
+        detachedContentRisks
       );
     },
     ...(input.syncMarker === undefined
@@ -203,6 +215,8 @@ export async function updateAcceptedTarget(
         status: "planned",
         plan: result.value.plan,
         projections: result.value.projections,
+        detachedContentRisks:
+          result.value.detachedContentRisks,
         state: result.value.state
       }
     };
@@ -214,6 +228,8 @@ export async function updateAcceptedTarget(
         status: "no-op",
         plan: result.value.plan,
         projections: result.value.projections,
+        detachedContentRisks:
+          result.value.detachedContentRisks,
         state: result.value.state
       }
     };
@@ -225,6 +241,8 @@ export async function updateAcceptedTarget(
         status: "declined",
         plan: result.value.plan,
         projections: result.value.projections,
+        detachedContentRisks:
+          result.value.detachedContentRisks,
         state: result.value.state
       }
     };
@@ -235,6 +253,8 @@ export async function updateAcceptedTarget(
       status: "updated",
       plan: result.value.plan,
       projections: result.value.projections,
+      detachedContentRisks:
+        result.value.detachedContentRisks,
       state: result.value.state,
       marker: result.value.marker
     }
