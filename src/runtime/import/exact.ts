@@ -3,7 +3,7 @@ import {
   lstat,
   readdir
 } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 
 import {
   productError,
@@ -359,7 +359,10 @@ async function inspectEmptyTarget(
   let stat;
   try {
     stat = await lstat(targetRoot);
-  } catch {
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ENOENT") {
+      return { ok: true, value: undefined };
+    }
     return {
       ok: false,
       error: productError(
@@ -411,4 +414,8 @@ async function inspectEmptyTarget(
     };
   }
   return { ok: true, value: undefined };
+}
+
+function isNodeError(error: unknown): error is NodeJS.ErrnoException {
+  return error instanceof Error && "code" in error;
 }

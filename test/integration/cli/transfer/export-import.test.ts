@@ -4,7 +4,6 @@ import {
   mkdir,
   mkdtemp,
   readFile,
-  readdir,
   rm,
   writeFile
 } from "node:fs/promises";
@@ -73,7 +72,6 @@ test("import restores a full export offline with a fresh Target identity", async
     assert.equal(exported.code, 0);
 
     const restoredTarget = join(cwd, "restored-skills");
-    await mkdir(restoredTarget);
     const imported = await runCli(
       [
         "import",
@@ -128,7 +126,6 @@ test("import --plan and missing approval validate the package without committing
     assert.equal(exported.code, 0);
 
     const plannedTarget = join(cwd, "planned-skills");
-    await mkdir(plannedTarget);
     const planned = await runCli(
       [
         "import",
@@ -143,10 +140,7 @@ test("import --plan and missing approval validate the package without committing
     assert.equal(planned.code, 0);
     const plannedOutput = parseOutput(planned.stdout);
     assert.equal(plannedOutput.result.status, "planned");
-    assert.deepEqual(
-      await readDirectoryNames(plannedTarget),
-      []
-    );
+    assert.equal(existsSync(plannedTarget), false);
     const planStatus = await runCli(
       ["status", "--target", plannedTarget, "--json"],
       { home, cwd, mode: "forbid-network" }
@@ -176,10 +170,7 @@ test("import --plan and missing approval validate the package without committing
       blockedOutput.error?.code,
       "InteractionRequired"
     );
-    assert.deepEqual(
-      await readDirectoryNames(plannedTarget),
-      []
-    );
+    assert.equal(existsSync(plannedTarget), false);
     const blockedStatus = await runCli(
       ["status", "--target", plannedTarget, "--json"],
       { home, cwd, mode: "forbid-network" }
@@ -533,12 +524,6 @@ function runCli(
 
 function parseOutput(source: string): ParsedCliOutput {
   return JSON.parse(source) as ParsedCliOutput;
-}
-
-async function readDirectoryNames(
-  path: string
-): Promise<ReadonlyArray<string>> {
-  return (await readdir(path)).sort();
 }
 
 function assertNoUnexpectedStderr(stderr: string): void {
