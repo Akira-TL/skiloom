@@ -18,9 +18,6 @@ import {
   readTargetRows
 } from "../registry/read.js";
 import {
-  CURRENT_REGISTRY_SCHEMA_VERSION
-} from "../registry/schema.js";
-import {
   verifyPackageStoreEntry
 } from "../store.js";
 import {
@@ -39,6 +36,10 @@ import type {
 import {
   acceptedTargetPlan
 } from "../orchestration/lifecycle/recovery/target.js";
+import {
+  inspectRegistryConnection,
+  targetIdsAtPath
+} from "./registry.js";
 
 export type DoctorRecommendation =
   "sync" | "repair" | "recover" | "rebind" | null;
@@ -161,10 +162,44 @@ export async function inspectDoctorTarget(
 
   try {
     const diagnostics: DoctorDiagnostic[] = [];
-    inspectRegistryConnection(database, diagnostics);
+    for (const issue of inspectRegistryConnection(database)) {
+      diagnostics.push(
+        issue.kind === "schema-mismatch"
+          ? diagnostic(
+              "RegistrySchemaMismatch",
+              "error",
+              null,
+              null,
+              {
+                actualVersion: issue.actualVersion,
+                currentVersion: issue.currentVersion
+              }
+            )
+          : diagnostic(
+              "RegistryIntegrityFailed",
+              "error",
+              null,
+              "recover",
+              { reason: issue.reason }
+            )
+      );
+    }
 
-    const locationTargetIds =
-      targetIdsAtPath(database, targetRoot);
+    let locationTargetIds: ReadonlyArray<string> = [];
+    try {
+      locationTargetIds =
+        targetIdsAtPath(database, targetRoot);
+    } catch {
+      diagnostics.push(
+        diagnostic(
+          "RegistryIntegrityFailed",
+          "error",
+          null,
+          "recover",
+          { reason: "target-lookup-failed" }
+        )
+      );
+    }
     if (locationTargetIds.length > 1) {
       diagnostics.push(
         diagnostic(
@@ -211,9 +246,11 @@ export async function inspectDoctorTarget(
     }
 
     let state: RegistryTargetState | undefined;
+    let stateReadFailed = false;
     try {
       state = readTargetRows(database, targetId);
     } catch {
+      stateReadFailed = true;
       diagnostics.push(
         diagnostic(
           "RegistryIntegrityFailed",
@@ -225,15 +262,17 @@ export async function inspectDoctorTarget(
       );
     }
     if (state === undefined) {
-      diagnostics.push(
-        diagnostic(
-          "RegistryMissing",
-          "error",
-          null,
-          "recover",
-          {}
-        )
-      );
+      if (!stateReadFailed) {
+        diagnostics.push(
+          diagnostic(
+            "RegistryMissing",
+            "error",
+            null,
+            "recover",
+            {}
+          )
+        );
+      }
       return inspection(
         targetId,
         null,
@@ -242,7 +281,23 @@ export async function inspectDoctorTarget(
       );
     }
 
-    for (const pending of readPendingOperations(database)) {
+    let pendingOperations:
+      ReturnType<typeof readPendingOperations> = [];
+    try {
+      pendingOperations =
+        readPendingOperations(database);
+    } catch {
+      diagnostics.push(
+        diagnostic(
+          "RegistryIntegrityFailed",
+          "error",
+          null,
+          "recover",
+          { reason: "pending-read-failed" }
+        )
+      );
+    }
+    for (const pending of pendingOperations) {
       if (pending.targetId === state.targetId) {
         diagnostics.push(
           diagnostic(
@@ -480,82 +535,6 @@ export async function inspectDoctorTarget(
   }
 }
 
-function targetIdsAtPath(
-  database: DatabaseSync,
-  targetRoot: string
-): ReadonlyArray<string> {
-  const rows = database
-    .prepare(
-      "SELECT target_id FROM target_locations WHERE path = ? ORDER BY target_id"
-    )
-    .all(targetRoot);
-  return rows.flatMap((row) =>
-    typeof row.target_id === "string"
-      ? [row.target_id]
-      : []
-  );
-}
-
-function inspectRegistryConnection(
-  database: DatabaseSync,
-  diagnostics: DoctorDiagnostic[]
-): void {
-  try {
-    const versionRow = database
-      .prepare("PRAGMA user_version")
-      .get();
-    const version = versionRow === undefined
-      ? undefined
-      : Object.values(versionRow)[0];
-    if (version !== CURRENT_REGISTRY_SCHEMA_VERSION) {
-      diagnostics.push(
-        diagnostic(
-          "RegistrySchemaMismatch",
-          "error",
-          null,
-          null,
-          {
-            actualVersion:
-              typeof version === "number"
-                ? version
-                : null,
-            currentVersion:
-              CURRENT_REGISTRY_SCHEMA_VERSION
-          }
-        )
-      );
-    }
-
-    const rows = database
-      .prepare("PRAGMA integrity_check")
-      .all();
-    const healthy =
-      rows.length === 1 &&
-      Object.values(rows[0] ?? {})[0] === "ok";
-    if (!healthy) {
-      diagnostics.push(
-        diagnostic(
-          "RegistryIntegrityFailed",
-          "error",
-          null,
-          "recover",
-          { reason: "integrity-check" }
-        )
-      );
-    }
-  } catch {
-    diagnostics.push(
-      diagnostic(
-        "RegistryIntegrityFailed",
-        "error",
-        null,
-        "recover",
-        { reason: "integrity-check-failed" }
-      )
-    );
-  }
-}
-
 async function inspectForeignEntries(
   targetRoot: string,
   state: RegistryTargetState,
@@ -661,9 +640,7 @@ function addMarkerDiagnostics(
           "MarkerReconcileRequired",
           "warning",
           null,
-          decision.reason === "missing-marker"
-            ? "sync"
-            : "repair",
+          "repair",
           { reason: decision.reason }
         )
       );
