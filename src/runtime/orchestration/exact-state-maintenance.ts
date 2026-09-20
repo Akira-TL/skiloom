@@ -72,6 +72,7 @@ export type ExactStateTargetUnavailable = ProductError<
     targetId: string;
     reason:
       | "target-not-found"
+      | "target-location-mismatch"
       | "projection-count-mismatch"
       | "projection-not-found"
       | "target-id-mismatch"
@@ -212,6 +213,20 @@ export async function repairExactAcceptedTarget(
       input.targetId,
       "target-not-found",
       input.targetId
+    );
+  }
+
+  const normalizedTargetRoot = resolve(input.targetRoot);
+  if (
+    !read.value.locations.some(
+      (location) =>
+        resolve(location.path) === normalizedTargetRoot
+    )
+  ) {
+    return unavailable(
+      input.targetId,
+      "target-location-mismatch",
+      normalizedTargetRoot
     );
   }
 

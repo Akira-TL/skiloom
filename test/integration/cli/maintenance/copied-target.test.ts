@@ -136,6 +136,99 @@ test("sync registers an exact current copied Target without advancing generation
   });
 });
 
+test("repair never adopts an unregistered copied Target and works only after sync registration", async () => {
+  await withRuntime(async ({ home, cwd, target }) => {
+    assert.equal(
+      (
+        await runCli(
+          ["install", "acme/app/app", "--yes", "--json"],
+          { home, cwd, mode: "base" }
+        )
+      ).code,
+      0
+    );
+    const copyTarget = join(cwd, "copy-repair-boundary");
+    await cp(target, copyTarget, {
+      recursive: true,
+      dereference: false
+    });
+
+    const blocked = await runCli(
+      ["repair", "--target", copyTarget, "--json"],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(blocked.code, 1);
+    assert.equal(
+      parseEnvelope(blocked.stdout).error?.code,
+      "ExactStateTargetUnavailable"
+    );
+    assert.equal(
+      parseEnvelope(blocked.stdout).error?.facts.reason,
+      "target-location-mismatch"
+    );
+    assert.equal(
+      registeredLocations(home).some(
+        (entry) => entry.path === resolve(copyTarget)
+      ),
+      false
+    );
+
+    await rm(join(copyTarget, "app"), {
+      recursive: true,
+      force: true
+    });
+    await mkdir(join(copyTarget, "app"));
+    await writeFile(
+      join(copyTarget, "app", "KEEP"),
+      "user replacement\n",
+      "utf8"
+    );
+    const driftBlocked = await runCli(
+      ["repair", "--target", copyTarget, "--json"],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(driftBlocked.code, 1);
+    assert.equal(
+      parseEnvelope(driftBlocked.stdout).error?.facts.reason,
+      "target-location-mismatch"
+    );
+    assert.equal(
+      await readFile(join(copyTarget, "app", "KEEP"), "utf8"),
+      "user replacement\n"
+    );
+    assert.equal(
+      registeredLocations(home).some(
+        (entry) => entry.path === resolve(copyTarget)
+      ),
+      false
+    );
+
+    await rm(copyTarget, {
+      recursive: true,
+      force: true
+    });
+    await cp(target, copyTarget, {
+      recursive: true,
+      dereference: false
+    });
+    const synced = await runCli(
+      ["sync", "--target", copyTarget, "--json"],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(synced.code, 0);
+
+    const repaired = await runCli(
+      ["repair", "--target", copyTarget, "--json"],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(repaired.code, 0);
+    assert.equal(
+      parseEnvelope(repaired.stdout).result.status,
+      "no-op"
+    );
+  });
+});
+
 test("sync upgrades an exact current V1 copied marker to V2 while registering the location", async () => {
   await withRuntime(async ({ home, cwd, target }) => {
     assert.equal(
