@@ -54,6 +54,11 @@ import {
   type CliLocalOperation
 } from "./local/index.js";
 import {
+  executeCliObserve,
+  parseCliObserveArguments,
+  type CliObserveInvocation
+} from "./observe/index.js";
+import {
   renderFailure,
   renderSuccess
 } from "./output/index.js";
@@ -120,6 +125,8 @@ type ParsedSync = CliSyncInvocation & Readonly<{ command: "sync" }>;
 type ParsedRepair = CliRepairInvocation & Readonly<{ command: "repair" }>;
 type ParsedLocal =
   CliLocalInvocation & Readonly<{ command: CliLocalOperation }>;
+type ParsedObserve =
+  CliObserveInvocation & Readonly<{ command: "observe" }>;
 type ParsedExport = CliExportInvocation & Readonly<{ command: "export" }>;
 type ParsedImport = CliImportInvocation & Readonly<{ command: "import" }>;
 type ParsedBootstrap =
@@ -137,6 +144,7 @@ type ParsedCommand =
   | ParsedSync
   | ParsedRepair
   | ParsedLocal
+  | ParsedObserve
   | ParsedExport
   | ParsedImport
   | ParsedBootstrap;
@@ -210,6 +218,8 @@ async function main(): Promise<number> {
     case "rebind":
     case "forget":
       return runLocal(parsed.value);
+    case "observe":
+      return runObserve(parsed.value);
   }
 }
 
@@ -312,6 +322,26 @@ async function runLocal(command: ParsedLocal): Promise<number> {
     return renderOperationFailure(command.command, command.json, operated.error, 1);
   }
   renderSuccess(command.command, operated.value, command.json);
+  return 0;
+}
+
+async function runObserve(
+  command: ParsedObserve
+): Promise<number> {
+  const observed = await executeCliObserve(command);
+  if (!observed.ok) {
+    return renderOperationFailure(
+      command.command,
+      command.json,
+      observed.error,
+      1
+    );
+  }
+  renderSuccess(
+    command.command,
+    observed.value,
+    command.json
+  );
   return 0;
 }
 
@@ -473,6 +503,11 @@ function parseArguments(
       return parseImport(withoutJson.slice(1), json);
     case "bootstrap":
       return parseBootstrap(
+        withoutJson.slice(1),
+        json
+      );
+    case "observe":
+      return parseObserve(
         withoutJson.slice(1),
         json
       );
@@ -658,6 +693,24 @@ function parseLocal(
   return parsed.ok
     ? { ok: true, value: { command, ...parsed.value } }
     : usage(command, json, parsed.reason);
+}
+
+function parseObserve(
+  argv: ReadonlyArray<string>,
+  json: boolean
+):
+  | Readonly<{ ok: true; value: ParsedObserve }>
+  | Readonly<{ ok: false; value: UsageFailure }> {
+  const parsed = parseCliObserveArguments(argv, json);
+  return parsed.ok
+    ? {
+        ok: true,
+        value: {
+          command: "observe",
+          ...parsed.value
+        }
+      }
+    : usage("observe", json, parsed.reason);
 }
 
 function parseStatus(argv: ReadonlyArray<string>, json: boolean):

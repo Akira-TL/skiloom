@@ -67,9 +67,11 @@ skiloom rename <package> <activation-name> --json
 skiloom detach <package> --json
 skiloom rebind <package> <activation-name> --json
 skiloom forget <package> --json
+skiloom observe <package> <name> --status <status> --json
+skiloom observe <package> <name> --clear --json
 ```
 
-These commands are the user's explicit local authorization and must not gain an extra hidden write path.
+These commands are the user's explicit local authorization and must not gain an extra hidden write path. `observe` records only machine-local `special` dependency observations for an already accepted Package; it never writes Skiloom-owned `software` observations, does not modify Target bytes, and does not advance Target Generation. It is not a Candidate operation, so do not add `--plan` or `--yes`.
 
 ## Transfer
 

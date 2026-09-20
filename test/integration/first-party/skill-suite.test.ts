@@ -277,6 +277,7 @@ test("Router examples map discovery management diagnosis and authoring to the in
   const examples = [
     ["find a Skill", "skiloom-discover"],
     ["install or update", "skiloom-manage"],
+    ["record the result", "skiloom-manage"],
     ["diagnose a Target", "skiloom-doctor"],
     ["author a Skill", "skiloom-author"]
   ] as const;
@@ -333,6 +334,22 @@ test("management guidance separates plan commit retarget merge and bootstrap aut
   assert.match(
     manage,
     /skiloom bootstrap --yes --json/u
+  );
+  assert.match(
+    manage,
+    /skiloom observe <package> <name> --status <status> --json/u
+  );
+  assert.match(
+    manage,
+    /skiloom observe <package> <name> --clear --json/u
+  );
+  assert.match(
+    manage,
+    /observe[^\n]*(?:do not|never)[^\n]*--plan/iu
+  );
+  assert.match(
+    manage,
+    /observe[^\n]*(?:do not|never)[^\n]*--yes/iu
   );
   assert.match(
     manage,
@@ -448,6 +465,7 @@ test("first-party instructions route responsibilities through public Skiloom com
     "remove",
     "sync",
     "repair",
+    "observe",
     "recover",
     "fork",
     "export",
@@ -458,6 +476,7 @@ test("first-party instructions route responsibilities through public Skiloom com
 
   const doctor = await skillText("skiloom-doctor");
   assert.match(doctor, /skiloom doctor/u);
+  assert.match(doctor, /skiloom observe/u);
   assert.match(doctor, /read-only/u);
   assert.doesNotMatch(doctor, /automatically repair/iu);
 

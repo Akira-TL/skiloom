@@ -32,6 +32,7 @@ const CANONICAL_COMMANDS = [
   "detach",
   "rebind",
   "forget",
+  "observe",
   "recover",
   "fork",
   "export",

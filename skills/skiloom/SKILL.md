@@ -10,7 +10,7 @@ Use this Skill as the Agent-facing router for Skiloom tasks. Do not implement re
 ## Route by intent
 
 - Finding, comparing, or interpreting Skill candidates: use `skiloom-discover`.
-- Installing, updating, removing, renaming, synchronizing, repairing, recovering, forking, detaching, rebinding, forgetting, exporting, importing, or bootstrapping a selected Target: use `skiloom-manage`.
+- Installing, updating, removing, renaming, synchronizing, repairing, recovering, forking, detaching, rebinding, forgetting, recording special dependency observations, exporting, importing, or bootstrapping a selected Target: use `skiloom-manage`.
 - Inspecting Registry, Store, Target, marker, ownership drift, or dependency observations: use `skiloom-doctor`.
 - Creating or validating Agent Skill package files: use `skiloom-author`.
 
@@ -19,6 +19,7 @@ Use this Skill as the Agent-facing router for Skiloom tasks. Do not implement re
 - "Find a Skill for this task" -> use `skiloom-discover`.
 - "Install or update a Skill" -> use `skiloom-manage`.
 - "Diagnose a Target problem" -> use `skiloom-doctor`.
+- "Record the result of a DEPENDENCIES.md check" -> use `skiloom-manage`.
 - "Author a Skill package" -> use `skiloom-author`.
 - "Bootstrap Skiloom into this Target" -> use `skiloom-manage`.
 

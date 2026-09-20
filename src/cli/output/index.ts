@@ -31,6 +31,10 @@ import {
   type CliMaintenanceResult
 } from "../maintenance/index.js";
 import {
+  formatCliObserveResult,
+  type CliObserveResult
+} from "../observe/index.js";
+import {
   formatCliRecoveryResult,
   type CliRecoveryResult
 } from "../recovery/index.js";
@@ -90,7 +94,8 @@ export function renderSuccess(
     | CliImportResult
     | CliBootstrapResult
     | CliMaintenanceResult
-    | CliLocalResult,
+    | CliLocalResult
+    | CliObserveResult,
   json: boolean,
   warnings: ReadonlyArray<ProductError> = []
 ): void {
@@ -174,6 +179,12 @@ export function renderSuccess(
   ) {
     process.stdout.write(
       formatCliLocalResult(result as CliLocalResult)
+    );
+    return;
+  }
+  if (command === "observe") {
+    process.stdout.write(
+      formatCliObserveResult(result as CliObserveResult)
     );
     return;
   }

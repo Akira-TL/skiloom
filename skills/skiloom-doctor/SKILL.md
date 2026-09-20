@@ -20,7 +20,7 @@ Inspect and explain findings involving:
 - Managed projection or ownership drift.
 - Detached binding presence without adopting user-owned bytes.
 - `.skiloom-state` recovery status.
-- Accepted dependency observations.
+- Live common-software observations and saved, content-digest-valid special dependency observations.
 - Foreign content that Skiloom must not adopt.
 
 ## Recommendations only
@@ -32,9 +32,10 @@ skiloom sync --json
 skiloom repair --json
 skiloom recover --plan --json
 skiloom rebind <package> <activation-name> --json
+skiloom observe <package> <name> --status <status> --json
 ```
 
-Never perform repairs, syncs, recovery, rebinding, deletion, or overwrite operations automatically.
+Never perform repairs, syncs, recovery, rebinding, observation recording, deletion, or overwrite operations automatically. If an Agent has checked a special requirement from `DEPENDENCIES.md` and the user wants that result saved, recommend the public `skiloom observe` path through `skiloom-manage`.
 
 Never write Registry, Store, marker, or Target state directly. Never reinterpret foreign or detached user-owned bytes as managed content. State-changing follow-up belongs to `skiloom-manage` and the normal lock/ownership/acceptance path.
 
