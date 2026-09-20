@@ -30,6 +30,9 @@ import {
 import type {
   SkiloomHomePaths
 } from "../home.js";
+import type {
+  HostProbeExecutor
+} from "../host-observation/index.js";
 import {
   acceptedTargetPlan
 } from "../orchestration/lifecycle/recovery/target.js";
@@ -94,6 +97,7 @@ export type DoctorInspection = Readonly<{
 export type InspectDoctorTargetInput = Readonly<{
   home: SkiloomHomePaths;
   targetRoot: string;
+  hostProbeExecutor?: HostProbeExecutor;
 }>;
 
 export async function inspectDoctorTarget(
@@ -352,7 +356,8 @@ export async function inspectDoctorTarget(
     let projectionsVerifiedExact = locationMatches;
     const packageInspection = await inspectDoctorPackages(
       input.home,
-      state.resolvedPackages
+      state.resolvedPackages,
+      input.hostProbeExecutor
     );
     const storeHealthy = packageInspection.storeHealthy;
     if (!packageInspection.storesHealthy) {

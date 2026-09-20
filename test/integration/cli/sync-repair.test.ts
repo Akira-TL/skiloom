@@ -268,6 +268,73 @@ test("sync refreshes common software observations without advancing Target gener
   });
 });
 
+test("lifecycle update discards cached observations when Package content digest changes", async () => {
+  await withCliRuntime(async ({ home, cwd }) => {
+    assert.equal(
+      (
+        await runCli(
+          ["install", "acme/app/app", "--yes", "--json"],
+          { home, cwd, mode: "host-observation" }
+        )
+      ).code,
+      0
+    );
+    assert.equal(
+      (
+        await runCli(
+          ["sync", "--json"],
+          { home, cwd, mode: "forbid-network" }
+        )
+      ).code,
+      0
+    );
+    assert.deepEqual(
+      parseStatusRegistry(
+        (
+          await runCli(
+            ["status", "--json"],
+            { home, cwd, mode: "forbid-network" }
+          )
+        ).stdout
+      ),
+      {
+        generation: 1,
+        dependencyObservations: 1
+      }
+    );
+
+    const updated = await runCli(
+      ["update", "--yes", "--json"],
+      { home, cwd, mode: "versions" }
+    );
+    assert.equal(updated.code, 0);
+    const updateOutput = JSON.parse(updated.stdout) as {
+      result: {
+        acceptedState: {
+          generation: number;
+        } | null;
+      };
+    };
+    assert.equal(
+      updateOutput.result.acceptedState?.generation,
+      2
+    );
+
+    const status = await runCli(
+      ["status", "--json"],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(status.code, 0);
+    assert.deepEqual(
+      parseStatusRegistry(status.stdout),
+      {
+        generation: 2,
+        dependencyObservations: 0
+      }
+    );
+  });
+});
+
 test("sync restores the accepted marker generation without network resolution", async () => {
   await withCliRuntime(async ({ home, cwd, target }) => {
     const installed = await runCli(

@@ -1,7 +1,8 @@
 import type { SkiloomHomePaths } from "../home.js";
 import {
   observePackageCommonSoftware,
-  type HostObservationDiagnosticCode
+  type HostObservationDiagnosticCode,
+  type HostProbeExecutor
 } from "../host-observation/index.js";
 import type {
   RegistryDependencyObservation,
@@ -41,7 +42,8 @@ export function sortDoctorObservations(
 
 export async function inspectDoctorPackages(
   home: SkiloomHomePaths,
-  packages: ReadonlyArray<RegistryResolvedPackage>
+  packages: ReadonlyArray<RegistryResolvedPackage>,
+  execute?: HostProbeExecutor
 ): Promise<DoctorPackageInspection> {
   const storeHealthy = new Map<string, boolean>();
   const observations: RegistryDependencyObservation[] = [];
@@ -76,7 +78,8 @@ export async function inspectDoctorPackages(
     const host = await observePackageCommonSoftware({
       packageCoordinate: packageFact.packageCoordinate,
       packageContentDigest: packageFact.contentDigest,
-      snapshot: verified.value.snapshot
+      snapshot: verified.value.snapshot,
+      ...(execute === undefined ? {} : { execute })
     });
     observations.push(...host.observations);
     for (const issue of host.diagnostics) {

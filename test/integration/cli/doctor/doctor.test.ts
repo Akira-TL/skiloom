@@ -13,6 +13,15 @@ import { spawn } from "node:child_process";
 import test from "node:test";
 
 import {
+  inspectDoctorTarget
+} from "../../../../src/runtime/doctor/index.js";
+import {
+  resolveSkiloomHomePaths
+} from "../../../../src/runtime/home.js";
+import type {
+  HostProbeExecutor
+} from "../../../../src/runtime/host-observation/index.js";
+import {
   readTargetStateMarkerFile,
   writeTargetStateMarkerFile
 } from "../../../../src/runtime/target-state-marker.js";
@@ -91,7 +100,7 @@ test("doctor reports a healthy accepted Target without network or mutation", asy
 });
 
 test("doctor probes common software live without persisting or advancing Target generation", async () => {
-  await withCliRuntime(async ({ home, cwd }) => {
+  await withCliRuntime(async ({ home, cwd, target }) => {
     assert.equal(
       (
         await runCli(
@@ -136,6 +145,42 @@ test("doctor probes common software live without persisting or advancing Target 
     assert.match(
       output.result.dependencyObservations[0]?.detectedVersion ?? "",
       /^\d+(?:\.\d+)+$/u
+    );
+
+    let injectedVersion = "21.9.0";
+    const execute: HostProbeExecutor = async () => ({
+      kind: "exited",
+      code: 0,
+      stdout: "v" + injectedVersion + "\n",
+      stderr: ""
+    });
+    const firstLive = await inspectDoctorTarget({
+      home: resolveSkiloomHomePaths(home),
+      targetRoot: target,
+      hostProbeExecutor: execute
+    });
+    assert.equal(firstLive.ok, true);
+    if (!firstLive.ok) {
+      return;
+    }
+    assert.equal(
+      firstLive.value.dependencyObservations[0]?.status,
+      "incompatible"
+    );
+
+    injectedVersion = "24.0.0";
+    const secondLive = await inspectDoctorTarget({
+      home: resolveSkiloomHomePaths(home),
+      targetRoot: target,
+      hostProbeExecutor: execute
+    });
+    assert.equal(secondLive.ok, true);
+    if (!secondLive.ok) {
+      return;
+    }
+    assert.equal(
+      secondLive.value.dependencyObservations[0]?.status,
+      "satisfied"
     );
 
     const after = await runCli(

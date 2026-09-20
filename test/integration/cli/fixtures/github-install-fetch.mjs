@@ -137,7 +137,7 @@ function appRepository() {
                 packageManifest(
                   ".",
                   {},
-                  { node: ">=0" }
+                  { node: ">=22" }
                 )
               ]
             : [])
