@@ -47,6 +47,10 @@ import {
   createGitHubRepositoryFetchTransport
 } from "../runtime/source/github/index.js";
 import {
+  acceptedInstallNoOp,
+  planOnlyInstallRegistry
+} from "./install/bootstrap-no-op.js";
+import {
   createCliCandidateAcceptance,
   currentUserHome,
   formatReleaseRetargetRisk,
@@ -104,6 +108,10 @@ export type CliInstallResult = Readonly<{
 export type CliInstallExecution = Readonly<{
   result: CliInstallResult;
   presentationRendered: boolean;
+}>;
+
+export type CliInstallExecutionPolicy = Readonly<{
+  noOpWhenDirectRequirementExists?: boolean;
 }>;
 
 type BuildCliInstallIntentInput = Readonly<{
@@ -392,7 +400,8 @@ export function buildCliInstallIntent(
 }
 
 export async function executeCliInstall(
-  input: CliInstallInvocation
+  input: CliInstallInvocation,
+  policy: CliInstallExecutionPolicy = {}
 ): Promise<Result<CliInstallExecution, ProductError>> {
   const userHome = currentUserHome();
   const home = resolveSkiloomHomePaths(userHome);
@@ -431,7 +440,8 @@ export async function executeCliInstall(
     input,
     home,
     userHome,
-    acquired.value
+    acquired.value,
+    policy
   );
   const released = await acquired.value.release();
   if (operated.ok && !released.ok) {
@@ -444,7 +454,8 @@ async function executeWhileLocked(
   input: CliInstallInvocation,
   home: SkiloomHomePaths,
   userHome: string,
-  lock: OperationLockSession
+  lock: OperationLockSession,
+  policy: CliInstallExecutionPolicy
 ): Promise<Result<CliInstallExecution, ProductError>> {
   const status = await readCliStatus(input.target, userHome);
   if (!status.ok) {
@@ -480,6 +491,37 @@ async function executeWhileLocked(
       registry = opened.value;
     }
 
+    if (
+      policy.noOpWhenDirectRequirementExists === true &&
+      existingTargetId !== undefined &&
+      registry !== undefined &&
+      input.intent.requestedProjectionRename === undefined
+    ) {
+      const noOp = acceptedInstallNoOp(
+        registry,
+        existingTargetId,
+        input.intent.directRequirement
+      );
+      if (!noOp.ok) {
+        return noOp;
+      }
+      if (noOp.value !== null) {
+        return {
+          ok: true,
+          value: {
+            result: lifecycleResult(
+              input.target,
+              input.intent,
+              "no-op",
+              noOp.value.plan,
+              noOp.value.state
+            ),
+            presentationRendered: false
+          }
+        };
+      }
+    }
+
     const transport = createGitHubJsonFetchTransport();
     const repositoryTransport =
       createGitHubRepositoryFetchTransport();
@@ -513,7 +555,7 @@ async function executeWhileLocked(
             home,
             targetRoot: input.target.path,
             lock,
-            registry: registry ?? planOnlyRegistry(),
+            registry: registry ?? planOnlyInstallRegistry(),
             directRequirements: [
               input.intent.directRequirement
             ],
@@ -752,22 +794,4 @@ function formatInstallPresentation(
   }
 
   return lines.join("\n") + "\n";
-}
-
-function planOnlyRegistry(): MachineRegistry {
-  const unexpected = (): never => {
-    throw new Error(
-      "plan-only fresh install touched Machine Registry"
-    );
-  };
-  return {
-    close() {},
-    pragmas: unexpected,
-    readTargetState: unexpected,
-    readPendingOperations: unexpected,
-    beginPendingOperation: unexpected,
-    beginPendingReconciliation: unexpected,
-    completePendingOperation: unexpected,
-    replaceTargetState: unexpected
-  };
 }

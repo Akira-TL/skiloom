@@ -4,33 +4,33 @@ import process from "node:process";
 
 import type { ProductError } from "../domain/errors/index.js";
 import {
+  executeCliBootstrap,
+  parseCliBootstrapArguments,
+  type CliBootstrapInvocation,
+  type CliBootstrapResult
+} from "./bootstrap/index.js";
+import {
   executeCliDoctor,
-  formatCliDoctorResult,
   parseCliDoctorArguments,
-  type CliDoctorInvocation,
-  type CliDoctorResult
+  type CliDoctorInvocation
 } from "./doctor/index.js";
 import {
-  searchSkillsMp,
-  type SkillsMpSearchResult
+  searchSkillsMp
 } from "../runtime/catalog/skillsmp.js";
 import {
   executeCliInstall,
-  formatCliInstallResult,
   parseCliInstallArguments,
   type CliInstallInvocation,
   type CliInstallResult
 } from "./install.js";
 import {
   executeCliRemove,
-  formatCliRemoveResult,
   parseCliRemoveArguments,
   type CliRemoveInvocation,
   type CliRemoveResult
 } from "./remove/index.js";
 import {
   executeCliRecovery,
-  formatCliRecoveryResult,
   parseCliRecoveryArguments,
   type CliRecoveryInvocation,
   type CliRecoveryResult
@@ -38,78 +38,52 @@ import {
 import {
   executeCliRepair,
   executeCliSync,
-  formatCliMaintenanceResult,
   parseCliRepairArguments,
   parseCliSyncArguments,
-  type CliMaintenanceResult,
   type CliRepairInvocation,
   type CliSyncInvocation
 } from "./maintenance/index.js";
 import {
   executeCliLocalOperation,
-  formatCliLocalResult,
   parseCliLocalArguments,
   type CliLocalInvocation,
-  type CliLocalOperation,
-  type CliLocalResult
+  type CliLocalOperation
 } from "./local/index.js";
+import {
+  renderFailure,
+  renderSuccess
+} from "./output/index.js";
 import {
   parseCliSearchArguments
 } from "./search/index.js";
 import {
   parseCliStatusArguments,
-  readCliStatus,
-  type CliStatusResult
+  readCliStatus
 } from "./status.js";
 import type {
   ResolvedCliTarget
 } from "./target-selector.js";
 import {
   executeCliExport,
-  formatCliExportResult,
   parseCliExportArguments,
-  type CliExportInvocation,
-  type CliExportResult
+  type CliExportInvocation
 } from "./transfer/index.js";
 import {
   executeCliImport,
-  formatCliImportResult,
   parseCliImportArguments,
   type CliImportInvocation,
   type CliImportResult
 } from "./transfer/import.js";
 import {
   executeCliUpdate,
-  formatCliUpdateResult,
   parseCliUpdateArguments,
   type CliUpdateInvocation,
   type CliUpdateResult
 } from "./update.js";
 import {
   parseCliValidateArguments,
-  validateLocalPath,
-  type ValidateLocalPathResult
+  validateLocalPath
 } from "./validate.js";
-
-const CLI_SCHEMA = "SKILOOM-CLI-V1" as const;
-
-type CliWarning = ProductError;
-
-type CliSuccess = Readonly<{
-  schema: typeof CLI_SCHEMA;
-  ok: true;
-  command: string;
-  result: unknown;
-  warnings: ReadonlyArray<CliWarning>;
-}>;
-
-type CliFailure = Readonly<{
-  schema: typeof CLI_SCHEMA;
-  ok: false;
-  command: string;
-  error: ProductError;
-  warnings: ReadonlyArray<CliWarning>;
-}>;
 
 type ParsedValidate = Readonly<{
   command: "validate";
@@ -144,6 +118,8 @@ type ParsedLocal =
   CliLocalInvocation & Readonly<{ command: CliLocalOperation }>;
 type ParsedExport = CliExportInvocation & Readonly<{ command: "export" }>;
 type ParsedImport = CliImportInvocation & Readonly<{ command: "import" }>;
+type ParsedBootstrap =
+  CliBootstrapInvocation & Readonly<{ command: "bootstrap" }>;
 
 type ParsedCommand =
   | ParsedValidate
@@ -158,21 +134,24 @@ type ParsedCommand =
   | ParsedRepair
   | ParsedLocal
   | ParsedExport
-  | ParsedImport;
+  | ParsedImport
+  | ParsedBootstrap;
 
 type ParsedCandidate =
   | ParsedInstall
   | ParsedUpdate
   | ParsedRemove
   | ParsedRecovery
-  | ParsedImport;
+  | ParsedImport
+  | ParsedBootstrap;
 
 type CandidateCliResult =
   | CliInstallResult
   | CliUpdateResult
   | CliRemoveResult
   | CliRecoveryResult
-  | CliImportResult;
+  | CliImportResult
+  | CliBootstrapResult;
 
 type CandidateCliExecution = Readonly<{
   result: CandidateCliResult;
@@ -215,6 +194,7 @@ async function main(): Promise<number> {
     case "recover":
     case "fork":
     case "import":
+    case "bootstrap":
       return runCandidate(parsed.value);
     case "sync":
     case "repair":
@@ -274,7 +254,9 @@ async function runCandidate(
   const executed =
     command.command === "install"
       ? await executeCliInstall(command)
-      : command.command === "update"
+      : command.command === "bootstrap"
+        ? await executeCliBootstrap(command)
+        : command.command === "update"
         ? await executeCliUpdate(command)
         : command.command === "remove"
           ? await executeCliRemove(command)
@@ -454,6 +436,11 @@ function parseArguments(
       return parseExport(withoutJson.slice(1), json);
     case "import":
       return parseImport(withoutJson.slice(1), json);
+    case "bootstrap":
+      return parseBootstrap(
+        withoutJson.slice(1),
+        json
+      );
     case "rename":
     case "detach":
     case "rebind":
@@ -589,6 +576,24 @@ function parseImport(
     : usage("import", json, parsed.reason);
 }
 
+function parseBootstrap(
+  argv: ReadonlyArray<string>,
+  json: boolean
+):
+  | Readonly<{ ok: true; value: ParsedBootstrap }>
+  | Readonly<{ ok: false; value: UsageFailure }> {
+  const parsed = parseCliBootstrapArguments(argv, json);
+  return parsed.ok
+    ? {
+        ok: true,
+        value: {
+          command: "bootstrap",
+          ...parsed.value
+        }
+      }
+    : usage("bootstrap", json, parsed.reason);
+}
+
 function parseSync(argv: ReadonlyArray<string>, json: boolean):
   | Readonly<{ ok: true; value: ParsedSync }>
   | Readonly<{ ok: false; value: UsageFailure }> {
@@ -648,152 +653,6 @@ function usage(
       }
     }
   };
-}
-
-function renderSuccess(
-  command: string,
-  result:
-    | ValidateLocalPathResult
-    | CliStatusResult
-    | CliDoctorResult
-    | SkillsMpSearchResult
-    | CliInstallResult
-    | CliUpdateResult
-    | CliRemoveResult
-    | CliRecoveryResult
-    | CliExportResult
-    | CliImportResult
-    | CliMaintenanceResult
-    | CliLocalResult,
-  json: boolean,
-  warnings: ReadonlyArray<CliWarning> = []
-): void {
-  if (json) {
-    const output: CliSuccess = {
-      schema: CLI_SCHEMA,
-      ok: true,
-      command,
-      result,
-      warnings
-    };
-    process.stdout.write(
-      JSON.stringify(output) + "\n"
-    );
-    return;
-  }
-
-  if (command === "validate") {
-    process.stdout.write(
-      `Valid Skiloom package: ${(result as ValidateLocalPathResult).path}\n`
-    );
-    return;
-  }
-  if (command === "doctor") {
-    process.stdout.write(formatCliDoctorResult(result as CliDoctorResult));
-    return;
-  }
-  if (command === "install") {
-    process.stdout.write(
-      formatCliInstallResult(result as CliInstallResult)
-    );
-    return;
-  }
-  if (command === "remove") {
-    process.stdout.write(
-      formatCliRemoveResult(result as CliRemoveResult)
-    );
-    return;
-  }
-  if (command === "export") {
-    process.stdout.write(
-      formatCliExportResult(result as CliExportResult)
-    );
-    for (const warning of warnings) {
-      process.stdout.write("Warning: " + warning.code + "\n");
-    }
-    return;
-  }
-  if (command === "import") {
-    process.stdout.write(
-      formatCliImportResult(result as CliImportResult)
-    );
-    return;
-  }
-  if (command === "recover" || command === "fork") {
-    process.stdout.write(
-      formatCliRecoveryResult(result as CliRecoveryResult)
-    );
-    return;
-  }
-  if (command === "sync" || command === "repair") {
-    process.stdout.write(
-      formatCliMaintenanceResult(
-        result as CliMaintenanceResult
-      )
-    );
-    return;
-  }
-  if (
-    command === "rename" ||
-    command === "detach" ||
-    command === "rebind" ||
-    command === "forget"
-  ) {
-    process.stdout.write(
-      formatCliLocalResult(result as CliLocalResult)
-    );
-    return;
-  }
-  if (command === "update") {
-    process.stdout.write(
-      formatCliUpdateResult(result as CliUpdateResult)
-    );
-    return;
-  }
-  if (command === "search") {
-    const search = result as SkillsMpSearchResult;
-    for (const candidate of search.candidates) {
-      const source = candidate.githubRepository === null
-        ? "display-only"
-        : candidate.githubRepository;
-      process.stdout.write(
-        `[SkillsMP] ${candidate.name} — ${source}\n`
-      );
-    }
-    return;
-  }
-
-  const status = result as CliStatusResult;
-  process.stdout.write(
-    `Target: ${status.target.path}\n` +
-      `Registry: ${status.registry === null ? "unregistered" : status.registry.targetId}\n` +
-      `Marker: ${status.marker === null ? "absent" : status.marker.targetId}\n`
-  );
-}
-
-function renderFailure(
-  command: string,
-  error: ProductError,
-  json: boolean,
-  exitCode: number
-): void {
-  if (json) {
-    const output: CliFailure = {
-      schema: CLI_SCHEMA,
-      ok: false,
-      command,
-      error,
-      warnings: []
-    };
-    process.stdout.write(
-      JSON.stringify(output) + "\n"
-    );
-    return;
-  }
-
-  process.stderr.write(
-    `skiloom: ${error.code} (exit ${exitCode})\n`
-  );
 }
 
 process.exitCode = await main();

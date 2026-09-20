@@ -48,6 +48,55 @@ function snapshot(entries) {
   return { entries };
 }
 
+function firstPartyRepository() {
+  const specialists = [
+    "skiloom-author",
+    "skiloom-discover",
+    "skiloom-doctor",
+    "skiloom-manage"
+  ];
+  return {
+    repository: "akira-tl/skiloom",
+    sourceKind: "github-release",
+    releases: [
+      {
+        tag: "v0.8.0",
+        commit: commit("8"),
+        immutable: true,
+        snapshot: snapshot([
+          {
+            path: "skiloom-repo.toml",
+            mode: "100644",
+            content:
+              'schema = 1\n\n[discovery]\ninclude = ["skills/*"]\n'
+          },
+          skill(
+            "skills/skiloom",
+            "skiloom",
+            "Skiloom Router."
+          ),
+          packageManifest(
+            "skills/skiloom",
+            Object.fromEntries(
+              specialists.map((name) => [
+                "akira-tl/skiloom/" + name,
+                "*"
+              ])
+            )
+          ),
+          ...specialists.map((name) =>
+            skill(
+              "skills/" + name,
+              name,
+              "Skiloom first-party specialist."
+            )
+          )
+        ])
+      }
+    ]
+  };
+}
+
 function appRepository() {
   const retarget = mode === "retarget";
   const releases = [
@@ -93,6 +142,7 @@ function appRepository() {
 const repositories = new Map(
   [
     appRepository(),
+    firstPartyRepository(),
     {
       repository: "acme/suite",
       sourceKind: "github-release",
