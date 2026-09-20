@@ -253,6 +253,8 @@ Target 内使用平铺 `<target>/<activation-name>` 结构。
 - 本机状态库保存该身份的当前 generation；
 - 目标目录 marker 保存该副本最后同步的 generation；
 - 落后副本必须显式选择单向同步到当前已接受状态，或 fork 为新的 `target-id`；
+- 安全同步落后副本不能把相同 `target-id` 当作覆盖授权。官方 writer 使用 `SKILOOM-STATE-V2` managed projection ownership/materialization baseline 证明该副本中旧 managed projection 仍精确等于 Skiloom 最后写入的内容；baseline 只保存 Package Root、content digest、activation、materialization 与必要 transform，不保存 Release/Git source resolution，因此 marker 仍不是 exact source lock。V1 marker 继续可读；current-generation V1 copy 可对照当前 Registry 精确验证并登记，lagging V1 若存在 managed projection 则因缺少 durable ownership proof fail closed；
+- 本机 `target_locations` 是 generation-neutral copy-location observation：在 `operation.lock` 下登记/更新，不递增 Target Generation；lagging copy 只有在旧 ownership preflight 通过后才能先记录旧 observed generation，reconcile 成功后再提升到 Registry current generation；
 - marker generation 超前于本机状态属于回滚/恢复异常，fail closed；
 - marker 丢失而数据库完整时，只在目标投影可验证为当前精确状态时允许修复 marker；否则进入 reconcile/fail-closed；
 - 数据库仍记录 target-id、但路径暂时不存在时，该身份可以保持 dormant。

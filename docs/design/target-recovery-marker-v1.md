@@ -1,10 +1,12 @@
 # `.skiloom-state` v1 公开格式
 
-状态：Accepted
+状态：Writer Superseded by ADR 0031 / V2；V1 parser compatibility remains required
 
 对应 Issue：#32 `Define .skiloom-state v1 public recovery format`
 
 对应产品规范：[`skiloom-v0-product-contract.md`](skiloom-v0-product-contract.md)
+
+当前说明：V1 继续是必须可读的历史公开格式；官方 writer 自 ADR 0031 起生成 `SKILOOM-STATE-V2`，新增 managed projection ownership/materialization baseline。V1 语义本身不被重新解释。
 
 `.skiloom-state` 是每个 Skiloom-managed Target 根目录中的轻量恢复锚点。它公开保存 Target Identity、该目录副本最后同步的 Target Generation、用户直接安装要求，以及恢复目标侧语义必须保留的稀疏 override。它不是完整精确安装状态、不是旧式 Lock，也不是用户内容备份。
 

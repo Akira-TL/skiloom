@@ -130,7 +130,7 @@ Skiloom 为 rename 或 dependency routing 等确定性变换生成并继续全�
 
 ## Target Recovery Marker
 
-每个 Skiloom-managed Target 根目录中的公开 TOML 文件 `.skiloom-state`。v1 使用 `SKILOOM-STATE-V1`，保存 canonical lowercase UUID v4 `target-id`、Target Generation、Package/repository-wide Direct Install Requirements、非默认 projection activation name，以及 Detached Override 的 logical Package + detach baseline provenance/digest。它不保存完整 transitive graph、exact transitive source/version、symlink/junction/copy 选择、Dependency Routing Overlay 展开内容或用户修改后的 bytes；routing overlay 由恢复后的依赖边与 projection name 确定性重建。v1 严格拒绝未知字段和非法组合，未知格式版本 fail closed。Machine Registry 丢失时，Skiloom 只能以这些信息重新解析 recovery candidate 并重新确认完整来源，不能把 Marker 当作精确 Lock。
+每个 Skiloom-managed Target 根目录中的公开 TOML 文件 `.skiloom-state`。当前 writer 使用 `SKILOOM-STATE-V2`；parser 继续接受 V1。V2 保留 `target-id`、Target Generation、Package/repository-wide Direct Install Requirements、非默认 projection activation name 与 Detached Override baseline，并额外保存每个 managed projection 的轻量 ownership/materialization baseline：Package Coordinate、activation name、materialization、Package Root、Package content digest 与 transformed copy 所需的 canonical transform JSON。该 managed baseline 只用于证明 lagging Target copy 中旧 managed bytes 仍是 Skiloom 最后写入的内容；它不保存 Release/Git source resolution、dependency graph 或 source authorization，因此 Marker 仍不是精确 Lock。Machine Registry 丢失时，Skiloom 继续根据 recovery intent 重新解析 candidate 并重新确认完整来源；V1 marker 若已落后且含 managed projection，因为缺少 durable ownership baseline，sync 必须 fail closed。
 
 ## Package Store GC Boundary
 
