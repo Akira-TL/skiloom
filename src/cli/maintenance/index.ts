@@ -29,6 +29,9 @@ import {
   currentUserHome
 } from "../candidate-acceptance.js";
 import {
+  resolveGitHubCredentialEnvironment
+} from "../github-credential/index.js";
+import {
   parseCliStatusArguments,
   readCliStatus
 } from "../status.js";
@@ -202,7 +205,8 @@ async function executeMaintenanceWhileLocked(
             lock,
             registry,
             transport: createGitHubJsonFetchTransport(),
-            sourceCachePath: home.sourceCachePath
+            sourceCachePath: home.sourceCachePath,
+            ...credentialOption()
           });
     if (!maintained.ok) {
       return maintained;
@@ -233,6 +237,16 @@ async function executeMaintenanceWhileLocked(
   } finally {
     registry?.close();
   }
+}
+
+function credentialOption():
+  | Readonly<{ credential: string }>
+  | Readonly<Record<never, never>> {
+  const credential =
+    resolveGitHubCredentialEnvironment(process.env);
+  return credential === undefined
+    ? {}
+    : { credential };
 }
 
 export function formatCliMaintenanceResult(

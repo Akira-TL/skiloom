@@ -46,6 +46,7 @@ import {
   createGitHubJsonFetchTransport,
   createGitHubRepositoryFetchTransport
 } from "../runtime/source/github/index.js";
+import { resolveGitHubCredentialEnvironment } from "./github-credential/index.js";
 import {
   acceptedInstallNoOp,
   planOnlyInstallRegistry
@@ -522,9 +523,9 @@ async function executeWhileLocked(
       }
     }
 
+    const credential = resolveGitHubCredentialEnvironment(process.env);
     const transport = createGitHubJsonFetchTransport();
-    const repositoryTransport =
-      createGitHubRepositoryFetchTransport();
+    const repositoryTransport = createGitHubRepositoryFetchTransport();
     let presentationRendered = false;
     const acceptance = createCliCandidateAcceptance(
       input,
@@ -562,6 +563,7 @@ async function executeWhileLocked(
             repositoryTransport,
             transport,
             sourceCachePath: home.sourceCachePath,
+            ...(credential === undefined ? {} : { credential }),
             acceptCandidate:
               acceptance.acceptCandidateWithRetarget,
             ...(input.intent.requestedProjectionRename === undefined
@@ -581,6 +583,7 @@ async function executeWhileLocked(
             repositoryTransport,
             transport,
             sourceCachePath: home.sourceCachePath,
+            ...(credential === undefined ? {} : { credential }),
             acceptCandidate:
               acceptance.acceptCandidateWithRetarget,
             ...(input.intent.requestedProjectionRename === undefined

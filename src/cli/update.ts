@@ -45,6 +45,9 @@ import {
   type CliCandidatePresentationFacts
 } from "./candidate/presentation.js";
 import {
+  resolveGitHubCredentialEnvironment
+} from "./github-credential/index.js";
+import {
   readCliStatus
 } from "./status.js";
 import type {
@@ -193,6 +196,8 @@ async function executeWhileLocked(
         }
       }
     );
+    const credential =
+      resolveGitHubCredentialEnvironment(process.env);
     const lifecycle = await updateAcceptedTarget({
       home,
       targetId: status.value.registry.targetId,
@@ -203,6 +208,9 @@ async function executeWhileLocked(
         createGitHubRepositoryFetchTransport(),
       transport: createGitHubJsonFetchTransport(),
       sourceCachePath: home.sourceCachePath,
+      ...(credential === undefined
+        ? {}
+        : { credential }),
       acceptCandidate: authorization.acceptCandidate,
       authorizeReleaseRetarget:
         authorization.authorizeReleaseRetarget

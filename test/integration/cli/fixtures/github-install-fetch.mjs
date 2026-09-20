@@ -1,6 +1,10 @@
 const originalFetch = globalThis.fetch;
 
 const mode = process.env.SKILOOM_TEST_GITHUB_MODE ?? "base";
+const expectedBearer =
+  process.env.SKILOOM_TEST_EXPECT_GITHUB_BEARER;
+const forbidAuthorization =
+  process.env.SKILOOM_TEST_FORBID_GITHUB_AUTH === "1";
 
 function commit(seed) {
   return seed.repeat(40).slice(0, 40);
@@ -243,6 +247,28 @@ globalThis.fetch = async (input, init) => {
   if (url.origin !== "https://api.github.com") {
     return originalFetch(input, init);
   }
+
+  const headers = new Headers(
+    input instanceof Request
+      ? input.headers
+      : init?.headers
+  );
+  const authorization = headers.get("authorization");
+  if (
+    expectedBearer !== undefined &&
+    authorization !== "Bearer " + expectedBearer
+  ) {
+    return json({ message: "fixture credential required" }, 401);
+  }
+  if (
+    forbidAuthorization &&
+    authorization !== null
+  ) {
+    throw new Error(
+      "GitHub Authorization header forbidden by test fixture"
+    );
+  }
+
   if (mode === "forbid-network") {
     throw new Error("GitHub network access forbidden by test fixture");
   }
