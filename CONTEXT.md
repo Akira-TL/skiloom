@@ -50,7 +50,7 @@ Package Root 中可选、不可变的 `DEPENDENCIES.md`。它是 Package author 
 
 ## Dependency Observation State
 
-Skiloom 保存的可删除重建的本机环境观察状态。它只记录当前机器的 dependency observations；Package `content-digest` 是唯一 freshness anchor，不复制 requirement、`DEPENDENCIES.md` digest、检查时间或授权信息。Skiloom 维护 common software observations，Agent 维护 special observations；其 SQLite/table/file 物理存储属于官方实现细节，不是公开产品格式。
+Skiloom 保存的可删除重建的本机环境观察状态。它只记录当前机器的 dependency observations；Package `content-digest` 是唯一 freshness anchor，不复制 requirement、`DEPENDENCIES.md` digest、检查时间或授权信息。v0 common software 只使用 `node` / `npm` / `git` / `gh` / `python` 五个实现内建、固定 argv 的只读 probe；`doctor` 实时检查但不写状态，`sync` 可以刷新 machine-local software observation cache。Agent 对 `DEPENDENCIES.md` 的 special observation 若要保存，只能通过公开 `skiloom observe` 写入；observation 变化不递增 Target Generation，也不传播到 marker/export。其 SQLite/table/file 物理存储属于官方实现细节，不是公开产品格式。
 
 ## Skill Dependency
 
@@ -162,7 +162,7 @@ Skiloom 官方实现使用 Node.js + TypeScript + npm 作为主控制面与发�
 
 ## CLI Surface
 
-Skiloom v0 的 canonical CLI commands 为 `search/status/doctor/validate/install/update/remove/rename/sync/repair/detach/rebind/forget/recover/fork/export/import/bootstrap`。完整 Candidate 命令统一支持 `--plan`；non-interactive 真正提交新状态需要 `--yes`，Release retarget 额外要求 `--allow-release-retarget`，merge import 额外要求 `--merge`。`--json` 自动禁止 prompt，但不自动批准 candidate，并通过 `SKILOOM-CLI-V1` envelope 返回 `schema/ok/command/result|error/warnings`。v0 不提供 `--force`、永久 source whitelist、policy DSL、同义 alias 或 TUI。
+Skiloom v0 的 canonical CLI commands 为 `search/status/doctor/validate/install/update/remove/rename/sync/repair/detach/rebind/forget/observe/recover/fork/export/import/bootstrap`。完整 Candidate 命令统一支持 `--plan`；non-interactive 真正提交新状态需要 `--yes`，Release retarget 额外要求 `--allow-release-retarget`，merge import 额外要求 `--merge`。`--json` 自动禁止 prompt，但不自动批准 candidate，并通过 `SKILOOM-CLI-V1` envelope 返回 `schema/ok/command/result|error/warnings`。v0 不提供 `--force`、永久 source whitelist、policy DSL、同义 alias 或 TUI。
 
 ## Machine Registry
 

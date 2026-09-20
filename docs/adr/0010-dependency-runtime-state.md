@@ -1,8 +1,8 @@
 # ADR 0010：依赖运行时状态只保存本机观察结果
 
-- 状态：Partially Superseded by ADR 0018
+- 状态：Partially Superseded by ADR 0018 and ADR 0028
 - 日期：2026-09-14
-- 当前说明：环境 requirement 与观察状态的职责分离继续有效；旧 `.agents/.skiloom/dependencies.lock` 项目路径和“四类项目状态”模型不再是当前产品权威。现行边界见 `docs/design/skiloom-v0-product-contract.md`。
+- 当前说明：环境 requirement 与观察状态的职责分离继续有效；旧 `.agents/.skiloom/dependencies.lock` 项目路径和“四类项目状态”模型不再是当前产品权威。ADR 0028 进一步固定当前 v0：Doctor 重探测 common software 但保持严格只读，`sync` 才可刷新 machine-local software observation cache，Agent-owned special observation 只能通过公开 `skiloom observe` 写入。现行边界见 `docs/design/skiloom-v0-product-contract.md`。
 
 ## 背景
 

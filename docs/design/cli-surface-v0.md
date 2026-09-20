@@ -37,6 +37,8 @@ skiloom repair
 skiloom detach <package>
 skiloom rebind <package> <activation-name>
 skiloom forget <package>
+skiloom observe <package> <name> --status <status>
+skiloom observe <package> <name> --clear
 
 skiloom recover
 skiloom fork
@@ -196,6 +198,21 @@ forget
 v0 不再机械增加第二次普通确认。
 
 它们仍必须取得 `operation.lock`、做 ownership preflight、通过 Machine Registry transaction 更新状态、按 DB-first materialize/reconcile Target，并更新 Target Generation / `.skiloom-state`。任何 foreign path、ownership 或状态异常继续 fail closed。
+
+### 8.1 Machine-local dependency observation
+
+`observe` 是另一类显式局部状态操作：它只记录或清除当前 accepted Package 的 `special` dependency observation，不修改 Package graph、Target bytes、projection ownership 或 `.skiloom-state`，也不递增 Target Generation。
+
+```text
+skiloom observe owner/repo/package <name> --status unknown|satisfied|missing|incompatible|blocked [--note <text>]
+skiloom observe owner/repo/package <name> --clear
+```
+
+它继续支持统一 Target selector，并必须取得 `operation.lock`。Package coordinate 必须已经存在于 selected Target 的 accepted state；caller 不能提供 `content-digest`，CLI 自动绑定当前 accepted Package digest。`observe` 只能写 `special` observation；`software` observation 由 Skiloom 内建只读 probe 拥有。
+
+`observe` 本身就是对这一次 machine-local metadata write 的显式授权，不是完整 Candidate 操作，因此没有 `--plan` 或 `--yes`。第一方 Skill 若要保存 Agent 对 `DEPENDENCIES.md` 的检查结果，也必须走这个公开命令。
+
+`doctor` 仍严格只读：它可以实时运行 common-software read-only probes 并合并展示当前有效的 saved special observations，但不得因为诊断而写 Registry。`sync` 可以在锁内刷新 disposable software observation cache；这种刷新同样不递增 Target Generation。
 
 ## 9. Interactive 与 non-interactive
 

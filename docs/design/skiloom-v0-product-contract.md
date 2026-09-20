@@ -74,7 +74,7 @@ sha256:<64 lowercase hex>
 - 环境 requirement 不是安装、升级、登录、下载、配置或服务修改授权；需要修改宿主环境时必须另行取得用户明确批准；
 - Package metadata 不允许提供任意 probe command、installer command、package-manager command、build/postinstall hook。
 
-宿主环境观察结果可以由官方实现保存在可删除重建的本机状态中，但其物理文件位置和数据库格式不是公开产品格式。Package `content-digest` 仍是环境观察有效性的唯一 Package 内容锚点。
+宿主环境观察结果可以由官方实现保存在可删除重建的本机状态中，但其物理文件位置和数据库格式不是公开产品格式。Package `content-digest` 仍是环境观察有效性的唯一 Package 内容锚点。v0 Host Observation 的完整行为由 ADR 0028 固定：`node` / `npm` / `git` / `gh` / `python` 使用实现内建、固定 argv 的只读 probe；`doctor` 每次实时检查但保持严格只读，`sync` 可以在 operation lock 下刷新 machine-local software observation cache；复杂 `DEPENDENCIES.md` 检查结果若要保存，只能通过公开 `skiloom observe` 写入 special observation。Observation 变化不递增 Target Generation，也不进入 marker/export/source authorization。
 
 ## 5. GitHub 来源模型
 
@@ -376,7 +376,7 @@ Skiloom 官方实现继续采用：
 
 ## 19. CLI、候选接受与机器输出
 
-Skiloom v0 使用一组 canonical CLI commands：`search`、`status`、`doctor`、`validate`、`install`、`update`、`remove`、`rename`、`sync`、`repair`、`detach`、`rebind`、`forget`、`recover`、`fork`、`export`、`import`、`bootstrap`。v0 不维护 `add/rm/fix/upgrade` 等同义 alias，也不提供 `--force` 绕过完整性或 ownership 检查。
+Skiloom v0 使用一组 canonical CLI commands：`search`、`status`、`doctor`、`validate`、`install`、`update`、`remove`、`rename`、`sync`、`repair`、`detach`、`rebind`、`forget`、`observe`、`recover`、`fork`、`export`、`import`、`bootstrap`。v0 不维护 `add/rm/fix/upgrade` 等同义 alias，也不提供 `--force` 绕过完整性或 ownership 检查。`observe` 只记录/清除 selected accepted Target 中某个现存 Package 的 machine-local `special` dependency observation；它自动使用当前 Package `content-digest`，不允许 caller 写 `software` observation，不修改 Target bytes，也不递增 Target Generation。
 
 `install/update/remove/recover/fork/import/bootstrap` 都属于完整 Candidate 操作，并统一支持 `--plan`：只计算、验证和展示完整 candidate，不接受、不写 Machine Registry、不修改 live Target。non-interactive 执行若 candidate 需要提交，必须显式 `--yes`；`--json` 自动禁止 prompt，但不隐含 `--yes`。Release tag retarget 还需要显式 `--allow-release-retarget`，merge import 还需要显式 `--merge`；v0 不把这些授权持久化成长期 source whitelist 或 policy profile。
 
