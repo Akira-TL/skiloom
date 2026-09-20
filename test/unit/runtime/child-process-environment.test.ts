@@ -26,7 +26,7 @@ test("restricted child environment preserves only process-startup lookup temp an
     SKILLSMP_API_KEY: "catalog-secret",
     NPM_TOKEN: "npm-secret",
     ARBITRARY_SENTINEL_SECRET: "arbitrary-secret"
-  });
+  }, "linux");
 
   assert.deepEqual(restricted, {
     PATH: "/bin:/usr/bin",
