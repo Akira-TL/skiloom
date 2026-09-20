@@ -1,6 +1,6 @@
 # Skiloom 项目规则
 
-Skiloom 是独立的 Agent Skill 包管理器与安装器项目。v0 架构 Wayfinder 主体已收敛，canonical Spec 为 GitHub #31；当前实现已完成 `0.8.3` Product Surface/diagnostics/first-party workflow 与 dependency-observation 闭环。当前先完成 #125 剩余 v0 产品语义 Wayfinder（#127 GitHub credential/private-source boundary），`0.9.x` Release Hardening 暂后。实现工作必须从已拆分、blocker 已解除的 executable ticket 进入，不在代码阶段重新发明已经接受的产品语义。
+Skiloom 是独立的 Agent Skill 包管理器与安装器项目。v0 架构 Wayfinder 主体已收敛，canonical Spec 为 GitHub #31；当前实现已完成 `0.8.4` Product Surface/diagnostics/first-party workflow、dependency-observation 与 GitHub credential/private-source 闭环。#125 已无未决设计 frontier；`0.9.x` Release Hardening 仍暂后，下一步先复核 v0 代码与既有规划是否还有遗漏。实现工作必须从已拆分、blocker 已解除的 executable ticket 进入，不在代码阶段重新发明已经接受的产品语义。
 
 ## 工程流程
 
