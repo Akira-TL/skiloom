@@ -5,6 +5,9 @@ import {
   productError,
   type Result
 } from "../domain/errors/index.js";
+import {
+  withRegistryReadSnapshot
+} from "../runtime/registry/read.js";
 import type {
   CliRegistryStatus,
   StatusRegistryAmbiguousTarget,
@@ -29,9 +32,33 @@ export function readRegistryStatus(
   }
 
   try {
+    return readRegistryStatusFromDatabase(
+      database,
+      registryPath,
+      targetPath,
+      markerTargetId
+    );
+  } catch {
+    return registryReadFailed(registryPath);
+  } finally {
+    database.close();
+  }
+}
+
+export function readRegistryStatusFromDatabase(
+  database: DatabaseSync,
+  registryPath: string,
+  targetPath: string,
+  markerTargetId: string | undefined
+): Result<
+  CliRegistryStatus | null,
+  StatusRegistryReadFailed | StatusRegistryAmbiguousTarget
+> {
+  return withRegistryReadSnapshot(database, () => {
+    const resolvedTargetPath = resolve(targetPath);
     const targetIds = lookupTargetIds(
       database,
-      resolve(targetPath),
+      resolvedTargetPath,
       markerTargetId
     );
     if (targetIds.length === 0) {
@@ -41,7 +68,7 @@ export function readRegistryStatus(
       return {
         ok: false,
         error: productError("StatusRegistryAmbiguousTarget", {
-          path: resolve(targetPath),
+          path: resolvedTargetPath,
           targetIds
         })
       };
@@ -108,11 +135,7 @@ export function readRegistryStatus(
         )
       }
     };
-  } catch {
-    return registryReadFailed(registryPath);
-  } finally {
-    database.close();
-  }
+  });
 }
 
 function lookupTargetIds(

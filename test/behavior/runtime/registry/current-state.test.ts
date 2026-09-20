@@ -2,12 +2,19 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import {
+  DatabaseSync,
+  type SQLInputValue
+} from "node:sqlite";
 import test from "node:test";
 
 import { resolveSkiloomHomePaths, type SkiloomHomePaths } from "../../../../src/runtime/home.js";
 import { openMachineRegistry } from "../../../../src/runtime/registry/database.js";
 import type { RegistryTargetStateInput } from "../../../../src/runtime/registry/model.js";
+import {
+  readTargetRows,
+  withRegistryReadSnapshot
+} from "../../../../src/runtime/registry/read.js";
 import { CURRENT_REGISTRY_SCHEMA_VERSION } from "../../../../src/runtime/registry/schema.js";
 
 type Fixture = Readonly<{
@@ -125,6 +132,60 @@ test("Machine Registry round-trips complete current state with canonical orderin
       ]);
     } finally {
       registry.close();
+    }
+  });
+});
+
+test("Machine Registry read snapshot does not mix rows across a concurrent committed generation", async () => {
+  await withTempHome(async (paths) => {
+    const fixture = await readFixture();
+    assert.ok(fixture.state.directRequirements.length > 1);
+
+    const seeded = requireRegistry(paths);
+    const first = seeded.replaceTargetState(fixture.state);
+    assert.equal(first.ok, true);
+    seeded.close();
+
+    const writer = requireRegistry(paths);
+    const rawReader = new DatabaseSync(paths.registryPath);
+    let writerCommitted = false;
+    const reader = interceptGenerationRead(
+      rawReader,
+      () => {
+        if (writerCommitted) {
+          return;
+        }
+        writerCommitted = true;
+        const replaced = writer.replaceTargetState({
+          ...fixture.state,
+          directRequirements:
+            fixture.state.directRequirements.slice(0, 1)
+        });
+        assert.equal(replaced.ok, true);
+      }
+    );
+
+    try {
+      const snapshot = withRegistryReadSnapshot(
+        reader,
+        () => readTargetRows(reader, fixture.state.targetId)
+      );
+      assert.notEqual(snapshot, undefined);
+      assert.equal(writerCommitted, true);
+      assert.equal(snapshot?.generation, 1);
+      assert.equal(
+        snapshot?.directRequirements.length,
+        fixture.state.directRequirements.length
+      );
+
+      const current = writer.readTargetState(
+        fixture.state.targetId
+      );
+      assert.equal(current?.generation, 2);
+      assert.equal(current?.directRequirements.length, 1);
+    } finally {
+      rawReader.close();
+      writer.close();
     }
   });
 });
@@ -510,6 +571,51 @@ function reverseStateCollections(state: RegistryTargetStateInput): RegistryTarge
 
 function compare(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function interceptGenerationRead(
+  database: DatabaseSync,
+  afterGenerationRead: () => void
+): DatabaseSync {
+  let intercepted = false;
+  return new Proxy(database, {
+    get(target, property) {
+      if (property === "prepare") {
+        return (sql: string) => {
+          const statement = target.prepare(sql);
+          if (!sql.includes("SELECT generation FROM targets")) {
+            return statement;
+          }
+          return new Proxy(statement, {
+            get(statementTarget, statementProperty) {
+              if (statementProperty === "get") {
+                return (...parameters: SQLInputValue[]) => {
+                  const row = statementTarget.get(...parameters);
+                  if (!intercepted) {
+                    intercepted = true;
+                    afterGenerationRead();
+                  }
+                  return row;
+                };
+              }
+              const value = Reflect.get(
+                statementTarget,
+                statementProperty,
+                statementTarget
+              );
+              return typeof value === "function"
+                ? value.bind(statementTarget)
+                : value;
+            }
+          });
+        };
+      }
+      const value = Reflect.get(target, property, target);
+      return typeof value === "function"
+        ? value.bind(target)
+        : value;
+    }
+  });
 }
 
 async function withTempHome(

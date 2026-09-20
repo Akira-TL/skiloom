@@ -14,7 +14,11 @@ import type {
   RegistryTargetState,
   RegistryTargetStateInput
 } from "./model.js";
-import { readPendingOperations as readPendingOperationRows, readTargetRows } from "./read.js";
+import {
+  readPendingOperations as readPendingOperationRows,
+  readTargetRows,
+  withRegistryReadSnapshot
+} from "./read.js";
 import {
   configureRegistryConnection,
   CURRENT_REGISTRY_SCHEMA_VERSION,
@@ -102,11 +106,17 @@ export class MachineRegistry {
   }
 
   readTargetState(targetId: string): RegistryTargetState | undefined {
-    return readTargetRows(this.#database, targetId);
+    return withRegistryReadSnapshot(
+      this.#database,
+      () => readTargetRows(this.#database, targetId)
+    );
   }
 
   readPendingOperations(): ReadonlyArray<RegistryPendingOperation> {
-    return readPendingOperationRows(this.#database);
+    return withRegistryReadSnapshot(
+      this.#database,
+      () => readPendingOperationRows(this.#database)
+    );
   }
 
   beginPendingOperation(
@@ -198,7 +208,10 @@ export class MachineRegistry {
       throw error;
     }
 
-    const readback = readTargetRows(this.#database, targetId);
+    const readback = withRegistryReadSnapshot(
+      this.#database,
+      () => readTargetRows(this.#database, targetId)
+    );
     if (readback === undefined) {
       throw new Error(
         "registry target disappeared after observation replacement"
@@ -235,7 +248,10 @@ export class MachineRegistry {
       throw error;
     }
 
-    const readback = readTargetRows(this.#database, state.targetId);
+    const readback = withRegistryReadSnapshot(
+      this.#database,
+      () => readTargetRows(this.#database, state.targetId)
+    );
     if (readback === undefined) {
       throw new Error("registry target disappeared after committed replacement");
     }

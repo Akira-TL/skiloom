@@ -13,10 +13,7 @@ import type {
   RegistryDependencyObservation,
   RegistryTargetState
 } from "../registry/index.js";
-import {
-  readPendingOperations,
-  readTargetRows
-} from "../registry/read.js";
+
 import {
   verifyManagedProjection
 } from "../target-projection/index.js";
@@ -41,8 +38,7 @@ import {
   sortDoctorObservations
 } from "./packages.js";
 import {
-  inspectRegistryConnection,
-  targetIdsAtPath
+  readDoctorRegistrySnapshot
 } from "./registry.js";
 
 export type DoctorRecommendation =
@@ -171,7 +167,31 @@ export async function inspectDoctorTarget(
 
   try {
     const diagnostics: DoctorDiagnostic[] = [];
-    for (const issue of inspectRegistryConnection(database)) {
+    let registrySnapshot;
+    try {
+      registrySnapshot = readDoctorRegistrySnapshot(
+        database,
+        targetRoot,
+        markerTargetId
+      );
+    } catch {
+      return inspection(
+        markerTargetId,
+        null,
+        [
+          diagnostic(
+            "RegistryIntegrityFailed",
+            "error",
+            null,
+            "recover",
+            { reason: "snapshot-read-failed" }
+          )
+        ],
+        []
+      );
+    }
+
+    for (const issue of registrySnapshot.connectionIssues) {
       diagnostics.push(
         issue.kind === "schema-mismatch"
           ? diagnostic(
@@ -193,12 +213,7 @@ export async function inspectDoctorTarget(
             )
       );
     }
-
-    let locationTargetIds: ReadonlyArray<string> = [];
-    try {
-      locationTargetIds =
-        targetIdsAtPath(database, targetRoot);
-    } catch {
+    if (registrySnapshot.targetLookupFailed) {
       diagnostics.push(
         diagnostic(
           "RegistryIntegrityFailed",
@@ -209,7 +224,7 @@ export async function inspectDoctorTarget(
         )
       );
     }
-    if (locationTargetIds.length > 1) {
+    if (registrySnapshot.locationTargetIds.length > 1) {
       diagnostics.push(
         diagnostic(
           "RegistryIntegrityFailed",
@@ -218,13 +233,14 @@ export async function inspectDoctorTarget(
           "recover",
           {
             reason: "ambiguous-target-location",
-            targetCount: locationTargetIds.length
+            targetCount:
+              registrySnapshot.locationTargetIds.length
           }
         )
       );
     }
-    const targetId =
-      locationTargetIds[0] ?? markerTargetId;
+
+    const targetId = registrySnapshot.targetId;
     if (targetId === null) {
       if (!marker.ok) {
         diagnostics.push(
@@ -254,12 +270,7 @@ export async function inspectDoctorTarget(
       );
     }
 
-    let state: RegistryTargetState | undefined;
-    let stateReadFailed = false;
-    try {
-      state = readTargetRows(database, targetId);
-    } catch {
-      stateReadFailed = true;
+    if (registrySnapshot.stateReadFailed) {
       diagnostics.push(
         diagnostic(
           "RegistryIntegrityFailed",
@@ -270,8 +281,9 @@ export async function inspectDoctorTarget(
         )
       );
     }
+    const state = registrySnapshot.state;
     if (state === undefined) {
-      if (!stateReadFailed) {
+      if (!registrySnapshot.stateReadFailed) {
         diagnostics.push(
           diagnostic(
             "RegistryMissing",
@@ -290,12 +302,7 @@ export async function inspectDoctorTarget(
       );
     }
 
-    let pendingOperations:
-      ReturnType<typeof readPendingOperations> = [];
-    try {
-      pendingOperations =
-        readPendingOperations(database);
-    } catch {
+    if (registrySnapshot.pendingReadFailed) {
       diagnostics.push(
         diagnostic(
           "RegistryIntegrityFailed",
@@ -306,7 +313,7 @@ export async function inspectDoctorTarget(
         )
       );
     }
-    for (const pending of pendingOperations) {
+    for (const pending of registrySnapshot.pendingOperations) {
       if (pending.targetId === state.targetId) {
         diagnostics.push(
           diagnostic(

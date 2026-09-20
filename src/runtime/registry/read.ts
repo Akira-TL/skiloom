@@ -14,6 +14,25 @@ import type {
   RegistryPendingProjectionAction
 } from "./model.js";
 
+export function withRegistryReadSnapshot<Value>(
+  database: DatabaseSync,
+  read: () => Value
+): Value {
+  database.exec("BEGIN");
+  try {
+    const value = read();
+    database.exec("COMMIT");
+    return value;
+  } catch (error) {
+    try {
+      database.exec("ROLLBACK");
+    } catch {
+      // Preserve the original read failure.
+    }
+    throw error;
+  }
+}
+
 export function readTargetRows(
   database: DatabaseSync,
   targetId: string
