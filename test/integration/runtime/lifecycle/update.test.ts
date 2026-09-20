@@ -41,6 +41,12 @@ import {
   type RegistryTargetState
 } from "../../../../src/runtime/registry/index.js";
 import {
+  readTargetStateMarkerFile
+} from "../../../../src/runtime/target-state-marker.js";
+import {
+  expectedManagedMarkerBaselines
+} from "./marker/fixture.js";
+import {
   release,
   releasePackageRequirement,
   releaseRepository,
@@ -159,6 +165,14 @@ test("whole-target update replaces transitive repositories and commits DB author
         }
         assert.equal(markerCalls, 1);
         assert.equal(result.value.state.generation, 2);
+        const marker = await readTargetStateMarkerFile(targetRoot);
+        assert.equal(marker.ok, true);
+        if (marker.ok && marker.value !== null) {
+          assert.deepEqual(
+            marker.value.managed,
+            expectedManagedMarkerBaselines(result.value.state)
+          );
+        }
         assert.equal(
           result.value.plan.candidate.sourceBindings.find(
             (entry) =>

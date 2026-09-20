@@ -24,6 +24,7 @@ const first: TargetRecoveryMarkerFacts = {
   generation: 1,
   requirements: [],
   projectionOverrides: [],
+  managed: [],
   detached: []
 };
 
@@ -44,6 +45,7 @@ const second: TargetRecoveryMarkerFacts = {
       activationName: "matt"
     }
   ],
+  managed: [],
   detached: []
 };
 
@@ -79,7 +81,7 @@ test("atomic target marker persistence replaces only complete canonical files", 
     );
     assert.equal(
       bytes,
-      'format = "SKILOOM-STATE-V1"\n' +
+      'format = "SKILOOM-STATE-V2"\n' +
         'target-id = "11111111-1111-4111-8111-111111111111"\n' +
         'generation = 2\n\n' +
         '[[requirements]]\n' +

@@ -25,12 +25,18 @@ import {
 } from "../public-format/common.js";
 import type {
   TargetRecoveryDetachedBaseline,
+  TargetRecoveryManagedBaseline,
   TargetRecoveryMarkerFacts,
   TargetRecoveryProjectionOverride,
   TargetRecoveryRequirement
 } from "./recovery.js";
+import {
+  parseManagedMarker,
+  writeManagedMarkerTable
+} from "./state-marker/managed.js";
 
-const FORMAT = "SKILOOM-STATE-V1";
+const FORMAT_V1 = "SKILOOM-STATE-V1";
+const FORMAT_V2 = "SKILOOM-STATE-V2";
 const FUTURE_FORMAT_PATTERN = /^SKILOOM-STATE-V[0-9]+$/u;
 
 export type InvalidTargetStateReason =
@@ -40,6 +46,7 @@ export type InvalidTargetStateReason =
   | "invalid-field"
   | "duplicate-requirement"
   | "duplicate-projection-override"
+  | "duplicate-managed"
   | "duplicate-detached"
   | "default-projection-override"
   | "contradictory-sparse-metadata";
@@ -84,7 +91,13 @@ export function parseTargetStateMarker(
   if (typeof format !== "string") {
     return invalid("invalid-field", "format");
   }
-  if (format !== FORMAT) {
+  const markerVersion =
+    format === FORMAT_V1
+      ? 1
+      : format === FORMAT_V2
+        ? 2
+        : null;
+  if (markerVersion === null) {
     return FUTURE_FORMAT_PATTERN.test(format)
       ? {
           ok: false,
@@ -95,14 +108,27 @@ export function parseTargetStateMarker(
       : invalid("invalid-field", "format");
   }
 
-  const unknown = firstUnknownField(parsed, [
-    "format",
-    "target-id",
-    "generation",
-    "requirements",
-    "projection-overrides",
-    "detached"
-  ]);
+  const unknown = firstUnknownField(
+    parsed,
+    markerVersion === 1
+      ? [
+          "format",
+          "target-id",
+          "generation",
+          "requirements",
+          "projection-overrides",
+          "detached"
+        ]
+      : [
+          "format",
+          "target-id",
+          "generation",
+          "requirements",
+          "projection-overrides",
+          "managed",
+          "detached"
+        ]
+  );
   if (unknown !== undefined) {
     return invalid("unknown-field", unknown);
   }
@@ -140,9 +166,31 @@ export function parseTargetStateMarker(
   if (!projectionOverrides.ok) {
     return projectionOverrides;
   }
+  const managed =
+    markerVersion === 1
+      ? { ok: true as const, value: [] as ReadonlyArray<TargetRecoveryManagedBaseline> }
+      : parseManagedMarker(parsed.managed);
+  if (!managed.ok) {
+    return invalid(
+      managed.issue.reason,
+      managed.issue.path
+    );
+  }
   const detached = parseDetached(parsed.detached);
   if (!detached.ok) {
     return detached;
+  }
+  const managedPackages = new Set(
+    managed.value.map((entry) => entry.packageCoordinate)
+  );
+  const contradictoryDetached = detached.value.find((entry) =>
+    managedPackages.has(entry.packageCoordinate)
+  );
+  if (contradictoryDetached !== undefined) {
+    return invalid(
+      "contradictory-sparse-metadata",
+      "detached"
+    );
   }
 
   return {
@@ -152,6 +200,7 @@ export function parseTargetStateMarker(
       generation: Number(generation),
       requirements: requirements.value,
       projectionOverrides: projectionOverrides.value,
+      managed: managed.value,
       detached: detached.value
     }
   };
@@ -161,7 +210,7 @@ export function writeTargetStateMarker(
   facts: TargetRecoveryMarkerFacts
 ): string {
   const lines: string[] = [
-    `format = ${tomlString(FORMAT)}`,
+    `format = ${tomlString(FORMAT_V2)}`,
     `target-id = ${tomlString(facts.targetId)}`,
     `generation = ${facts.generation}`
   ];
@@ -190,6 +239,19 @@ export function writeTargetStateMarker(
       "[[projection-overrides]]",
       `package = ${tomlString(override.packageCoordinate)}`,
       `activation-name = ${tomlString(override.activationName)}`
+    );
+  }
+
+  const managed = [...facts.managed].sort((left, right) =>
+    compareUtf8(
+      left.packageCoordinate,
+      right.packageCoordinate
+    )
+  );
+  for (const baseline of managed) {
+    lines.push(
+      "",
+      ...writeManagedMarkerTable(baseline)
     );
   }
 

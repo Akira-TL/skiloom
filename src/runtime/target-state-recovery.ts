@@ -9,6 +9,7 @@ import {
   type TargetRecoveryObservationFacts,
   type TargetRecoveryStaleChoice,
   type TargetRecoveryMarkerFacts,
+  type TargetRecoveryManagedBaseline,
   type TargetRecoveryConflict
 } from "../domain/target/recovery.js";
 import {
@@ -123,6 +124,40 @@ export async function inspectTargetRecovery(
 export function targetStateMarkerFactsFromRegistryState(
   state: RegistryTargetState
 ): Result<TargetRecoveryMarkerFacts, InvalidRegistryTargetMarkerFacts> {
+  const packageByCoordinate = new Map(
+    state.resolvedPackages.map((packageFact) => [
+      packageFact.packageCoordinate,
+      packageFact
+    ])
+  );
+  const managed: TargetRecoveryManagedBaseline[] = [];
+  for (const projection of state.projections) {
+    if (projection.ownership !== "managed") {
+      continue;
+    }
+    const packageFact = packageByCoordinate.get(
+      projection.packageCoordinate
+    );
+    if (packageFact === undefined) {
+      return {
+        ok: false,
+        error: productError("InvalidRegistryTargetMarkerFacts", {
+          targetId: state.targetId,
+          reason: "managed-package-missing",
+          subject: projection.packageCoordinate
+        })
+      };
+    }
+    managed.push({
+      packageCoordinate: projection.packageCoordinate,
+      activationName: projection.activationName,
+      materialization: projection.materialization,
+      packageRoot: packageFact.packageRoot,
+      contentDigest: packageFact.contentDigest,
+      transformJson: projection.transformJson
+    });
+  }
+
   const candidate: TargetRecoveryMarkerFacts = {
     targetId: state.targetId,
     generation: state.generation,
@@ -131,6 +166,7 @@ export function targetStateMarkerFactsFromRegistryState(
       packageCoordinate: projection.packageCoordinate,
       activationName: projection.activationName
     })),
+    managed,
     detached: state.detachedBaselines.map((baseline) =>
       baseline.sourceKind === "git"
         ? {

@@ -98,6 +98,26 @@ test("rename updates managed projection intent DB-first and writes marker genera
           activationName: "app-local"
         }
       ]);
+      assert.equal(marker.value?.managed.length, 1);
+      assert.deepEqual(
+        marker.value?.managed.map((entry) => ({
+          packageCoordinate: entry.packageCoordinate,
+          activationName: entry.activationName,
+          materialization: entry.materialization,
+          packageRoot: entry.packageRoot,
+          hasTransform: entry.transformJson !== null
+        })),
+        [
+          {
+            packageCoordinate: "acme/app/app",
+            activationName: "app-local",
+            materialization: "copy",
+            packageRoot: ".",
+            hasTransform: true
+          }
+        ]
+      );
+      assert.deepEqual(marker.value?.detached, []);
     }
   });
 });
@@ -269,6 +289,17 @@ test("detach rebind and forget preserve user bytes while advancing DB-first mark
     assert.equal(detachedStat.isDirectory(), true);
     assert.equal(detachedStat.isSymbolicLink(), false);
 
+    const detachedMarker =
+      await readTargetStateMarkerFile(target);
+    assert.equal(detachedMarker.ok, true);
+    if (detachedMarker.ok && detachedMarker.value !== null) {
+      assert.deepEqual(detachedMarker.value.managed, []);
+      assert.equal(
+        detachedMarker.value.detached[0]?.packageCoordinate,
+        "acme/app/app"
+      );
+    }
+
     await writeFile(
       join(target, "app", "USER-NOTE"),
       "keep detached bytes\n"
@@ -320,6 +351,7 @@ test("detach rebind and forget preserve user bytes while advancing DB-first mark
           }
         ]
       );
+      assert.deepEqual(reboundMarker.value?.managed, []);
       assert.equal(
         reboundMarker.value?.detached[0]?.packageCoordinate,
         "acme/app/app"
@@ -355,6 +387,7 @@ test("detach rebind and forget preserve user bytes while advancing DB-first mark
         forgottenMarker.value?.projectionOverrides,
         []
       );
+      assert.deepEqual(forgottenMarker.value?.managed, []);
       assert.deepEqual(forgottenMarker.value?.detached, []);
     }
   });

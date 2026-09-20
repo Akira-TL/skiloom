@@ -42,6 +42,7 @@ import {
 import {
   readTargetStateMarkerFile
 } from "../../../../src/runtime/target-state-marker.js";
+import { expectedManagedMarkerBaselines } from "./marker/fixture.js";
 import {
   release,
   releasePackageRequirement,
@@ -140,6 +141,10 @@ test("adding a Package root recomputes the complete graph and keeps one shared d
         assert.equal(marker.ok, true);
         if (marker.ok) {
           assert.equal(marker.value?.generation, 2);
+          assert.deepEqual(
+            marker.value?.managed,
+            expectedManagedMarkerBaselines(result.value.state)
+          );
           assert.deepEqual(
             marker.value?.requirements.map((entry) => [
               entry.kind,

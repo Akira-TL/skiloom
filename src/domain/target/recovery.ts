@@ -24,6 +24,15 @@ export type TargetRecoveryProjectionOverride = Readonly<{
   activationName: string;
 }>;
 
+export type TargetRecoveryManagedBaseline = Readonly<{
+  packageCoordinate: string;
+  activationName: string;
+  materialization: "symlink" | "junction" | "copy";
+  packageRoot: string;
+  contentDigest: string;
+  transformJson: string | null;
+}>;
+
 export type TargetRecoveryDetachedBaseline =
   | Readonly<{
       packageCoordinate: string;
@@ -48,6 +57,7 @@ export type TargetRecoveryMarkerFacts = Readonly<{
   generation: number;
   requirements: ReadonlyArray<TargetRecoveryRequirement>;
   projectionOverrides: ReadonlyArray<TargetRecoveryProjectionOverride>;
+  managed: ReadonlyArray<TargetRecoveryManagedBaseline>;
   detached: ReadonlyArray<TargetRecoveryDetachedBaseline>;
 }>;
 

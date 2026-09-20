@@ -322,11 +322,39 @@ export function buildMarkerFacts(
     ];
   });
 
+  const packageByCoordinate = new Map(
+    state.resolvedPackages.map((packageFact) => [
+      packageFact.packageCoordinate,
+      packageFact
+    ])
+  );
+  const managed = state.projections
+    .filter((projection) => projection.ownership === "managed")
+    .map((projection) => {
+      const packageFact = packageByCoordinate.get(
+        projection.packageCoordinate
+      );
+      if (packageFact === undefined) {
+        throw new Error(
+          "managed projection package missing from accepted Registry state"
+        );
+      }
+      return {
+        packageCoordinate: projection.packageCoordinate,
+        activationName: projection.activationName,
+        materialization: projection.materialization,
+        packageRoot: packageFact.packageRoot,
+        contentDigest: packageFact.contentDigest,
+        transformJson: projection.transformJson
+      };
+    });
+
   return {
     targetId: state.targetId,
     generation: state.generation,
     requirements: state.directRequirements,
     projectionOverrides,
+    managed,
     detached: state.detachedBaselines.map((baseline) =>
       baseline.sourceKind === "git"
         ? {

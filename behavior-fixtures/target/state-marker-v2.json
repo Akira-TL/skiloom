@@ -1,0 +1,114 @@
+{
+  "fixtureVersion": 2,
+  "valid": [
+    {
+      "id": "managed-copy-and-link-with-detached",
+      "source": "format = \"SKILOOM-STATE-V2\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 7\n\n[[requirements]]\nkind = \"package\"\ncoordinate = \"acme/skills/router\"\nsource = \"github-release\"\nversion = \"^1.0.0\"\n\n[[projection-overrides]]\npackage = \"acme/skills/router\"\nactivation-name = \"router-local\"\n\n[[managed]]\npackage = \"acme/skills/helper\"\nactivation-name = \"helper\"\nmaterialization = \"symlink\"\nbaseline-package-root = \"skills/helper\"\nbaseline-content-digest = \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n\n[[managed]]\npackage = \"acme/skills/router\"\nactivation-name = \"router-local\"\nmaterialization = \"copy\"\nbaseline-package-root = \"skills/router\"\nbaseline-content-digest = \"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"\nbaseline-transform-json = \"{\\\"rename\\\":{\\\"fromActivationName\\\":\\\"router\\\",\\\"toActivationName\\\":\\\"router-local\\\"},\\\"dependencyRoutes\\\":[]}\"\n\n[[detached]]\npackage = \"vendor/local/tool\"\nbaseline-source = \"git\"\nbaseline-ref = \"main\"\nbaseline-commit = \"0123456789abcdef0123456789abcdef01234567\"\nbaseline-package-root = \"skills/tool\"\nbaseline-content-digest = \"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\"\n",
+      "expected": {
+        "targetId": "11111111-1111-4111-8111-111111111111",
+        "generation": 7,
+        "requirements": [
+          {
+            "kind": "package",
+            "coordinate": "acme/skills/router",
+            "sourceKind": "github-release",
+            "versionRequirement": "^1.0.0"
+          }
+        ],
+        "projectionOverrides": [
+          {
+            "packageCoordinate": "acme/skills/router",
+            "activationName": "router-local"
+          }
+        ],
+        "managed": [
+          {
+            "packageCoordinate": "acme/skills/helper",
+            "activationName": "helper",
+            "materialization": "symlink",
+            "packageRoot": "skills/helper",
+            "contentDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "transformJson": null
+          },
+          {
+            "packageCoordinate": "acme/skills/router",
+            "activationName": "router-local",
+            "materialization": "copy",
+            "packageRoot": "skills/router",
+            "contentDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "transformJson": "{\"rename\":{\"fromActivationName\":\"router\",\"toActivationName\":\"router-local\"},\"dependencyRoutes\":[]}"
+          }
+        ],
+        "detached": [
+          {
+            "packageCoordinate": "vendor/local/tool",
+            "sourceKind": "git",
+            "requestedRef": "main",
+            "exactCommit": "0123456789abcdef0123456789abcdef01234567",
+            "packageRoot": "skills/tool",
+            "contentDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          }
+        ]
+      },
+      "canonical": "format = \"SKILOOM-STATE-V2\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 7\n\n[[requirements]]\nkind = \"package\"\ncoordinate = \"acme/skills/router\"\nsource = \"github-release\"\nversion = \"^1.0.0\"\n\n[[projection-overrides]]\npackage = \"acme/skills/router\"\nactivation-name = \"router-local\"\n\n[[managed]]\npackage = \"acme/skills/helper\"\nactivation-name = \"helper\"\nmaterialization = \"symlink\"\nbaseline-package-root = \"skills/helper\"\nbaseline-content-digest = \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n\n[[managed]]\npackage = \"acme/skills/router\"\nactivation-name = \"router-local\"\nmaterialization = \"copy\"\nbaseline-package-root = \"skills/router\"\nbaseline-content-digest = \"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"\nbaseline-transform-json = \"{\\\"rename\\\":{\\\"fromActivationName\\\":\\\"router\\\",\\\"toActivationName\\\":\\\"router-local\\\"},\\\"dependencyRoutes\\\":[]}\"\n\n[[detached]]\npackage = \"vendor/local/tool\"\nbaseline-source = \"git\"\nbaseline-ref = \"main\"\nbaseline-commit = \"0123456789abcdef0123456789abcdef01234567\"\nbaseline-package-root = \"skills/tool\"\nbaseline-content-digest = \"sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\"\n"
+    }
+  ],
+  "invalid": [
+    {
+      "id": "unknown-managed-field",
+      "source": "format = \"SKILOOM-STATE-V2\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 1\n\n[[managed]]\npackage = \"acme/skills/helper\"\nactivation-name = \"helper\"\nmaterialization = \"symlink\"\nbaseline-package-root = \"skills/helper\"\nbaseline-content-digest = \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\nextra = \"x\"\n",
+      "code": "InvalidTargetState",
+      "reason": "unknown-field",
+      "path": "managed[0].extra"
+    },
+    {
+      "id": "invalid-materialization",
+      "source": "format = \"SKILOOM-STATE-V2\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 1\n\n[[managed]]\npackage = \"acme/skills/helper\"\nactivation-name = \"helper\"\nmaterialization = \"directory\"\nbaseline-package-root = \"skills/helper\"\nbaseline-content-digest = \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n",
+      "code": "InvalidTargetState",
+      "reason": "invalid-field",
+      "path": "managed[0].materialization"
+    },
+    {
+      "id": "link-with-transform",
+      "source": "format = \"SKILOOM-STATE-V2\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 1\n\n[[managed]]\npackage = \"acme/skills/helper\"\nactivation-name = \"helper\"\nmaterialization = \"symlink\"\nbaseline-package-root = \"skills/helper\"\nbaseline-content-digest = \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\nbaseline-transform-json = \"{\\\"rename\\\":{\\\"fromActivationName\\\":\\\"router\\\",\\\"toActivationName\\\":\\\"router-local\\\"},\\\"dependencyRoutes\\\":[]}\"\n",
+      "code": "InvalidTargetState",
+      "reason": "invalid-field",
+      "path": "managed[0].baseline-transform-json"
+    },
+    {
+      "id": "copy-with-noncanonical-transform",
+      "source": "format = \"SKILOOM-STATE-V2\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 1\n\n[[managed]]\npackage = \"acme/skills/router\"\nactivation-name = \"router-local\"\nmaterialization = \"copy\"\nbaseline-package-root = \"skills/router\"\nbaseline-content-digest = \"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"\nbaseline-transform-json = \"{ \\\"rename\\\": null, \\\"dependencyRoutes\\\": [] }\"\n",
+      "code": "InvalidTargetState",
+      "reason": "invalid-field",
+      "path": "managed[0].baseline-transform-json"
+    },
+    {
+      "id": "duplicate-managed-package",
+      "source": "format = \"SKILOOM-STATE-V2\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 1\n\n[[managed]]\npackage = \"acme/skills/helper\"\nactivation-name = \"helper\"\nmaterialization = \"symlink\"\nbaseline-package-root = \"skills/helper\"\nbaseline-content-digest = \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n\n[[managed]]\npackage = \"acme/skills/helper\"\nactivation-name = \"helper\"\nmaterialization = \"symlink\"\nbaseline-package-root = \"skills/helper\"\nbaseline-content-digest = \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n",
+      "code": "InvalidTargetState",
+      "reason": "duplicate-managed",
+      "path": "managed[1]"
+    },
+    {
+      "id": "invalid-managed-root",
+      "source": "format = \"SKILOOM-STATE-V2\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 1\n\n[[managed]]\npackage = \"acme/skills/helper\"\nactivation-name = \"helper\"\nmaterialization = \"symlink\"\nbaseline-package-root = \"../helper\"\nbaseline-content-digest = \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n",
+      "code": "InvalidTargetState",
+      "reason": "invalid-field",
+      "path": "managed[0].baseline-package-root"
+    },
+    {
+      "id": "invalid-managed-digest",
+      "source": "format = \"SKILOOM-STATE-V2\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 1\n\n[[managed]]\npackage = \"acme/skills/helper\"\nactivation-name = \"helper\"\nmaterialization = \"symlink\"\nbaseline-package-root = \"skills/helper\"\nbaseline-content-digest = \"sha256:BAD\"\n",
+      "code": "InvalidTargetState",
+      "reason": "invalid-field",
+      "path": "managed[0].baseline-content-digest"
+    },
+    {
+      "id": "managed-and-detached-same-package",
+      "source": "format = \"SKILOOM-STATE-V2\"\ntarget-id = \"11111111-1111-4111-8111-111111111111\"\ngeneration = 1\n\n[[managed]]\npackage = \"acme/skills/helper\"\nactivation-name = \"helper\"\nmaterialization = \"symlink\"\nbaseline-package-root = \"skills/helper\"\nbaseline-content-digest = \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n\n[[detached]]\npackage = \"acme/skills/helper\"\nbaseline-source = \"git\"\nbaseline-ref = \"main\"\nbaseline-commit = \"0123456789abcdef0123456789abcdef01234567\"\nbaseline-package-root = \"skills/helper\"\nbaseline-content-digest = \"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n",
+      "code": "InvalidTargetState",
+      "reason": "contradictory-sparse-metadata",
+      "path": "detached"
+    }
+  ]
+}

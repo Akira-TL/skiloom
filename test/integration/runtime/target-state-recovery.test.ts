@@ -429,7 +429,14 @@ function registryState(): RegistryTargetState {
       }
     ],
     resolvedSources: [],
-    resolvedPackages: [],
+    resolvedPackages: [
+      {
+        packageCoordinate: "akira-tl/skills/ask-matt",
+        repositoryCoordinate: "akira-tl/skills",
+        packageRoot: "skills/ask-matt",
+        contentDigest: "sha256:" + "b".repeat(64)
+      }
+    ],
     dependencyEdges: [],
     projections: [
       {
@@ -468,6 +475,16 @@ function expectedMarker(
       {
         packageCoordinate: "akira-tl/skills/ask-matt",
         activationName: "matt"
+      }
+    ],
+    managed: [
+      {
+        packageCoordinate: "akira-tl/skills/ask-matt",
+        activationName: "matt",
+        materialization: "symlink",
+        packageRoot: "skills/ask-matt",
+        contentDigest: "sha256:" + "b".repeat(64),
+        transformJson: null
       }
     ],
     detached: [
