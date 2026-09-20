@@ -4,4 +4,4 @@ version = 4
 
 [[package]]
 name = "skiloom-lock"
-version = "0.8.9"
+version = "0.8.10"
