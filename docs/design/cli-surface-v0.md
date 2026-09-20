@@ -51,6 +51,30 @@ skiloom bootstrap
 
 v0 不建立 `upgrade`、`uninstall`、`add`、`rm`、`fix`、`heal` 等 alias，也不保留隐藏 alias。
 
+### 2.1 CLI 自描述 meta surface
+
+CLI 自描述不属于新的产品 command，固定为：
+
+```text
+skiloom
+skiloom --help
+skiloom -h
+skiloom --version
+skiloom -V
+skiloom <canonical-command> --help
+skiloom <canonical-command> -h
+```
+
+规则：
+
+- bare `skiloom` 与 top-level `--help` / `-h` 输出相同 human help 到 stdout，exit 0；
+- top-level `--version` / `-V` 输出 `skiloom <installed-package-version>` 并换行，exit 0；版本必须从实际运行 package metadata 读取，不能维护第二份 hard-coded version；
+- 每个 canonical command 的 `--help` / `-h` 是短路 meta operation：一旦出现，就在该 command 的 operand/option parser、network、operation lock、Registry、Store 或 Target 副作用之前输出 human help 并 exit 0；其他 command operands/options 即使同时存在也不得执行产品操作；
+- `install --version <requirement>` 仍是 `install` 自己的 Release requirement 参数；只有 product command 之前出现的 top-level `--version` / `-V` 才表示 CLI version；
+- help/version 是 human-only surface，不使用 `SKILOOM-CLI-V1`；与 `--json` 混用属于 invalid argv，exit 2；
+- v0 不增加 `skiloom help` command，也不增加 product-command alias；
+- human help 中的 command/usage/public flags 由实现内同一份静态 help specification 驱动并受测试约束；自然语言句式和排版不是 machine API。
+
 ## 3. Target 选择
 
 显式路径：
@@ -385,7 +409,8 @@ warnings
 - doctor 自动修复；
 - bootstrap 自动 update；
 - 需要 Agent 解析 human terminal output 的机器接口；
-- `--token` / `--credential` 参数或持久 credential profile。GitHub authenticated/private source 只按 ADR 0029 使用 `GH_TOKEN`，其次 `GITHUB_TOKEN`；没有时匿名访问，token 不进入 argv、candidate presentation、JSON output 或持久状态。
+- `--token` / `--credential` 参数或持久 credential profile。GitHub authenticated/private source 只按 ADR 0029 使用 `GH_TOKEN`，其次 `GITHUB_TOKEN`；没有时匿名访问，token 不进入 argv、candidate presentation、JSON output 或持久状态；
+- `skiloom help` command 或独立 help JSON schema；CLI 自描述只使用 ADR 0030 定义的 human-only help/version meta flags。
 
 ## 16. 最终边界
 

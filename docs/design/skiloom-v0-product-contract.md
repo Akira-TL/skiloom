@@ -379,6 +379,8 @@ Skiloom 官方实现继续采用：
 
 Skiloom v0 使用一组 canonical CLI commands：`search`、`status`、`doctor`、`validate`、`install`、`update`、`remove`、`rename`、`sync`、`repair`、`detach`、`rebind`、`forget`、`observe`、`recover`、`fork`、`export`、`import`、`bootstrap`。v0 不维护 `add/rm/fix/upgrade` 等同义 alias，也不提供 `--force` 绕过完整性或 ownership 检查。`observe` 只记录/清除 selected accepted Target 中某个现存 Package 的 machine-local `special` dependency observation；它自动使用当前 Package `content-digest`，不允许 caller 写 `software` observation，不修改 Target bytes，也不递增 Target Generation。
 
+CLI 自描述属于 human-only meta surface，不增加新的 canonical product command。`skiloom`、`skiloom --help` / `-h` 输出顶层 help；`skiloom --version` / `-V` 输出实际正在执行 package 的安装版本；每个 canonical command 支持 `--help` / `-h` 并在任何 command parser、network、lock、Registry 或 Target 副作用之前短路。Help/version 不进入 `SKILOOM-CLI-V1`；它们与 `--json` 混用属于 invalid argv。v0 不增加 `skiloom help` command。完整边界见 ADR 0030。
+
 `install/update/remove/recover/fork/import/bootstrap` 都属于完整 Candidate 操作，并统一支持 `--plan`：只计算、验证和展示完整 candidate，不接受、不写 Machine Registry、不修改 live Target。non-interactive 执行若 candidate 需要提交，必须显式 `--yes`；`--json` 自动禁止 prompt，但不隐含 `--yes`。Release tag retarget 还需要显式 `--allow-release-retarget`，merge import 还需要显式 `--merge`；v0 不把这些授权持久化成长期 source whitelist 或 policy profile。
 
 `sync/repair` 只恢复当前已接受 exact state，不重新解析，因此不再次要求接受当前状态。`rename/detach/rebind/forget` 是用户显式局部状态操作，命令本身提供该局部授权，但仍必须经过 `operation.lock`、ownership preflight、Machine Registry transaction 与 DB-first Target materialization。

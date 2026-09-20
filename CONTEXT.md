@@ -162,7 +162,7 @@ Skiloom 官方实现使用 Node.js + TypeScript + npm 作为主控制面与发�
 
 ## CLI Surface
 
-Skiloom v0 的 canonical CLI commands 为 `search/status/doctor/validate/install/update/remove/rename/sync/repair/detach/rebind/forget/observe/recover/fork/export/import/bootstrap`。完整 Candidate 命令统一支持 `--plan`；non-interactive 真正提交新状态需要 `--yes`，Release retarget 额外要求 `--allow-release-retarget`，merge import 额外要求 `--merge`。`--json` 自动禁止 prompt，但不自动批准 candidate，并通过 `SKILOOM-CLI-V1` envelope 返回 `schema/ok/command/result|error/warnings`。v0 不提供 `--force`、永久 source whitelist、policy DSL、同义 alias 或 TUI。
+Skiloom v0 的 canonical CLI commands 为 `search/status/doctor/validate/install/update/remove/rename/sync/repair/detach/rebind/forget/observe/recover/fork/export/import/bootstrap`。完整 Candidate 命令统一支持 `--plan`；non-interactive 真正提交新状态需要 `--yes`，Release retarget 额外要求 `--allow-release-retarget`，merge import 额外要求 `--merge`。`--json` 自动禁止 prompt，但不自动批准 candidate，并通过 `SKILOOM-CLI-V1` envelope 返回 `schema/ok/command/result|error/warnings`。CLI 自描述是独立的人类 meta surface：bare `skiloom`、top-level `--help/-h`、`--version/-V` 和每个 canonical command 的 `--help/-h` 在产品 parser/副作用前短路；help/version 不进入 JSON envelope，也不新增 `help` command。v0 不提供 `--force`、永久 source whitelist、policy DSL、同义 alias 或 TUI。
 
 ## Machine Registry
 
