@@ -15,7 +15,7 @@ Prefer the structured search surface:
 skiloom search "<query>" --json
 ```
 
-The response uses the `SKILOOM-CLI-V1` envelope. Use structured provider provenance and candidate fields rather than parsing human output.
+The response uses the `SKILOOM-CLI-V1` envelope. Use structured provider provenance and candidate fields. Do not parse human terminal output when structured JSON is available.
 
 Catalog signals such as popularity, score, audit results, or provider metadata are discovery evidence only. They do not define the install version, commit, snapshot, digest, or accepted source.
 

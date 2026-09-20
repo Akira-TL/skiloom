@@ -272,6 +272,155 @@ test("first-party executable guidance uses only the public Skiloom CLI", async (
   }
 });
 
+test("Router examples map discovery management diagnosis and authoring to the intended specialists", async () => {
+  const router = await skillText("skiloom");
+  const examples = [
+    ["find a Skill", "skiloom-discover"],
+    ["install or update", "skiloom-manage"],
+    ["diagnose a Target", "skiloom-doctor"],
+    ["author a Skill", "skiloom-author"]
+  ] as const;
+
+  for (const [intent, specialist] of examples) {
+    assert.match(
+      router,
+      new RegExp(
+        escapeRegExp(intent) + "[^\n]*" +
+        escapeRegExp(specialist),
+        "iu"
+      ),
+      intent
+    );
+  }
+  assert.match(
+    router,
+    /bootstrap[^\n]*skiloom-manage/iu
+  );
+});
+
+test("management guidance separates plan commit retarget merge and bootstrap authorization", async () => {
+  const manage = await skillText("skiloom-manage");
+
+  for (const command of [
+    "install <coordinate>",
+    "update",
+    "remove <coordinate>",
+    "recover",
+    "fork",
+    "import <file>",
+    "bootstrap"
+  ]) {
+    assert.match(
+      manage,
+      new RegExp(
+        escapeRegExp(
+          "skiloom " + command + " --plan --json"
+        ),
+        "u"
+      ),
+      command
+    );
+  }
+
+  assert.match(
+    manage,
+    /skiloom update --yes --allow-release-retarget --json/u
+  );
+  assert.match(
+    manage,
+    /skiloom import <file> --merge --yes --json/u
+  );
+  assert.match(
+    manage,
+    /skiloom bootstrap --yes --json/u
+  );
+  assert.match(
+    manage,
+    /--json[^\n]*(?:does not|never)[^\n]*--yes/iu
+  );
+  assert.match(
+    manage,
+    /--yes[^\n]*(?:does not|never)[^\n]*(?:retarget|--allow-release-retarget)/iu
+  );
+  assert.match(
+    manage,
+    /--yes[^\n]*(?:does not|never)[^\n]*(?:merge|--merge)/iu
+  );
+  assert.match(
+    manage,
+    /one Target|single Target/iu
+  );
+  assert.doesNotMatch(
+    manage,
+    /postinstall|first[- ]run[^\n]*mutat/iu
+  );
+  assert.doesNotMatch(
+    manage,
+    /(?:all|every|multiple)\s+(?:Host|Target)[^\n]*(?:bootstrap|install)/iu
+  );
+});
+
+test("first-party Agent guidance forbids private writes and human-output parsing", async () => {
+  for (const name of ROOTS) {
+    const text = await skillText(name);
+
+    assert.match(
+      text,
+      /SKILOOM-CLI-V1/u,
+      name
+    );
+    assert.match(
+      text,
+      /(?:do not|never)[^\n]*parse[^\n]*human/iu,
+      name
+    );
+    assert.doesNotMatch(
+      text,
+      /\b(?:DatabaseSync|better-sqlite3|sqlite3\s|fs\.writeFile|writeFile\(|rename\(|unlink\(|rm\(|cp\(|mv\s)\b/u,
+      name
+    );
+    assert.doesNotMatch(
+      text,
+      /(?:open|edit|modify|write|delete|overwrite)\s+(?:the\s+)?(?:registry\.sqlite3|Package Store|\.skiloom-state|Target contents?)(?!\s+(?:directly|itself))/iu,
+      name
+    );
+  }
+});
+
+test("doctor stays recommendation-only and author stays package-format focused", async () => {
+  const doctor = await skillText("skiloom-doctor");
+  assert.match(doctor, /read-only/u);
+  assert.match(
+    doctor,
+    /recommend[^\n]*(?:skiloom|command)/iu
+  );
+  assert.doesNotMatch(
+    doctor,
+    /(?:run|execute)[^\n]*(?:sync|repair|recover|rebind)[^\n]*automatically/iu
+  );
+
+  const author = await skillText("skiloom-author");
+  for (const file of [
+    "SKILL.md",
+    "skiloom-package.toml",
+    "skiloom-repo.toml",
+    "DEPENDENCIES.md"
+  ]) {
+    assert.match(
+      author,
+      new RegExp(
+        escapeRegExp(file),
+        "u"
+      )
+    );
+  }
+  assert.match(author, /skiloom validate <path> --json/u);
+  assert.doesNotMatch(
+    author,
+    /skiloom (?:install|update|remove|bootstrap)\b/u
+  );
+});
+
 test("first-party instructions route responsibilities through public Skiloom commands", async () => {
   const router = await skillText("skiloom");
   assert.match(router, /skiloom-discover/u);
@@ -318,6 +467,10 @@ test("first-party instructions route responsibilities through public Skiloom com
 
 async function skillText(name: string): Promise<string> {
   return readFile(join("skills", name, "SKILL.md"), "utf8");
+}
+
+function escapeRegExp(source: string): string {
+  return source.replace(/[.*+?^(){}$|[\]\\]/gu, "\\$&");
 }
 
 function regularEntry(

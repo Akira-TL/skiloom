@@ -22,7 +22,7 @@ Validate local package/repository content through the public CLI:
 skiloom validate <path> --json
 ```
 
-Use the `SKILOOM-CLI-V1` envelope rather than parsing human output.
+Use the `SKILOOM-CLI-V1` envelope. Do not parse human terminal output when structured JSON is available.
 
 ## Authoring boundaries
 

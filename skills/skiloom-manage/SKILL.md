@@ -5,7 +5,7 @@ description: Map Skiloom management intent to the public CLI while preserving ca
 
 # Skiloom Manage
 
-Use only the public Skiloom CLI/runtime for state-changing or maintenance operations. Prefer `--json` so Agent workflows consume the `SKILOOM-CLI-V1` envelope.
+Use only the public Skiloom CLI/runtime for state-changing or maintenance operations. Prefer `--json` so Agent workflows consume the `SKILOOM-CLI-V1` envelope. Do not parse human terminal output when structured JSON is available.
 
 ## Candidate operations
 
@@ -18,11 +18,34 @@ skiloom remove <coordinate> --plan --json
 skiloom recover --plan --json
 skiloom fork --plan --json
 skiloom import <file> --plan --json
+skiloom bootstrap --plan --json
 ```
 
-For non-interactive commit, add the explicit approval required by the CLI, normally `--yes`. `--json` never implies `--yes`.
+For non-interactive commit, use the matching public command with explicit approval:
 
-Release-tag retarget authorization is independent from ordinary approval. Do not imply that `--yes` authorizes a retarget. Import merge is also a separate explicit boundary and must use the public `--merge` behavior.
+```text
+skiloom install <coordinate> --yes --json
+skiloom update --yes --json
+skiloom remove <coordinate> --yes --json
+skiloom recover --yes --json
+skiloom fork --yes --json
+skiloom import <file> --yes --json
+skiloom bootstrap --yes --json
+```
+
+`--json` never implies `--yes`.
+
+Release-tag retarget authorization is independent from ordinary approval. `--yes` does not authorize Release retarget; when the user has explicitly authorized that risk, use:
+
+```text
+skiloom update --yes --allow-release-retarget --json
+```
+
+Import merge is also a separate explicit boundary. `--yes` does not authorize merge; when the user explicitly chose merge, use:
+
+```text
+skiloom import <file> --merge --yes --json
+```
 
 ## Exact-state maintenance
 
@@ -59,6 +82,17 @@ skiloom import <file> --plan --json
 ```
 
 Never overwrite conflicts, invent auto-renames, or introduce a `--force` bypass.
+
+## Bootstrap
+
+Bootstrap is a normal candidate operation for one Target per invocation. Use the same Target selector rules as every other management command.
+
+```text
+skiloom bootstrap --plan --json
+skiloom bootstrap --yes --json
+```
+
+Installing the Skiloom npm program never modifies a Skill Target by itself. Bootstrap must be an explicit public CLI action and first-party Packages have no privileged Target or installation path.
 
 ## Safety boundary
 
