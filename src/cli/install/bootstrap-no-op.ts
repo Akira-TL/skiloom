@@ -76,11 +76,27 @@ function hasDirectRequirement(
   state: RegistryTargetState,
   requirement: DirectInstallRequirement
 ): boolean {
-  return state.directRequirements.some(
-    (entry) =>
-      entry.kind === requirement.kind &&
-      entry.coordinate === requirement.coordinate.canonical
-  );
+  return state.directRequirements.some((entry) => {
+    if (
+      entry.kind !== requirement.kind ||
+      entry.coordinate !== requirement.coordinate.canonical ||
+      entry.sourceKind !== requirement.sourceKind
+    ) {
+      return false;
+    }
+    if (
+      entry.sourceKind === "git" &&
+      requirement.sourceKind === "git"
+    ) {
+      return entry.requestedRef === requirement.requestedRef;
+    }
+    return (
+      entry.sourceKind === "github-release" &&
+      requirement.sourceKind === "github-release" &&
+      entry.versionRequirement ===
+        (requirement.versionRequirement ?? null)
+    );
+  });
 }
 
 function acceptedNoOpPlan(

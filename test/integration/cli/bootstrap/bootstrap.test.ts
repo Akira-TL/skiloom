@@ -44,6 +44,7 @@ type ParsedBootstrapOutput = Readonly<{
     }>;
     directRequirements: ReadonlyArray<Readonly<{
       coordinate: string;
+      versionRequirement?: string;
     }>>;
     packages: ReadonlyArray<Readonly<{
       packageCoordinate: string;
@@ -204,6 +205,43 @@ test("bootstrap is an idempotent no-op without network when the Router direct ro
       [ROUTER]
     );
     assert.equal(output.result.acceptedState?.generation, 1);
+  });
+});
+
+test("bootstrap does not no-op a different accepted Router requirement", async () => {
+  await withCliRuntime(async ({ home, cwd }) => {
+    const constrained = await runCli(
+      [
+        "install",
+        ROUTER,
+        "--version",
+        "^0.8.0",
+        "--yes",
+        "--json"
+      ],
+      { home, cwd, mode: "first-party" }
+    );
+    assert.equal(constrained.code, 0);
+
+    const bootstrapped = await runCli(
+      ["bootstrap", "--yes", "--json"],
+      { home, cwd, mode: "first-party" }
+    );
+
+    assert.equal(bootstrapped.code, 0);
+    const output = parseOutput(bootstrapped.stdout);
+    assert.equal(output.result.status, "applied");
+    assert.equal(output.result.acceptedState?.generation, 2);
+    assert.deepEqual(
+      output.result.directRequirements.map(
+        (entry) => entry.coordinate
+      ),
+      [ROUTER]
+    );
+    assert.equal(
+      output.result.directRequirements[0]?.versionRequirement,
+      undefined
+    );
   });
 });
 
