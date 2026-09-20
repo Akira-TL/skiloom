@@ -36,6 +36,7 @@ import {
 import {
   readTargetStateMarkerFile
 } from "../../../../src/runtime/target-state-marker.js";
+import { expectedManagedMarkerBaselines } from "./marker/fixture.js";
 import {
   release,
   releasePackageRequirement,
@@ -106,7 +107,10 @@ test("accepted first install publishes Store before DB authority and materialize
           syncMarker: async (facts) => {
             const accepted = registry.readTargetState(targetId);
             assert.equal(accepted.ok, true);
-            assert.equal(accepted.ok ? accepted.value?.generation : null, 1);
+            if (!accepted.ok || accepted.value === undefined) {
+              assert.fail("accepted Registry state must exist");
+            }
+            assert.equal(accepted.value.generation, 1);
             assert.equal(existsSync(join(targetRoot, "app")), true);
             assert.equal(existsSync(join(targetRoot, "lib")), true);
             events.push("marker-sync");
@@ -122,6 +126,9 @@ test("accepted first install publishes Store before DB authority and materialize
                 }
               ],
               projectionOverrides: [],
+              managed: expectedManagedMarkerBaselines(
+                accepted.value
+              ),
               detached: []
             });
           }
@@ -221,6 +228,9 @@ test("first install persists the canonical public marker by default", async () =
                 }
               ],
               projectionOverrides: [],
+              managed: expectedManagedMarkerBaselines(
+                result.value.state
+              ),
               detached: []
             }
           }
