@@ -8,6 +8,7 @@ import {
 } from "../../domain/errors/index.js";
 import type { SkiloomHomePaths } from "../home.js";
 import type {
+  RegistryDependencyObservation,
   RegistryPendingOperation,
   RegistryPendingOperationInput,
   RegistryTargetState,
@@ -23,7 +24,9 @@ import {
   beginPendingOperationRows,
   beginPendingReconciliationRows,
   completePendingOperationRows,
+  RegistryObservationConflictError,
   RegistryPendingOperationConflictError,
+  replaceDependencyObservationRows,
   replaceTargetRows
 } from "./write.js";
 
@@ -54,6 +57,15 @@ export type RegistryPendingOperationRejected = ProductError<
 export type RegistryReplaceError =
   | RegistryStateRejected
   | RegistryPendingOperationRejected;
+
+export type RegistryObservationRejected = ProductError<
+  "RegistryObservationRejected",
+  Readonly<{
+    targetId: string;
+    kind: RegistryDependencyObservation["kind"];
+    reason: "conflict";
+  }>
+>;
 
 export type RegistryConnectionPragmas = Readonly<{
   foreignKeys: boolean;
@@ -155,6 +167,44 @@ export class MachineRegistry {
 
   completePendingOperation(operationId: string): void {
     completePendingOperationRows(this.#database, operationId);
+  }
+
+  replaceDependencyObservations(
+    targetId: string,
+    kind: RegistryDependencyObservation["kind"],
+    observations: ReadonlyArray<RegistryDependencyObservation>
+  ): Result<RegistryTargetState, RegistryObservationRejected> {
+    try {
+      replaceDependencyObservationRows(
+        this.#database,
+        targetId,
+        kind,
+        observations
+      );
+    } catch (error) {
+      if (
+        error instanceof RegistryObservationConflictError ||
+        isConstraintError(error)
+      ) {
+        return {
+          ok: false,
+          error: productError("RegistryObservationRejected", {
+            targetId,
+            kind,
+            reason: "conflict"
+          })
+        };
+      }
+      throw error;
+    }
+
+    const readback = readTargetRows(this.#database, targetId);
+    if (readback === undefined) {
+      throw new Error(
+        "registry target disappeared after observation replacement"
+      );
+    }
+    return { ok: true, value: readback };
   }
 
   replaceTargetState(

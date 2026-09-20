@@ -8,6 +8,7 @@ import {
   openMachineRegistry as openRawMachineRegistry,
   type MachineRegistry as RawMachineRegistry,
   type RegistryConnectionPragmas,
+  type RegistryObservationRejected,
   type RegistryPendingOperationRejected,
   type RegistryReplaceError
 } from "./database.js";
@@ -17,6 +18,7 @@ import {
   type RegistryMaintenanceError
 } from "./maintenance.js";
 import type {
+  RegistryDependencyObservation,
   RegistryPendingOperation,
   RegistryPendingOperationInput,
   RegistryTargetState,
@@ -28,6 +30,9 @@ export type RegistryPendingLockedError =
   | RegistryPendingOperationRejected
   | OperationLockLost;
 export type RegistryReplaceLockedError = RegistryReplaceError | OperationLockLost;
+export type RegistryObservationLockedError =
+  | RegistryObservationRejected
+  | OperationLockLost;
 
 export interface MachineRegistry {
   close(): void;
@@ -50,6 +55,11 @@ export interface MachineRegistry {
   completePendingOperation(
     operationId: string
   ): Result<void, OperationLockLost>;
+  replaceDependencyObservations(
+    targetId: string,
+    kind: RegistryDependencyObservation["kind"],
+    observations: ReadonlyArray<RegistryDependencyObservation>
+  ): Result<RegistryTargetState, RegistryObservationLockedError>;
   replaceTargetState(
     state: RegistryTargetStateInput,
     pendingOperationId?: string
@@ -129,6 +139,22 @@ class LockedMachineRegistry implements MachineRegistry {
     }
     this.#registry.completePendingOperation(operationId);
     return { ok: true, value: undefined };
+  }
+
+  replaceDependencyObservations(
+    targetId: string,
+    kind: RegistryDependencyObservation["kind"],
+    observations: ReadonlyArray<RegistryDependencyObservation>
+  ): Result<RegistryTargetState, RegistryObservationLockedError> {
+    const held = this.#lock.checkHeld();
+    if (!held.ok) {
+      return held;
+    }
+    return this.#registry.replaceDependencyObservations(
+      targetId,
+      kind,
+      observations
+    );
   }
 
   replaceTargetState(

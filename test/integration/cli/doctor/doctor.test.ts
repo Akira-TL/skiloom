@@ -37,7 +37,16 @@ type ParsedDoctorOutput = Readonly<{
   result: Readonly<{
     status: string;
     diagnostics: ReadonlyArray<DoctorDiagnostic>;
-    dependencyObservations: ReadonlyArray<unknown>;
+    dependencyObservations: ReadonlyArray<Readonly<{
+      packageCoordinate: string;
+      packageContentDigest: string;
+      kind: "software" | "special";
+      name: string;
+      status: string;
+      detectedVersion: string | null;
+      location: string | null;
+      note: string | null;
+    }>>;
   }>;
 }>;
 
@@ -78,6 +87,64 @@ test("doctor reports a healthy accepted Target without network or mutation", asy
       await readFile(join(target, "app", "SKILL.md"), "utf8"),
       before
     );
+  });
+});
+
+test("doctor probes common software live without persisting or advancing Target generation", async () => {
+  await withCliRuntime(async ({ home, cwd }) => {
+    assert.equal(
+      (
+        await runCli(
+          ["install", "acme/app/app", "--yes", "--json"],
+          { home, cwd, mode: "host-observation" }
+        )
+      ).code,
+      0
+    );
+
+    const before = await runCli(
+      ["status", "--json"],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(before.code, 0);
+    const beforeStatus = parseStatusRegistry(before.stdout);
+    assert.equal(beforeStatus.generation, 1);
+    assert.equal(beforeStatus.dependencyObservations, 0);
+
+    const doctor = await runCli(
+      ["doctor", "--json"],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(doctor.code, 0);
+    const output = parseDoctorOutput(doctor.stdout);
+    assert.deepEqual(
+      output.result.dependencyObservations.map((entry) => ({
+        packageCoordinate: entry.packageCoordinate,
+        kind: entry.kind,
+        name: entry.name,
+        status: entry.status
+      })),
+      [
+        {
+          packageCoordinate: "acme/app/app",
+          kind: "software",
+          name: "node",
+          status: "satisfied"
+        }
+      ]
+    );
+    assert.match(
+      output.result.dependencyObservations[0]?.detectedVersion ?? "",
+      /^\d+(?:\.\d+)+$/u
+    );
+
+    const after = await runCli(
+      ["status", "--json"],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(after.code, 0);
+    const afterStatus = parseStatusRegistry(after.stdout);
+    assert.deepEqual(afterStatus, beforeStatus);
   });
 });
 
@@ -369,6 +436,26 @@ function runCli(
 
 function parseDoctorOutput(source: string): ParsedDoctorOutput {
   return JSON.parse(source) as ParsedDoctorOutput;
+}
+
+function parseStatusRegistry(source: string): Readonly<{
+  generation: number;
+  dependencyObservations: number;
+}> {
+  const parsed = JSON.parse(source) as {
+    result: {
+      registry: {
+        generation: number;
+        dependencyObservations: number;
+      } | null;
+    };
+  };
+  assert.notEqual(parsed.result.registry, null);
+  return {
+    generation: parsed.result.registry!.generation,
+    dependencyObservations:
+      parsed.result.registry!.dependencyObservations
+  };
 }
 
 function assertNoUnexpectedStderr(stderr: string): void {

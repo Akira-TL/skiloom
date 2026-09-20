@@ -224,6 +224,50 @@ test("sync is a no-op for an exact Target without network or approval", async ()
   });
 });
 
+test("sync refreshes common software observations without advancing Target generation", async () => {
+  await withCliRuntime(async ({ home, cwd }) => {
+    const installed = await runCli(
+      ["install", "acme/app/app", "--yes", "--json"],
+      { home, cwd, mode: "host-observation" }
+    );
+    assert.equal(installed.code, 0);
+
+    const before = await runCli(
+      ["status", "--json"],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(before.code, 0);
+    assert.deepEqual(
+      parseStatusRegistry(before.stdout),
+      {
+        generation: 1,
+        dependencyObservations: 0
+      }
+    );
+
+    const synced = await runCli(
+      ["sync", "--json"],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(synced.code, 0);
+    const output = parseMaintenanceOutput(synced.stdout);
+    assert.equal(output.result.generation, 1);
+
+    const after = await runCli(
+      ["status", "--json"],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(after.code, 0);
+    assert.deepEqual(
+      parseStatusRegistry(after.stdout),
+      {
+        generation: 1,
+        dependencyObservations: 1
+      }
+    );
+  });
+});
+
 test("sync restores the accepted marker generation without network resolution", async () => {
   await withCliRuntime(async ({ home, cwd, target }) => {
     const installed = await runCli(
@@ -357,6 +401,26 @@ function parseMaintenanceOutput(
   source: string
 ): ParsedMaintenanceOutput {
   return JSON.parse(source) as ParsedMaintenanceOutput;
+}
+
+function parseStatusRegistry(source: string): Readonly<{
+  generation: number;
+  dependencyObservations: number;
+}> {
+  const parsed = JSON.parse(source) as {
+    result: {
+      registry: {
+        generation: number;
+        dependencyObservations: number;
+      } | null;
+    };
+  };
+  assert.notEqual(parsed.result.registry, null);
+  return {
+    generation: parsed.result.registry!.generation,
+    dependencyObservations:
+      parsed.result.registry!.dependencyObservations
+  };
 }
 
 function escapeRegExp(source: string): string {

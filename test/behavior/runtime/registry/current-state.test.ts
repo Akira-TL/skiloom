@@ -129,6 +129,92 @@ test("Machine Registry round-trips complete current state with canonical orderin
   });
 });
 
+test("Machine Registry observation refresh is generation-neutral and preserves the other observation kind", async () => {
+  await withTempHome(async (paths) => {
+    const fixture = await readFixture();
+    const registry = requireRegistry(paths);
+
+    try {
+      const initial = registry.replaceTargetState(fixture.state);
+      assert.equal(initial.ok, true);
+      if (!initial.ok) {
+        return;
+      }
+      assert.equal(initial.value.generation, 1);
+
+      const refreshed = registry.replaceDependencyObservations(
+        fixture.state.targetId,
+        "software",
+        [
+          {
+            packageCoordinate: "acme/tools/alpha",
+            packageContentDigest:
+              "sha256:" + "a".repeat(64),
+            kind: "software",
+            name: "node",
+            status: "satisfied",
+            detectedVersion: "24.0.0",
+            location: null,
+            note: null
+          }
+        ]
+      );
+      assert.equal(refreshed.ok, true);
+      if (!refreshed.ok) {
+        return;
+      }
+      assert.equal(refreshed.value.generation, 1);
+      assert.deepEqual(
+        refreshed.value.dependencyObservations.map((entry) => ({
+          packageCoordinate: entry.packageCoordinate,
+          kind: entry.kind,
+          name: entry.name,
+          status: entry.status
+        })),
+        [
+          {
+            packageCoordinate: "acme/tools/alpha",
+            kind: "software",
+            name: "node",
+            status: "satisfied"
+          },
+          {
+            packageCoordinate: "vendor/gitpkg/leaf",
+            kind: "special",
+            name: "gpu",
+            status: "unknown"
+          }
+        ]
+      );
+
+      const rejected = registry.replaceDependencyObservations(
+        fixture.state.targetId,
+        "software",
+        [
+          {
+            packageCoordinate: "acme/tools/alpha",
+            packageContentDigest:
+              "sha256:" + "d".repeat(64),
+            kind: "software",
+            name: "node",
+            status: "satisfied",
+            detectedVersion: "24.0.0",
+            location: null,
+            note: null
+          }
+        ]
+      );
+      assert.equal(rejected.ok, false);
+      assert.equal(
+        registry.readTargetState(fixture.state.targetId)?.generation,
+        1
+      );
+    } finally {
+      registry.close();
+    }
+  });
+});
+
 test("Machine Registry replace is atomic and constraint failure preserves previous generation and state", async () => {
   await withTempHome(async (paths) => {
     const fixture = await readFixture();

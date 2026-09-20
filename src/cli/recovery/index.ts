@@ -333,6 +333,7 @@ function recoveryPlanOnlyRegistry(): MachineRegistry {
     beginPendingOperation: unexpected,
     beginPendingReconciliation: unexpected,
     completePendingOperation: unexpected,
+    replaceDependencyObservations: unexpected,
     replaceTargetState: unexpected
   };
 }

@@ -1,0 +1,30 @@
+{
+  "valid": [
+    { "requirement": "*", "version": "0", "expected": true },
+    { "requirement": ">=22", "version": "22.0.0", "expected": true },
+    { "requirement": ">=22", "version": "21.99.9", "expected": false },
+    { "requirement": ">=2.40,<3", "version": "2.45.1", "expected": true },
+    { "requirement": ">=2.40,<3", "version": "3.0.0", "expected": false },
+    { "requirement": "=3.11", "version": "3.11.0", "expected": true },
+    { "requirement": ">1.2.0,<=1.2.3", "version": "1.2.3", "expected": true },
+    { "requirement": "<1.2.3", "version": "1.2.3", "expected": false }
+  ],
+  "invalidRequirements": [
+    "",
+    "22",
+    "^22",
+    "~2.40",
+    ">=1 || <2",
+    "1.0 - 2.0",
+    ">=1,",
+    ">=1.x",
+    ">=1.0.0-beta"
+  ],
+  "invalidVersions": [
+    "",
+    "v22.0.0",
+    "1.0-beta",
+    "1..2",
+    "1.x"
+  ]
+}

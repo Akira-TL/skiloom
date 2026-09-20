@@ -18,9 +18,6 @@ import {
   readTargetRows
 } from "../registry/read.js";
 import {
-  verifyPackageStoreEntry
-} from "../store.js";
-import {
   verifyManagedProjection
 } from "../target-projection/index.js";
 import {
@@ -36,6 +33,10 @@ import type {
 import {
   acceptedTargetPlan
 } from "../orchestration/lifecycle/recovery/target.js";
+import {
+  inspectDoctorPackages,
+  sortDoctorObservations
+} from "./packages.js";
 import {
   inspectRegistryConnection,
   targetIdsAtPath
@@ -67,7 +68,11 @@ export type DoctorDiagnosticCode =
   | "MarkerInvalid"
   | "MarkerStale"
   | "MarkerConflict"
-  | "MarkerReconcileRequired";
+  | "MarkerReconcileRequired"
+  | "UnsupportedHostSoftwareProbe"
+  | "InvalidHostSoftwareRequirement"
+  | "UnparseableHostSoftwareVersion"
+  | "InvalidHostObservationMetadata";
 
 export type DoctorDiagnostic = Readonly<{
   code: DoctorDiagnosticCode;
@@ -345,37 +350,27 @@ export async function inspectDoctorTarget(
 
     const plan = acceptedTargetPlan(state);
     let projectionsVerifiedExact = locationMatches;
-    const storeHealthy = new Map<string, boolean>();
-
-    for (const packageFact of state.resolvedPackages) {
-      const verified = await verifyPackageStoreEntry(
-        input.home,
-        packageFact.contentDigest
-      );
-      const healthy = verified.ok;
-      storeHealthy.set(
-        packageFact.packageCoordinate,
-        healthy
-      );
-      if (!healthy) {
-        const missing =
-          verified.error.code === "StoreEntryNotFound";
-        diagnostics.push(
-          diagnostic(
-            missing
-              ? "StoreEntryMissing"
-              : "StoreEntryCorrupt",
-            "error",
-            packageFact.packageCoordinate,
-            "repair",
-            {
-              storeError: verified.error.code
-            }
-          )
-        );
-        projectionsVerifiedExact = false;
-      }
+    const packageInspection = await inspectDoctorPackages(
+      input.home,
+      state.resolvedPackages
+    );
+    const storeHealthy = packageInspection.storeHealthy;
+    if (!packageInspection.storesHealthy) {
+      projectionsVerifiedExact = false;
     }
+    for (const issue of packageInspection.issues) {
+      diagnostics.push(
+        diagnostic(
+          issue.code,
+          issue.severity,
+          issue.subject,
+          issue.recommendation,
+          issue.facts
+        )
+      );
+    }
+    const liveSoftwareObservations =
+      packageInspection.observations;
 
     if (!plan.ok) {
       diagnostics.push(
@@ -524,11 +519,28 @@ export async function inspectDoctorTarget(
       );
     }
 
+    const digestByPackage = new Map(
+      state.resolvedPackages.map((packageFact) => [
+        packageFact.packageCoordinate,
+        packageFact.contentDigest
+      ])
+    );
+    const savedSpecialObservations =
+      state.dependencyObservations.filter(
+        (observation) =>
+          observation.kind === "special" &&
+          digestByPackage.get(observation.packageCoordinate) ===
+            observation.packageContentDigest
+      );
+
     return inspection(
       state.targetId,
       state.generation,
       diagnostics,
-      state.dependencyObservations
+      sortDoctorObservations([
+        ...liveSoftwareObservations,
+        ...savedSpecialObservations
+      ])
     );
   } finally {
     database.close();

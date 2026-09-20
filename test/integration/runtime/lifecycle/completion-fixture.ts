@@ -138,6 +138,16 @@ export function countRegistryWrites(
       counters.completePending += 1;
       return registry.completePendingOperation(operationId);
     },
+    replaceDependencyObservations: (
+      targetId,
+      kind,
+      observations
+    ) =>
+      registry.replaceDependencyObservations(
+        targetId,
+        kind,
+        observations
+      ),
     replaceTargetState: (state, pendingOperationId) => {
       counters.replace += 1;
       return registry.replaceTargetState(state, pendingOperationId);
@@ -160,6 +170,16 @@ export function failBeforeCommitRegistry(
       registry.beginPendingReconciliation(id, pending),
     completePendingOperation: (operationId) =>
       registry.completePendingOperation(operationId),
+    replaceDependencyObservations: () => ({
+      ok: false,
+      error: {
+        code: "OperationLockLost",
+        facts: {
+          lockPath,
+          reason: "session-not-held"
+        }
+      }
+    }),
     replaceTargetState: () => ({
       ok: false,
       error: {
@@ -188,6 +208,16 @@ export function afterSuccessfulReplaceRegistry(
       registry.beginPendingReconciliation(id, pending),
     completePendingOperation: (operationId) =>
       registry.completePendingOperation(operationId),
+    replaceDependencyObservations: (
+      targetId,
+      kind,
+      observations
+    ) =>
+      registry.replaceDependencyObservations(
+        targetId,
+        kind,
+        observations
+      ),
     replaceTargetState: (state, pendingOperationId) => {
       const result = registry.replaceTargetState(
         state,

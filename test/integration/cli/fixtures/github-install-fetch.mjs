@@ -28,14 +28,28 @@ function skill(root, name, description) {
   };
 }
 
-function packageManifest(root, dependencies) {
+function packageManifest(root, dependencies, software = {}) {
   const prefix = root === "." ? "" : root + "/";
-  const lines = ["schema = 1", "", "[dependencies]"];
-  for (const [coordinate, requirement] of Object.entries(dependencies)) {
-    lines.push(
-      JSON.stringify(coordinate) + " = " +
-      JSON.stringify(requirement)
-    );
+  const lines = ["schema = 1"];
+  const dependencyEntries = Object.entries(dependencies);
+  if (dependencyEntries.length > 0) {
+    lines.push("", "[dependencies]");
+    for (const [coordinate, requirement] of dependencyEntries) {
+      lines.push(
+        JSON.stringify(coordinate) + " = " +
+        JSON.stringify(requirement)
+      );
+    }
+  }
+  const softwareEntries = Object.entries(software);
+  if (softwareEntries.length > 0) {
+    lines.push("", "[software]");
+    for (const [name, requirement] of softwareEntries) {
+      lines.push(
+        JSON.stringify(name) + " = " +
+        JSON.stringify(requirement)
+      );
+    }
   }
   return {
     path: prefix + "skiloom-package.toml",
@@ -118,7 +132,15 @@ function appRepository() {
                 "acme/shared/shared": "^1.0.0"
               })
             ]
-          : [])
+          : mode === "host-observation"
+            ? [
+                packageManifest(
+                  ".",
+                  {},
+                  { node: ">=0" }
+                )
+              ]
+            : [])
       ])
     }
   ];

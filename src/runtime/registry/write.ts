@@ -153,6 +153,75 @@ export function completePendingOperationRows(
   }
 }
 
+export function replaceDependencyObservationRows(
+  database: DatabaseSync,
+  targetId: string,
+  kind: RegistryDependencyObservation["kind"],
+  observations: ReadonlyArray<RegistryDependencyObservation>
+): void {
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const target = database
+      .prepare("SELECT generation FROM targets WHERE target_id = ?")
+      .get(targetId);
+    if (target === undefined) {
+      throw new RegistryObservationConflictError(
+        "registry observation target is missing"
+      );
+    }
+
+    const packageDigest = database.prepare(`
+      SELECT content_digest
+      FROM resolved_packages
+      WHERE target_id = ? AND package_coordinate = ?
+    `);
+    for (const observation of observations) {
+      if (
+        observation.kind !== kind ||
+        observation.packageContentDigest.length === 0
+      ) {
+        throw new RegistryObservationConflictError(
+          "registry observation kind is invalid"
+        );
+      }
+      const packageRow = packageDigest.get(
+        targetId,
+        observation.packageCoordinate
+      );
+      if (
+        packageRow?.content_digest !==
+        observation.packageContentDigest
+      ) {
+        throw new RegistryObservationConflictError(
+          "registry observation package digest is stale"
+        );
+      }
+    }
+
+    database
+      .prepare(
+        "DELETE FROM dependency_observations WHERE target_id = ? AND kind = ?"
+      )
+      .run(targetId, kind);
+    insertObservations(database, targetId, observations);
+    database.exec("COMMIT");
+  } catch (error) {
+    try {
+      database.exec("ROLLBACK");
+    } catch {
+      // Preserve the original transaction failure.
+    }
+    throw error;
+  }
+}
+
+export class RegistryObservationConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RegistryObservationConflictError";
+  }
+}
+
 export function replaceTargetRows(
   database: DatabaseSync,
   state: RegistryTargetStateInput,

@@ -40,6 +40,9 @@ import {
   verifyPackageStoreEntry
 } from "../store.js";
 import {
+  observePackageCommonSoftware
+} from "../host-observation/index.js";
+import {
   acquireCachedExactGitHubRepositorySnapshot,
   acquireExactGitHubRepositorySnapshot,
   buildGitHubResolverRepositorySnapshot,
@@ -150,6 +153,14 @@ export async function syncExactAcceptedTarget(
     return synced;
   }
 
+  const observations = await refreshSoftwareObservations(
+    input,
+    synced.value
+  );
+  if (!observations.ok) {
+    return observations;
+  }
+
   return {
     ok: true,
     value: {
@@ -158,7 +169,7 @@ export async function syncExactAcceptedTarget(
         !prepared.value.markerCurrent
           ? "synchronized"
           : "no-op",
-      state: synced.value,
+      state: observations.value,
       actions: prepared.value.preflight.actions
     }
   };
@@ -275,6 +286,34 @@ async function syncPreparedTarget(
     currentProjections: prepared.currentProjections,
     acceptedState: registryStateInput(prepared.state)
   });
+}
+
+async function refreshSoftwareObservations(
+  input: SyncExactAcceptedTargetInput,
+  state: RegistryTargetState
+): Promise<Result<RegistryTargetState, ProductError>> {
+  const observations = [];
+  for (const packageFact of state.resolvedPackages) {
+    const verified = await verifyPackageStoreEntry(
+      input.home,
+      packageFact.contentDigest
+    );
+    if (!verified.ok) {
+      return verified;
+    }
+    const observed = await observePackageCommonSoftware({
+      packageCoordinate: packageFact.packageCoordinate,
+      packageContentDigest: packageFact.contentDigest,
+      snapshot: verified.value.snapshot
+    });
+    observations.push(...observed.observations);
+  }
+
+  return input.registry.replaceDependencyObservations(
+    state.targetId,
+    "software",
+    observations
+  );
 }
 
 async function repairManagedTargetDrift(

@@ -679,6 +679,16 @@ function observeRegistry(
       registry.beginPendingReconciliation(id, pending),
     completePendingOperation: (operationId) =>
       registry.completePendingOperation(operationId),
+    replaceDependencyObservations: (
+      targetId,
+      kind,
+      observations
+    ) =>
+      registry.replaceDependencyObservations(
+        targetId,
+        kind,
+        observations
+      ),
     replaceTargetState: (state, pendingOperationId) => {
       const replaced = registry.replaceTargetState(
         state,
