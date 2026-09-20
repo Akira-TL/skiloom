@@ -379,11 +379,19 @@ test("first-party Agent guidance forbids private writes and human-output parsing
       /\b(?:DatabaseSync|better-sqlite3|sqlite3\s|fs\.writeFile|writeFile\(|rename\(|unlink\(|rm\(|cp\(|mv\s)\b/u,
       name
     );
-    assert.doesNotMatch(
-      text,
-      /(?:open|edit|modify|write|delete|overwrite)\s+(?:the\s+)?(?:registry\.sqlite3|Package Store|\.skiloom-state|Target contents?)(?!\s+(?:directly|itself))/iu,
-      name
-    );
+    for (const line of text.split("\n")) {
+      if (
+        /(?:open|edit|modify|write|delete|overwrite)[^\n]*(?:registry\.sqlite3|Package Store|\.skiloom-state|Target (?:contents?|files?|state))/iu.test(
+          line
+        )
+      ) {
+        assert.match(
+          line,
+          /(?:do not|never|must not)/iu,
+          name + ": private write guidance must be prohibitive"
+        );
+      }
+    }
   }
 });
 
