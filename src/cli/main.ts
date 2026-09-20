@@ -4,6 +4,13 @@ import process from "node:process";
 
 import type { ProductError } from "../domain/errors/index.js";
 import {
+  executeCliDoctor,
+  formatCliDoctorResult,
+  parseCliDoctorArguments,
+  type CliDoctorInvocation,
+  type CliDoctorResult
+} from "./doctor/index.js";
+import {
   searchSkillsMp,
   type SkillsMpSearchResult
 } from "../runtime/catalog/skillsmp.js";
@@ -115,6 +122,7 @@ type ParsedStatus = Readonly<{
   target: ResolvedCliTarget;
   json: boolean;
 }>;
+type ParsedDoctor = CliDoctorInvocation & Readonly<{ command: "doctor" }>;
 
 type ParsedSearch = Readonly<{
   command: "search";
@@ -130,20 +138,17 @@ type ParsedRemove =
   CliRemoveInvocation & Readonly<{ command: "remove" }>;
 type ParsedRecovery =
   CliRecoveryInvocation & Readonly<{ command: "recover" | "fork" }>;
-type ParsedSync =
-  CliSyncInvocation & Readonly<{ command: "sync" }>;
-type ParsedRepair =
-  CliRepairInvocation & Readonly<{ command: "repair" }>;
+type ParsedSync = CliSyncInvocation & Readonly<{ command: "sync" }>;
+type ParsedRepair = CliRepairInvocation & Readonly<{ command: "repair" }>;
 type ParsedLocal =
   CliLocalInvocation & Readonly<{ command: CliLocalOperation }>;
-type ParsedExport =
-  CliExportInvocation & Readonly<{ command: "export" }>;
-type ParsedImport =
-  CliImportInvocation & Readonly<{ command: "import" }>;
+type ParsedExport = CliExportInvocation & Readonly<{ command: "export" }>;
+type ParsedImport = CliImportInvocation & Readonly<{ command: "import" }>;
 
 type ParsedCommand =
   | ParsedValidate
   | ParsedStatus
+  | ParsedDoctor
   | ParsedSearch
   | ParsedInstall
   | ParsedUpdate
@@ -200,6 +205,8 @@ async function main(): Promise<number> {
       return runValidate(parsed.value);
     case "status":
       return runStatus(parsed.value);
+    case "doctor":
+      return runDoctor(parsed.value);
     case "search":
       return runSearch(parsed.value);
     case "install":
@@ -233,6 +240,17 @@ async function runValidate(command: ParsedValidate): Promise<number> {
     );
   }
   renderSuccess(command.command, validated.value, command.json);
+  return 0;
+}
+
+async function runDoctor(command: ParsedDoctor): Promise<number> {
+  const inspected = await executeCliDoctor(command);
+  if (!inspected.ok) {
+    return renderOperationFailure(
+      command.command, command.json, inspected.error, 1
+    );
+  }
+  renderSuccess(command.command, inspected.value, command.json);
   return 0;
 }
 
@@ -400,6 +418,8 @@ function parseArguments(
         withoutJson.slice(1),
         json
       );
+    case "doctor":
+      return parseDoctor(withoutJson.slice(1), json);
     case "search":
       return parseSearch(
         withoutJson.slice(1),
@@ -472,6 +492,15 @@ function parseValidate(
         }
       }
     : usage("validate", json, parsed.reason);
+}
+
+function parseDoctor(argv: ReadonlyArray<string>, json: boolean):
+  | Readonly<{ ok: true; value: ParsedDoctor }>
+  | Readonly<{ ok: false; value: UsageFailure }> {
+  const parsed = parseCliDoctorArguments(argv, json);
+  return parsed.ok
+    ? { ok: true, value: { command: "doctor", ...parsed.value } }
+    : usage("doctor", json, parsed.reason);
 }
 
 function parseSearch(
@@ -626,6 +655,7 @@ function renderSuccess(
   result:
     | ValidateLocalPathResult
     | CliStatusResult
+    | CliDoctorResult
     | SkillsMpSearchResult
     | CliInstallResult
     | CliUpdateResult
@@ -656,6 +686,10 @@ function renderSuccess(
     process.stdout.write(
       `Valid Skiloom package: ${(result as ValidateLocalPathResult).path}\n`
     );
+    return;
+  }
+  if (command === "doctor") {
+    process.stdout.write(formatCliDoctorResult(result as CliDoctorResult));
     return;
   }
   if (command === "install") {
