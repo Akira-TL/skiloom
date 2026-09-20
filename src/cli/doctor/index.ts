@@ -4,9 +4,8 @@ import type {
   ProductError,
   Result
 } from "../../domain/errors/index.js";
-import {
-  inspectDoctorTarget,
-  type DoctorInspection
+import type {
+  DoctorInspection
 } from "../../runtime/doctor/index.js";
 import {
   resolveSkiloomHomePaths
@@ -58,6 +57,8 @@ export function parseCliDoctorArguments(
 export async function executeCliDoctor(
   input: CliDoctorInvocation
 ): Promise<Result<CliDoctorResult, ProductError>> {
+  const { inspectDoctorTarget } =
+    await import("../../runtime/doctor/index.js");
   const inspected = await inspectDoctorTarget({
     home: resolveSkiloomHomePaths(currentUserHome()),
     targetRoot: input.target.path
