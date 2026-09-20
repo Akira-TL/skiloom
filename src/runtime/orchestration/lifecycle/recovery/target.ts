@@ -96,6 +96,7 @@ export function acceptedTargetPlan(
       projection
     ])
   );
+  const acceptedPackages = new Set<string>();
   for (const projection of state.projections) {
     const planned = byPackage.get(
       projection.packageCoordinate
@@ -118,9 +119,19 @@ export function acceptedTargetPlan(
         projection.packageCoordinate
       );
     }
+    acceptedPackages.add(projection.packageCoordinate);
   }
 
-  return plan;
+  return {
+    ok: true,
+    value: {
+      ...plan.value,
+      projections: plan.value.projections.filter(
+        (projection) =>
+          acceptedPackages.has(projection.packageCoordinate)
+      )
+    }
+  };
 }
 
 function registryGraph(
