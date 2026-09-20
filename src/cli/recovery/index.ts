@@ -24,6 +24,9 @@ import type {
   LifecycleCandidatePlan
 } from "../../runtime/orchestration/lifecycle-candidate.js";
 import type {
+  DetachedContentChangeRisk
+} from "../../runtime/orchestration/lifecycle/projection/risk.js";
+import type {
   MachineRegistry
 } from "../../runtime/registry/index.js";
 import {
@@ -66,6 +69,8 @@ export type CliRecoveryResult =
     mode: RecoveryCandidateMode;
     targetId: string;
     generation: number | null;
+    detachedContentRisks:
+      ReadonlyArray<DetachedContentChangeRisk>;
   }>;
 
 export type CliRecoveryExecution = Readonly<{
@@ -182,14 +187,19 @@ async function executeWhileLocked(
     const acceptance = createCliCandidateAcceptance(
       input,
       {
-        presentCandidate: (plan, projections) => {
+        presentCandidate: (
+          plan,
+          projections,
+          detachedContentRisks
+        ) => {
           presentationRendered = true;
           process.stdout.write(
             formatRecoveryCandidate(
               input.target,
               input.mode,
               plan,
-              projections
+              projections,
+              detachedContentRisks
             )
           );
         },
@@ -280,7 +290,8 @@ function presentRecoveryResult(
     dependencyEdges:
       result.plan.candidate.dependencyEdges,
     comparison: result.plan.comparison,
-    projections: result.projections
+    projections: result.projections,
+    detachedContentRisks: result.detachedContentRisks
   };
 }
 
@@ -288,7 +299,9 @@ function formatRecoveryCandidate(
   target: ResolvedCliTarget,
   mode: RecoveryCandidateMode,
   plan: LifecycleCandidatePlan,
-  projections: CliRecoveryResult["projections"]
+  projections: CliRecoveryResult["projections"],
+  detachedContentRisks:
+    CliRecoveryResult["detachedContentRisks"]
 ): string {
   return (
     "Recovery mode: " + mode + "\n" +
@@ -304,7 +317,8 @@ function formatRecoveryCandidate(
       dependencyEdges:
         plan.candidate.dependencyEdges,
       comparison: plan.comparison,
-      projections
+      projections,
+      detachedContentRisks
     })
   );
 }

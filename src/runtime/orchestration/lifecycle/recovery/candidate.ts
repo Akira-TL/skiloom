@@ -56,6 +56,10 @@ import type {
   LifecycleCandidateProjection
 } from "../projection/plan.js";
 import {
+  recoveryDetachedContentChangeRisks,
+  type DetachedContentChangeRisk
+} from "../projection/risk.js";
+import {
   prepareRecoveryTarget
 } from "./candidate-target.js";
 
@@ -81,6 +85,7 @@ export type RecoveryCandidateResult =
       targetId: string;
       plan: LifecycleCandidatePlan;
       projections: ReadonlyArray<LifecycleCandidateProjection>;
+      detachedContentRisks: ReadonlyArray<DetachedContentChangeRisk>;
     }>
   | Readonly<{
       status: "recovered" | "forked";
@@ -88,6 +93,7 @@ export type RecoveryCandidateResult =
       targetId: string;
       plan: LifecycleCandidatePlan;
       projections: ReadonlyArray<LifecycleCandidateProjection>;
+      detachedContentRisks: ReadonlyArray<DetachedContentChangeRisk>;
       state: RegistryTargetState;
       marker: TargetRecoveryMarkerFacts;
     }>;
@@ -204,13 +210,20 @@ export async function executeRecoveryCandidate(
   if (!prepared.ok) {
     return prepared;
   }
+  const detachedContentRisks =
+    recoveryDetachedContentChangeRisks(
+      selected.value.intent.detached,
+      candidatePlan,
+      prepared.value.projections
+    );
 
   let acceptance;
   try {
     acceptance = resolveLifecycleCandidateAcceptance(
       await input.acceptCandidate(
         candidatePlan,
-        prepared.value.projections
+        prepared.value.projections,
+        detachedContentRisks
       )
     );
   } catch {
@@ -236,7 +249,8 @@ export async function executeRecoveryCandidate(
         mode: input.mode,
         targetId: selected.value.targetId,
         plan: candidatePlan,
-        projections: prepared.value.projections
+        projections: prepared.value.projections,
+        detachedContentRisks
       }
     };
   }
@@ -248,7 +262,8 @@ export async function executeRecoveryCandidate(
         mode: input.mode,
         targetId: selected.value.targetId,
         plan: candidatePlan,
-        projections: prepared.value.projections
+        projections: prepared.value.projections,
+        detachedContentRisks
       }
     };
   }
@@ -331,6 +346,7 @@ export async function executeRecoveryCandidate(
       targetId: selected.value.targetId,
       plan: candidatePlan,
       projections: prepared.value.projections,
+      detachedContentRisks,
       state: reconciled.value,
       marker
     }

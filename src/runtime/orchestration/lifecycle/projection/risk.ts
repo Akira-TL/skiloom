@@ -2,6 +2,9 @@ import type {
   ResolverSourceBindingSummary
 } from "../../../../domain/resolver/index.js";
 import type {
+  TargetRecoveryDetachedBaseline
+} from "../../../../domain/target/recovery.js";
+import type {
   RegistryTargetState
 } from "../../../registry/index.js";
 import type {
@@ -104,6 +107,116 @@ export function detachedContentChangeRisks(
     });
   }
   return risks;
+}
+
+export function recoveryDetachedContentChangeRisks(
+  detachedBaselines: ReadonlyArray<TargetRecoveryDetachedBaseline>,
+  plan: LifecycleCandidatePlan,
+  projections: ReadonlyArray<LifecycleCandidateProjection>
+): ReadonlyArray<DetachedContentChangeRisk> {
+  const detached = new Set(
+    projections
+      .filter((projection) => projection.ownership === "detached")
+      .map((projection) => projection.packageCoordinate)
+  );
+  const candidatePackages = new Map(
+    plan.candidate.packages.map((entry) => [
+      entry.packageCoordinate,
+      entry
+    ])
+  );
+  const candidateSources = new Map(
+    plan.candidate.sourceBindings.map((entry) => [
+      entry.repositoryCoordinate,
+      entry
+    ])
+  );
+
+  const risks: DetachedContentChangeRisk[] = [];
+  for (
+    const baseline of [...detachedBaselines].sort(
+      (left, right) =>
+        compareUtf8(
+          left.packageCoordinate,
+          right.packageCoordinate
+        )
+    )
+  ) {
+    if (!detached.has(baseline.packageCoordinate)) {
+      continue;
+    }
+    const candidatePackage = candidatePackages.get(
+      baseline.packageCoordinate
+    );
+    if (candidatePackage === undefined) {
+      continue;
+    }
+
+    const previousSource = baselineSource(baseline);
+    const candidateSource =
+      candidateSources.get(
+        repositoryCoordinateFromPackage(
+          baseline.packageCoordinate
+        )
+      ) ?? null;
+    const packageChanged =
+      baseline.packageRoot !== candidatePackage.packageRoot ||
+      baseline.contentDigest !== candidatePackage.contentDigest;
+    const sourceChanged = !sameSource(
+      previousSource,
+      candidateSource
+    );
+    if (!packageChanged && !sourceChanged) {
+      continue;
+    }
+
+    risks.push({
+      kind: "detached-content-change",
+      packageCoordinate: baseline.packageCoordinate,
+      previousPackage: {
+        packageRoot: baseline.packageRoot,
+        contentDigest: baseline.contentDigest
+      },
+      candidatePackage: {
+        packageRoot: candidatePackage.packageRoot,
+        contentDigest: candidatePackage.contentDigest
+      },
+      previousSource,
+      candidateSource
+    });
+  }
+  return risks;
+}
+
+function baselineSource(
+  baseline: TargetRecoveryDetachedBaseline
+): ResolverSourceBindingSummary {
+  const repositoryCoordinate =
+    repositoryCoordinateFromPackage(
+      baseline.packageCoordinate
+    );
+  return baseline.sourceKind === "git"
+    ? {
+        repositoryCoordinate,
+        sourceKind: "git",
+        requestedRef: baseline.requestedRef,
+        exactCommit: baseline.exactCommit
+      }
+    : {
+        repositoryCoordinate,
+        sourceKind: "github-release",
+        version: baseline.version,
+        actualTag: baseline.actualTag,
+        exactCommit: baseline.exactCommit,
+        immutable: null
+      };
+}
+
+function repositoryCoordinateFromPackage(
+  packageCoordinate: string
+): string {
+  const [owner, repository] = packageCoordinate.split("/");
+  return owner + "/" + repository;
 }
 
 function sameSource(
