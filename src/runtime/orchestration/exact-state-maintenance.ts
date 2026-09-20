@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { lstat } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 
 import {
   parseRepositoryCoordinate
@@ -22,8 +21,7 @@ import {
   preflightTargetOwnership,
   type TargetOwnedProjection,
   type TargetOwnershipAction,
-  type TargetOwnershipPreflight,
-  type TargetPathObservation
+  type TargetOwnershipPreflight
 } from "../../domain/target/preflight.js";
 import type {
   OperationLockSession
@@ -57,14 +55,16 @@ import {
   type LocalLifecycleError
 } from "./local-lifecycle.js";
 import {
-  buildMarkerFacts
-} from "./lifecycle/apply.js";
-import {
   acceptedTargetPlan
 } from "./lifecycle/recovery/target.js";
 import {
-  readTargetStateMarkerFile
-} from "../target-state-marker.js";
+  readExactTargetMarkerContext
+} from "./exact-state-maintenance/copied-target.js";
+import {
+  acceptedMarkerCurrent,
+  currentOwnedProjections,
+  observeCurrentTarget
+} from "./exact-state-maintenance/target.js";
 
 export type ExactStateTargetUnavailable = ProductError<
   "ExactStateTargetUnavailable",
@@ -73,7 +73,12 @@ export type ExactStateTargetUnavailable = ProductError<
     reason:
       | "target-not-found"
       | "projection-count-mismatch"
-      | "projection-not-found";
+      | "projection-not-found"
+      | "target-id-mismatch"
+      | "marker-generation-ahead"
+      | "managed-baseline-required"
+      | "invalid-marker-package"
+      | "invalid-managed-transform";
     subject: string;
   }>
 >;
@@ -153,9 +158,18 @@ export async function syncExactAcceptedTarget(
     return synced;
   }
 
+  const location = input.registry.observeTargetLocation(
+    synced.value.targetId,
+    resolve(input.targetRoot),
+    synced.value.generation
+  );
+  if (!location.ok) {
+    return location;
+  }
+
   const observations = await refreshSoftwareObservations(
     input,
-    synced.value
+    location.value
   );
   if (!observations.ok) {
     return observations;
@@ -166,7 +180,8 @@ export async function syncExactAcceptedTarget(
     value: {
       status:
         requiresConvergence(prepared.value.preflight.actions) ||
-        !prepared.value.markerCurrent
+        !prepared.value.markerCurrent ||
+        prepared.value.locationRegistered
           ? "synchronized"
           : "no-op",
       state: observations.value,
@@ -497,6 +512,7 @@ type PreparedAcceptedTarget = Readonly<{
   currentProjections: ReadonlyArray<TargetOwnedProjection>;
   preflight: TargetOwnershipPreflight;
   markerCurrent: boolean;
+  locationRegistered: boolean;
 }>;
 
 async function prepareAcceptedTarget(
@@ -527,10 +543,25 @@ async function prepareAcceptedTarget(
   if (!plan.ok) {
     return plan;
   }
-  const current = currentOwnedProjections(state, plan.value);
+  const markerContext = await readExactTargetMarkerContext(
+    resolve(input.targetRoot),
+    state
+  );
+  if (!markerContext.ok) {
+    return markerContext;
+  }
+
+  const current =
+    markerContext.value.kind === "lagging-v2"
+      ? {
+          ok: true as const,
+          value: markerContext.value.currentProjections
+        }
+      : currentOwnedProjections(state, plan.value);
   if (!current.ok) {
     return current;
   }
+
   const observed = await observeCurrentTarget(
     input.home,
     resolve(input.targetRoot),
@@ -547,6 +578,7 @@ async function prepareAcceptedTarget(
   if (!preflight.ok) {
     return preflight;
   }
+
   const markerCurrent = await acceptedMarkerCurrent(
     resolve(input.targetRoot),
     state,
@@ -556,131 +588,38 @@ async function prepareAcceptedTarget(
     return markerCurrent;
   }
 
+  const normalizedTargetRoot = resolve(input.targetRoot);
+  const locationRegistered = !state.locations.some(
+    (location) =>
+      resolve(location.path) === normalizedTargetRoot
+  );
+  let preparedState = state;
+  if (locationRegistered) {
+    const observedGeneration =
+      markerContext.value.kind === "lagging-v2"
+        ? markerContext.value.document.facts.generation
+        : state.generation;
+    const registered = input.registry.observeTargetLocation(
+      state.targetId,
+      normalizedTargetRoot,
+      observedGeneration
+    );
+    if (!registered.ok) {
+      return registered;
+    }
+    preparedState = registered.value;
+  }
+
   return {
     ok: true,
     value: {
-      state,
+      state: preparedState,
       plan: plan.value,
       currentProjections: current.value,
       preflight: preflight.value,
-      markerCurrent: markerCurrent.value
+      markerCurrent: markerCurrent.value,
+      locationRegistered
     }
-  };
-}
-
-function currentOwnedProjections(
-  state: RegistryTargetState,
-  plan: PreparedAcceptedTarget["plan"]
-): Result<
-  ReadonlyArray<TargetOwnedProjection>,
-  ExactStateTargetUnavailable
-> {
-  const plannedByPackage = new Map(
-    plan.projections.map((projection) => [
-      projection.packageCoordinate,
-      projection
-    ])
-  );
-  if (plannedByPackage.size !== state.projections.length) {
-    return unavailable(
-      state.targetId,
-      "projection-count-mismatch",
-      state.targetId
-    );
-  }
-
-  const result: TargetOwnedProjection[] = [];
-  for (const registryProjection of state.projections) {
-    const projection = plannedByPackage.get(
-      registryProjection.packageCoordinate
-    );
-    if (projection === undefined) {
-      return unavailable(
-        state.targetId,
-        "projection-not-found",
-        registryProjection.packageCoordinate
-      );
-    }
-    result.push({
-      projection,
-      ownership: registryProjection.ownership,
-      materialization: registryProjection.materialization
-    });
-  }
-  return { ok: true, value: result };
-}
-
-async function observeCurrentTarget(
-  home: SkiloomHomePaths,
-  targetRoot: string,
-  current: ReadonlyArray<TargetOwnedProjection>
-): Promise<Result<ReadonlyArray<TargetPathObservation>, ProductError>> {
-  const observations: TargetPathObservation[] = [];
-
-  for (const owned of current) {
-    const activationPath = join(
-      targetRoot,
-      owned.projection.activationName
-    );
-    if (owned.ownership === "detached") {
-      if (await pathExists(activationPath)) {
-        observations.push({
-          activationName: owned.projection.activationName,
-          kind: "existing"
-        });
-      }
-      continue;
-    }
-
-    const verified = await verifyManagedProjection({
-      home,
-      targetRoot,
-      expected: {
-        projection: owned.projection,
-        materialization: owned.materialization
-      }
-    });
-    if (verified.ok) {
-      observations.push({
-        activationName: owned.projection.activationName,
-        kind: "managed",
-        packageCoordinate:
-          owned.projection.packageCoordinate,
-        contentDigest: owned.projection.contentDigest,
-        materialization: owned.materialization,
-        expectedViewMatches: true
-      });
-      continue;
-    }
-    if (verified.error.code === "ManagedProjectionMissing") {
-      continue;
-    }
-    return verified;
-  }
-
-  return { ok: true, value: observations };
-}
-
-async function acceptedMarkerCurrent(
-  targetRoot: string,
-  state: RegistryTargetState,
-  plan: TargetPlan
-): Promise<Result<boolean, ProductError>> {
-  const read = await readTargetStateMarkerFile(targetRoot);
-  if (!read.ok) {
-    if (read.error.code === "TargetStateMarkerReadFailed") {
-      return read;
-    }
-    return { ok: true, value: false };
-  }
-  if (read.value === null) {
-    return { ok: true, value: false };
-  }
-  return {
-    ok: true,
-    value:
-      JSON.stringify(read.value) ===
-      JSON.stringify(buildMarkerFacts(state, plan))
   };
 }
 
@@ -710,22 +649,6 @@ function requiresConvergence(
       action.action === "remove" ||
       action.action === "drop-missing"
   );
-}
-
-async function pathExists(path: string): Promise<boolean> {
-  try {
-    await lstat(path);
-    return true;
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      "code" in error &&
-      error.code === "ENOENT"
-    ) {
-      return false;
-    }
-    throw error;
-  }
 }
 
 function compareUtf8(left: string, right: string): number {

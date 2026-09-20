@@ -68,9 +68,27 @@ export type TargetStateMarkerParseError =
   | InvalidTargetState
   | UnsupportedTargetStateVersion;
 
+export type TargetStateMarkerFormat =
+  | "SKILOOM-STATE-V1"
+  | "SKILOOM-STATE-V2";
+
+export type TargetStateMarkerDocument = Readonly<{
+  format: TargetStateMarkerFormat;
+  facts: TargetRecoveryMarkerFacts;
+}>;
+
 export function parseTargetStateMarker(
   source: string
 ): Result<TargetRecoveryMarkerFacts, TargetStateMarkerParseError> {
+  const parsed = parseTargetStateMarkerDocument(source);
+  return parsed.ok
+    ? { ok: true, value: parsed.value.facts }
+    : parsed;
+}
+
+export function parseTargetStateMarkerDocument(
+  source: string
+): Result<TargetStateMarkerDocument, TargetStateMarkerParseError> {
   let parsed: unknown;
   try {
     parsed = parseToml(source, {
@@ -196,12 +214,18 @@ export function parseTargetStateMarker(
   return {
     ok: true,
     value: {
-      targetId,
-      generation: Number(generation),
-      requirements: requirements.value,
-      projectionOverrides: projectionOverrides.value,
-      managed: managed.value,
-      detached: detached.value
+      format:
+        markerVersion === 1
+          ? FORMAT_V1
+          : FORMAT_V2,
+      facts: {
+        targetId,
+        generation: Number(generation),
+        requirements: requirements.value,
+        projectionOverrides: projectionOverrides.value,
+        managed: managed.value,
+        detached: detached.value
+      }
     }
   };
 }

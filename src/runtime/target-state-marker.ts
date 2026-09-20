@@ -13,8 +13,9 @@ import {
   type Result
 } from "../domain/errors/index.js";
 import {
-  parseTargetStateMarker,
+  parseTargetStateMarkerDocument,
   writeTargetStateMarker,
+  type TargetStateMarkerDocument,
   type TargetStateMarkerParseError
 } from "../domain/target/state-marker.js";
 import type {
@@ -49,6 +50,25 @@ export async function readTargetStateMarkerFile(
     ReadTargetStateMarkerFileError
   >
 > {
+  const document = await readTargetStateMarkerDocumentFile(
+    targetRoot
+  );
+  return document.ok
+    ? {
+        ok: true,
+        value: document.value?.facts ?? null
+      }
+    : document;
+}
+
+export async function readTargetStateMarkerDocumentFile(
+  targetRoot: string
+): Promise<
+  Result<
+    TargetStateMarkerDocument | null,
+    ReadTargetStateMarkerFileError
+  >
+> {
   const markerPath = join(
     resolve(targetRoot),
     TARGET_STATE_MARKER_FILENAME
@@ -67,7 +87,7 @@ export async function readTargetStateMarkerFile(
       })
     };
   }
-  return parseTargetStateMarker(source);
+  return parseTargetStateMarkerDocument(source);
 }
 
 export async function writeTargetStateMarkerFile(
