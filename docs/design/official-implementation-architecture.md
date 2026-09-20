@@ -206,7 +206,7 @@ Native helper MUST NOT 独立拥有：
 - Package Store ownership policy；
 - CLI rendering/exit policy。
 
-Node runtime 负责取得/验证外部事实，并向 helper 提供明确 deterministic input。Helper 返回 deterministic result/error；Node 决定如何呈现、接受或执行 side effect。
+Node runtime 负责取得/验证外部事实，并向 helper 提供明确 deterministic input。Helper 返回 deterministic result/error；Node 决定如何呈现、接受或执行 side effect。GitHub credential discovery 也属于这个 Node control plane：v0 只按 ADR 0029 从 `GH_TOKEN`、其次 `GITHUB_TOKEN` 读取 process environment；不增加 `--token`、持久 credential store、`gh auth` 读取或 native-helper credential access。
 
 Helper MAY 读取 Node 明确提供的 immutable input/file/stream，并 MAY 写到 Node 明确分配的 temporary/output target；它不得自行遍历任意 project/home/network 状态来补充隐式输入。
 

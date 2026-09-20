@@ -384,7 +384,8 @@ warnings
 - partial dependency update；
 - doctor 自动修复；
 - bootstrap 自动 update；
-- 需要 Agent 解析 human terminal output 的机器接口。
+- 需要 Agent 解析 human terminal output 的机器接口；
+- `--token` / `--credential` 参数或持久 credential profile。GitHub authenticated/private source 只按 ADR 0029 使用 `GH_TOKEN`，其次 `GITHUB_TOKEN`；没有时匿名访问，token 不进入 argv、candidate presentation、JSON output 或持久状态。
 
 ## 16. 最终边界
 

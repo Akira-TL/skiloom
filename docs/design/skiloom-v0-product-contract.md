@@ -96,7 +96,8 @@ git
 - Release 只考虑 published (`draft=false`) records；SemVer authority 是 actual tag，不使用 `target_commitish` 代替 tag -> exact commit；
 - GitHub `immutable` 只作为 provenance signal，不是安装准入条件；exact commit 与 Package Content Digest 始终必须存在；
 - repository rename/transfer/redirect 到另一个 canonical coordinate 时返回 `RepositoryCoordinateChanged`，不自动改写来源坐标；
-- Catalog 只负责发现与展示，不能在 v0 中改变 source/version/content authority；v0 默认使用 SkillsMP，只有能明确归一成 GitHub `owner/repo` 的条目才能进入安装候选，且必须重新经过 Skiloom 自己的 GitHub 来源验证。
+- Catalog 只负责发现与展示，不能在 v0 中改变 source/version/content authority；v0 默认使用 SkillsMP，只有能明确归一成 GitHub `owner/repo` 的条目才能进入安装候选，且必须重新经过 Skiloom 自己的 GitHub 来源验证；
+- GitHub 网络访问可使用 machine/process environment 提供的 credential。v0 对 `github.com` 只按 `GH_TOKEN` > `GITHUB_TOKEN` 选择第一项非空值；两者都不存在时保持匿名访问。Credential 只作为 Node source transport 输入，不进入 accepted source identity、Registry、Store/cache identity、marker、export 或 CLI output，也不建立 `--token`、credential store、`gh auth` 读取或 GitHub Enterprise host discovery。完整边界见 ADR 0029。
 
 ## 6. 版本要求与完整依赖解析
 
