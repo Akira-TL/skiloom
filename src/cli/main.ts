@@ -4,6 +4,10 @@ import process from "node:process";
 
 import type { ProductError } from "../domain/errors/index.js";
 import {
+  catalogProviderWarnings,
+  hostPresetWarnings
+} from "./diagnostics/index.js";
+import {
   executeCliBootstrap,
   parseCliBootstrapArguments,
   type CliBootstrapInvocation,
@@ -224,27 +228,44 @@ async function runValidate(command: ParsedValidate): Promise<number> {
 }
 
 async function runDoctor(command: ParsedDoctor): Promise<number> {
+  const warnings = hostPresetWarnings(command.target);
   const inspected = await executeCliDoctor(command);
   if (!inspected.ok) {
     return renderOperationFailure(
-      command.command, command.json, inspected.error, 1
+      command.command,
+      command.json,
+      inspected.error,
+      1,
+      warnings
     );
   }
-  renderSuccess(command.command, inspected.value, command.json);
+  renderSuccess(
+    command.command,
+    inspected.value,
+    command.json,
+    warnings
+  );
   return 0;
 }
 
 async function runSearch(command: ParsedSearch): Promise<number> {
+  const warnings = catalogProviderWarnings();
   const searched = await searchSkillsMp(command.query);
   if (!searched.ok) {
     return renderOperationFailure(
       command.command,
       command.json,
       searched.error,
-      1
+      1,
+      warnings
     );
   }
-  renderSuccess(command.command, searched.value, command.json);
+  renderSuccess(
+    command.command,
+    searched.value,
+    command.json,
+    warnings
+  );
   return 0;
 }
 
@@ -351,23 +372,37 @@ function renderOperationFailure(
   command: string,
   json: boolean,
   error: ProductError,
-  exitCode: number
+  exitCode: number,
+  warnings: ReadonlyArray<ProductError> = []
 ): number {
-  renderFailure(command, error, json, exitCode);
+  renderFailure(
+    command,
+    error,
+    json,
+    exitCode,
+    warnings
+  );
   return exitCode;
 }
 
 async function runStatus(command: ParsedStatus): Promise<number> {
+  const warnings = hostPresetWarnings(command.target);
   const status = await readCliStatus(command.target);
   if (!status.ok) {
     return renderOperationFailure(
       command.command,
       command.json,
       status.error,
-      1
+      1,
+      warnings
     );
   }
-  renderSuccess(command.command, status.value, command.json);
+  renderSuccess(
+    command.command,
+    status.value,
+    command.json,
+    warnings
+  );
   return 0;
 }
 

@@ -61,7 +61,15 @@ test("search --json normalizes SkillsMP discovery candidates without provider au
         }
       ]
     },
-    warnings: []
+    warnings: [
+      {
+        code: "CatalogProviderProvenance",
+        facts: {
+          provider: "skillsmp",
+          role: "discovery-only"
+        }
+      }
+    ]
   });
 });
 
@@ -105,14 +113,40 @@ test("malformed GitHub path hints remain display-only instead of escaping struct
 
 test("search failures stay structured and secret-safe", async () => {
   const cases = [
-    ["authentication", "authentication", 401],
-    ["rate-limit", "rate-limit", 429],
-    ["incompatible-response", "incompatible-response", 200],
-    ["network", "network", null],
-    ["timeout", "timeout", null]
+    [
+      "authentication",
+      "authentication",
+      401,
+      "check-credentials",
+      false
+    ],
+    [
+      "rate-limit",
+      "rate-limit",
+      429,
+      "retry-later",
+      true
+    ],
+    [
+      "incompatible-response",
+      "incompatible-response",
+      200,
+      "update-client",
+      false
+    ],
+    ["network", "network", null, "retry", true],
+    ["timeout", "timeout", null, "retry", true]
   ] as const;
 
-  for (const [mode, reason, status] of cases) {
+  for (
+    const [
+      mode,
+      reason,
+      status,
+      action,
+      retryable
+    ] of cases
+  ) {
     const result = await runCli(["search", "frontend", "--json"], mode);
 
     assert.equal(result.code, 1);
@@ -127,6 +161,9 @@ test("search failures stay structured and secret-safe", async () => {
           provider: string;
           reason: string;
           status: number | null;
+          action: string;
+          retryable: boolean;
+          fallback: string;
         };
       };
       warnings: unknown[];
@@ -140,10 +177,21 @@ test("search failures stay structured and secret-safe", async () => {
         facts: {
           provider: "skillsmp",
           reason,
-          status
+          status,
+          action,
+          retryable,
+          fallback: "explicit-github-coordinate"
         }
       },
-      warnings: []
+      warnings: [
+        {
+          code: "CatalogProviderProvenance",
+          facts: {
+            provider: "skillsmp",
+            role: "discovery-only"
+          }
+        }
+      ]
     });
     assert.equal(
       result.stdout.includes("secret-token-that-must-not-leak"),

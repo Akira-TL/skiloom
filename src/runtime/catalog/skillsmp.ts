@@ -43,12 +43,21 @@ export type SkillsMpSearchFailureReason =
   | "network"
   | "incompatible-response";
 
+export type SkillsMpSearchAction =
+  | "retry"
+  | "retry-later"
+  | "check-credentials"
+  | "update-client";
+
 export type SkillsMpSearchFailed = ProductError<
   "SkillsMpSearchFailed",
   Readonly<{
     provider: "skillsmp";
     reason: SkillsMpSearchFailureReason;
     status: number | null;
+    action: SkillsMpSearchAction;
+    retryable: boolean;
+    fallback: "explicit-github-coordinate";
   }>
 >;
 
@@ -384,14 +393,50 @@ function failed(
   reason: SkillsMpSearchFailureReason,
   status: number | null
 ): Result<never, SkillsMpSearchFailed> {
+  const guidance = failureGuidance(reason);
   return {
     ok: false,
     error: productError("SkillsMpSearchFailed", {
       provider: "skillsmp",
       reason,
-      status
+      status,
+      action: guidance.action,
+      retryable: guidance.retryable,
+      fallback: "explicit-github-coordinate"
     })
   };
+}
+
+function failureGuidance(
+  reason: SkillsMpSearchFailureReason
+): Readonly<{
+  action: SkillsMpSearchAction;
+  retryable: boolean;
+}> {
+  switch (reason) {
+    case "authentication":
+      return {
+        action: "check-credentials",
+        retryable: false
+      };
+    case "rate-limit":
+      return {
+        action: "retry-later",
+        retryable: true
+      };
+    case "incompatible-response":
+      return {
+        action: "update-client",
+        retryable: false
+      };
+    case "timeout":
+    case "network":
+    case "provider-error":
+      return {
+        action: "retry",
+        retryable: true
+      };
+  }
 }
 
 function isTimeoutError(

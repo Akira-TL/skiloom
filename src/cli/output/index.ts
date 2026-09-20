@@ -3,6 +3,10 @@ import process from "node:process";
 import type {
   ProductError
 } from "../../domain/errors/index.js";
+import {
+  formatDiagnosticFailure,
+  formatDiagnosticWarning
+} from "../diagnostics/index.js";
 import type {
   SkillsMpSearchResult
 } from "../../runtime/catalog/skillsmp.js";
@@ -114,6 +118,7 @@ export function renderSuccess(
     process.stdout.write(
       formatCliDoctorResult(result as CliDoctorResult)
     );
+    renderHumanWarnings(warnings);
     return;
   }
   if (command === "install") {
@@ -138,11 +143,7 @@ export function renderSuccess(
     process.stdout.write(
       formatCliExportResult(result as CliExportResult)
     );
-    for (const warning of warnings) {
-      process.stdout.write(
-        "Warning: " + warning.code + "\n"
-      );
-    }
+    renderHumanWarnings(warnings);
     return;
   }
   if (command === "import") {
@@ -202,13 +203,15 @@ export function renderSuccess(
       `Registry: ${status.registry === null ? "unregistered" : status.registry.targetId}\n` +
       `Marker: ${status.marker === null ? "absent" : status.marker.targetId}\n`
   );
+  renderHumanWarnings(warnings);
 }
 
 export function renderFailure(
   command: string,
   error: ProductError,
   json: boolean,
-  exitCode: number
+  exitCode: number,
+  warnings: ReadonlyArray<ProductError> = []
 ): void {
   if (json) {
     const output: CliFailure = {
@@ -216,7 +219,7 @@ export function renderFailure(
       ok: false,
       command,
       error,
-      warnings: []
+      warnings
     };
     process.stdout.write(
       JSON.stringify(output) + "\n"
@@ -224,7 +227,26 @@ export function renderFailure(
     return;
   }
 
+  const diagnostic =
+    formatDiagnosticFailure(error, exitCode);
   process.stderr.write(
-    `skiloom: ${error.code} (exit ${exitCode})\n`
+    diagnostic === undefined
+      ? `skiloom: ${error.code} (exit ${exitCode})\n`
+      : diagnostic + "\n"
   );
+  renderHumanWarnings(warnings);
+}
+
+function renderHumanWarnings(
+  warnings: ReadonlyArray<ProductError>
+): void {
+  for (const warning of warnings) {
+    const diagnostic =
+      formatDiagnosticWarning(warning);
+    process.stderr.write(
+      diagnostic === undefined
+        ? "Warning: " + warning.code + "\n"
+        : diagnostic + "\n"
+    );
+  }
 }
