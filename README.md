@@ -2,7 +2,7 @@
 
 Skiloom 是面向 Agent Skill 的独立包管理器与安装器。它把标准 Agent Skill 作为真正的软件包处理，负责 GitHub 来源解析、依赖图、不可变内容存储、Target 投影、恢复和可传播环境导出。
 
-当前进入 **v0 / `0.1.x` 实施阶段**。v0 架构已经收敛，canonical Spec 为 GitHub #31；开发按 executable implementation tickets 逐步推进，不再使用早期 AKM、Project Lock 或第三方 conformance 模型作为当前产品权威。
+当前实现版本为 **`0.8.2`**。`0.1.x`–`0.8.x` 的领域、解析、Machine State、Target、GitHub Source、生命周期、恢复/导入导出与 Product Surface 已完成；下一阶段是 **`0.9.x` Release Hardening**。v0 架构已经收敛，canonical Spec 为 GitHub #31；后续开发继续按 executable implementation tickets 推进，不再使用早期 AKM、Project Lock 或第三方 conformance 模型作为当前产品权威。
 
 ## v0 开发路线
 
@@ -38,4 +38,4 @@ Skiloom 是面向 Agent Skill 的独立包管理器与安装器。它把标准 A
 - [`docs/planning/skiloom-v0-version-roadmap.md`](docs/planning/skiloom-v0-version-roadmap.md)：`0.1.x`–`0.9.x` 版本路线；
 - GitHub #31：canonical implementation Spec。
 
-当前 `0.1.0` 的目标是在完全离线的 fixture 下建立 Package admission、metadata、repository discovery、`SKILOOM-PACKAGE-V1` snapshot/digest 与 Release Version Requirement 领域基础。
+当前 `0.8.2` 已形成完整 canonical CLI、Catalog/Host diagnostics、第一方 Skill Suite 与 bootstrap Agent workflow。正式公开发布前仍需完成 `0.9.x`：平台 helper npm packaging、`npm pack`/`npx`/global-install smoke、Linux/macOS/Windows 发布物级验证、fresh HOME 与故障/中断 release e2e，以及发布文档与许可收尾。
