@@ -4,6 +4,9 @@ import { basename, join } from "node:path";
 import test from "node:test";
 
 import {
+  parseRepositoryCoordinate
+} from "../../../src/domain/coordinate/index.js";
+import {
   discoverRepositorySkills
 } from "../../../src/domain/discovery/index.js";
 import {
@@ -14,6 +17,9 @@ import {
   buildPackageSnapshot,
   type RepositorySnapshotEntry
 } from "../../../src/domain/snapshot/index.js";
+import {
+  buildGitHubResolverRepositorySnapshot
+} from "../../../src/runtime/source/github/index.js";
 
 const ROOTS = [
   "skiloom",
@@ -91,6 +97,77 @@ test("repository discovery control exposes exactly the five product Skill roots"
       entry.packageRoot
     ]),
     ROOTS.map((name) => [name, `skills/${name}`])
+  );
+});
+
+test("the first-party repository snapshot feeds Router dependencies into the ordinary resolver source pipeline", async () => {
+  const repository = parseRepositoryCoordinate(
+    "akira-tl/skiloom"
+  );
+  assert.equal(repository.ok, true);
+  if (!repository.ok) {
+    return;
+  }
+
+  const entries: RepositorySnapshotEntry[] = [
+    regularEntry(
+      "skiloom-repo.toml",
+      await readFile("skiloom-repo.toml")
+    )
+  ];
+  for (const name of ROOTS) {
+    entries.push(
+      regularEntry(
+        `skills/${name}/SKILL.md`,
+        await readFile(
+          join("skills", name, "SKILL.md")
+        )
+      )
+    );
+  }
+  entries.push(
+    regularEntry(
+      "skills/skiloom/skiloom-package.toml",
+      await readFile(
+        "skills/skiloom/skiloom-package.toml"
+      )
+    )
+  );
+
+  const source =
+    buildGitHubResolverRepositorySnapshot({
+      repository: repository.value,
+      exactCommit:
+        "1111111111111111111111111111111111111111",
+      entries
+    });
+
+  assert.equal(source.ok, true);
+  if (!source.ok) {
+    return;
+  }
+  assert.deepEqual(
+    source.value.packages.map(
+      (entry) => entry.coordinate.canonical
+    ),
+    ROOTS.map(
+      (name) => `akira-tl/skiloom/${name}`
+    ).sort()
+  );
+  const router = source.value.packages.find(
+    (entry) =>
+      entry.coordinate.canonical ===
+      "akira-tl/skiloom/skiloom"
+  );
+  assert.notEqual(router, undefined);
+  assert.deepEqual(
+    router?.dependencies.map((entry) => [
+      entry.target.canonical,
+      entry.requirement
+    ]),
+    ROUTER_DEPENDENCIES.map(
+      (coordinate) => [coordinate, "*"]
+    )
   );
 });
 
