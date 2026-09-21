@@ -33,7 +33,9 @@ import {
 } from "../github-credential/index.js";
 import {
   parseCliStatusArguments,
-  readCliStatus
+  preflightCurrentTargetCopy,
+  readCliStatus,
+  requireCurrentTargetCopy
 } from "../status.js";
 import type {
   ResolvedCliTarget
@@ -109,6 +111,15 @@ async function executeCliMaintenance(
   kind: "sync" | "repair"
 ): Promise<Result<CliMaintenanceResult, ProductError>> {
   const userHome = currentUserHome();
+  if (kind === "repair") {
+    const current = await preflightCurrentTargetCopy(
+      input.target,
+      userHome
+    );
+    if (!current.ok) {
+      return current;
+    }
+  }
   const home = resolveSkiloomHomePaths(userHome);
   try {
     await mkdir(home.homeRoot, { recursive: true });
@@ -177,6 +188,12 @@ async function executeMaintenanceWhileLocked(
             : "recovery-required"
       })
     };
+  }
+  if (kind === "repair") {
+    const current = requireCurrentTargetCopy(status.value);
+    if (!current.ok) {
+      return current;
+    }
   }
 
   let registry: MachineRegistry | undefined;

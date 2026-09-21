@@ -51,7 +51,9 @@ import {
   resolveGitHubCredentialEnvironment
 } from "./github-credential/index.js";
 import {
-  readCliStatus
+  preflightCurrentTargetCopy,
+  readCliStatus,
+  requireCurrentTargetCopy
 } from "./status.js";
 import type {
   ResolvedCliTarget
@@ -100,6 +102,13 @@ export async function executeCliUpdate(
   input: CliUpdateInvocation
 ): Promise<Result<CliUpdateExecution, ProductError>> {
   const userHome = currentUserHome();
+  const current = await preflightCurrentTargetCopy(
+    input.target,
+    userHome
+  );
+  if (!current.ok) {
+    return current;
+  }
   const home = resolveSkiloomHomePaths(userHome);
   try {
     await mkdir(home.homeRoot, { recursive: true });
@@ -166,6 +175,10 @@ async function executeWhileLocked(
             : "recovery-required"
       })
     };
+  }
+  const current = requireCurrentTargetCopy(status.value);
+  if (!current.ok) {
+    return current;
   }
 
   let registry: MachineRegistry | undefined;

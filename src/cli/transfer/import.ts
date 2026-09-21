@@ -34,7 +34,9 @@ import {
 } from "../candidate-acceptance.js";
 import {
   parseCliStatusArguments,
-  readCliStatus
+  preflightCurrentTargetCopy,
+  readCliStatus,
+  requireCurrentTargetCopy
 } from "../status.js";
 import type {
   ResolvedCliTarget
@@ -153,6 +155,15 @@ export async function executeCliImport(
   input: CliImportInvocation
 ): Promise<Result<CliImportExecution, ProductError>> {
   const userHome = currentUserHome();
+  if (input.merge) {
+    const current = await preflightCurrentTargetCopy(
+      input.target,
+      userHome
+    );
+    if (!current.ok) {
+      return transferFailure(current.error);
+    }
+  }
   const home = resolveSkiloomHomePaths(userHome);
   try {
     await mkdir(home.homeRoot, { recursive: true });
@@ -233,6 +244,10 @@ async function executeImportWhileLocked(
           }
         )
       };
+    }
+    const current = requireCurrentTargetCopy(status.value);
+    if (!current.ok) {
+      return current;
     }
   } else {
     if (status.value.registry !== null) {

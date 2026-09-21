@@ -20,6 +20,7 @@ import {
 } from "./maintenance.js";
 import type {
   RegistryDependencyObservation,
+  RegistryForkLocationTransfer,
   RegistryPendingOperation,
   RegistryPendingOperationInput,
   RegistryTargetState,
@@ -74,6 +75,11 @@ export interface MachineRegistry {
   ): Result<RegistryTargetState, RegistryObservationLockedError>;
   replaceTargetState(
     state: RegistryTargetStateInput,
+    pendingOperationId?: string
+  ): Result<RegistryTargetState, RegistryReplaceLockedError>;
+  replaceForkedTargetState?(
+    state: RegistryTargetStateInput,
+    transfer: RegistryForkLocationTransfer,
     pendingOperationId?: string
   ): Result<RegistryTargetState, RegistryReplaceLockedError>;
 }
@@ -197,6 +203,22 @@ class LockedMachineRegistry implements MachineRegistry {
       return held;
     }
     return this.#registry.replaceTargetState(state, pendingOperationId);
+  }
+
+  replaceForkedTargetState(
+    state: RegistryTargetStateInput,
+    transfer: RegistryForkLocationTransfer,
+    pendingOperationId?: string
+  ): Result<RegistryTargetState, RegistryReplaceLockedError> {
+    const held = this.#lock.checkHeld();
+    if (!held.ok) {
+      return held;
+    }
+    return this.#registry.replaceForkedTargetState(
+      state,
+      transfer,
+      pendingOperationId
+    );
   }
 }
 

@@ -4,6 +4,7 @@ import type {
   RegistryDependencyObservation,
   RegistryDetachedBaseline,
   RegistryDirectRequirement,
+  RegistryForkLocationTransfer,
   RegistryPendingOperation,
   RegistryPendingOperationInput,
   RegistryProjection,
@@ -302,10 +303,44 @@ export class RegistryObservationConflictError extends Error {
   }
 }
 
+export class RegistryForkLocationConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RegistryForkLocationConflictError";
+  }
+}
+
 export function replaceTargetRows(
   database: DatabaseSync,
   state: RegistryTargetStateInput,
   pendingOperationId?: string
+): number {
+  return replaceTargetRowsTransaction(
+    database,
+    state,
+    pendingOperationId
+  );
+}
+
+export function replaceForkedTargetRows(
+  database: DatabaseSync,
+  state: RegistryTargetStateInput,
+  transfer: RegistryForkLocationTransfer,
+  pendingOperationId?: string
+): number {
+  return replaceTargetRowsTransaction(
+    database,
+    state,
+    pendingOperationId,
+    transfer
+  );
+}
+
+function replaceTargetRowsTransaction(
+  database: DatabaseSync,
+  state: RegistryTargetStateInput,
+  pendingOperationId: string | undefined,
+  transfer?: RegistryForkLocationTransfer
 ): number {
   database.exec("BEGIN IMMEDIATE");
   try {
@@ -320,6 +355,14 @@ export function replaceTargetRows(
       generationBefore,
       pendingOperationId
     );
+
+    if (transfer !== undefined) {
+      transferForkLocation(
+        database,
+        state,
+        transfer
+      );
+    }
 
     database.prepare("DELETE FROM target_locations WHERE target_id = ?").run(state.targetId);
     database.prepare("DELETE FROM direct_requirements WHERE target_id = ?").run(state.targetId);
@@ -349,6 +392,52 @@ export function replaceTargetRows(
       // Preserve the original transaction failure.
     }
     throw error;
+  }
+}
+
+function transferForkLocation(
+  database: DatabaseSync,
+  state: RegistryTargetStateInput,
+  transfer: RegistryForkLocationTransfer
+): void {
+  if (
+    transfer.fromTargetId === state.targetId ||
+    state.locations.length !== 1 ||
+    state.locations[0]?.path !== transfer.path
+  ) {
+    throw new RegistryForkLocationConflictError(
+      "invalid fork location transfer"
+    );
+  }
+
+  const source = database
+    .prepare("SELECT generation FROM targets WHERE target_id = ?")
+    .get(transfer.fromTargetId);
+  if (
+    source === undefined ||
+    source.generation !== transfer.expectedFromGeneration
+  ) {
+    throw new RegistryForkLocationConflictError(
+      "fork source generation changed"
+    );
+  }
+
+  const location = database
+    .prepare("SELECT target_id FROM target_locations WHERE path = ?")
+    .get(transfer.path);
+  if (location?.target_id !== transfer.fromTargetId) {
+    throw new RegistryForkLocationConflictError(
+      "fork source no longer owns location"
+    );
+  }
+
+  const deleted = database
+    .prepare("DELETE FROM target_locations WHERE path = ? AND target_id = ?")
+    .run(transfer.path, transfer.fromTargetId);
+  if (deleted.changes !== 1) {
+    throw new RegistryForkLocationConflictError(
+      "fork location transfer did not remove exactly one source location"
+    );
   }
 }
 

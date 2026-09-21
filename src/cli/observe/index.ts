@@ -33,7 +33,9 @@ import {
 } from "../candidate-acceptance.js";
 import {
   parseCliStatusArguments,
-  readCliStatus
+  preflightCurrentTargetCopy,
+  readCliStatus,
+  requireCurrentTargetCopy
 } from "../status.js";
 import type {
   ResolvedCliTarget
@@ -211,6 +213,13 @@ export async function executeCliObserve(
   input: CliObserveInvocation
 ): Promise<Result<CliObserveResult, ProductError>> {
   const userHome = currentUserHome();
+  const current = await preflightCurrentTargetCopy(
+    input.target,
+    userHome
+  );
+  if (!current.ok) {
+    return current;
+  }
   const home = resolveSkiloomHomePaths(userHome);
   try {
     await mkdir(home.homeRoot, { recursive: true });
@@ -282,6 +291,10 @@ async function executeObserveWhileLocked(
             : "marker-missing"
       })
     };
+  }
+  const current = requireCurrentTargetCopy(status.value);
+  if (!current.ok) {
+    return current;
   }
   if (
     status.value.marker.targetId !==

@@ -178,7 +178,7 @@ test("fork plans and commits a stale copied Target under a new identity without 
   });
 });
 
-test("fork refuses a stale marker on a path still registered to the old Target identity", async () => {
+test("fork fails closed when a stale marker baseline no longer matches registered Target bytes", async () => {
   await withCliRuntime(async ({ home, cwd, target }) => {
     const installed = await runCli(
       ["install", "acme/app/app", "--yes", "--json"],
@@ -210,11 +210,7 @@ test("fork refuses a stale marker on a path still registered to the old Target i
     const output = parseRecoveryOutput(forked.stdout);
     assert.equal(
       output.error?.code,
-      "RecoveryCandidateNotAllowed"
-    );
-    assert.equal(
-      output.error?.facts.reason,
-      "target-current"
+      "ForeignTargetPathConflict"
     );
 
     const status = await runCli(

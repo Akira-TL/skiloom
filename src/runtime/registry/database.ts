@@ -9,6 +9,7 @@ import {
 import type { SkiloomHomePaths } from "../home.js";
 import type {
   RegistryDependencyObservation,
+  RegistryForkLocationTransfer,
   RegistryPendingOperation,
   RegistryPendingOperationInput,
   RegistryTargetState,
@@ -28,11 +29,13 @@ import {
   beginPendingOperationRows,
   beginPendingReconciliationRows,
   completePendingOperationRows,
+  RegistryForkLocationConflictError,
   RegistryLocationConflictError,
   RegistryObservationConflictError,
   RegistryPendingOperationConflictError,
   observeTargetLocationRows,
   replaceDependencyObservationRows,
+  replaceForkedTargetRows,
   replaceTargetRows,
   type RegistryLocationConflictReason
 } from "./write.js";
@@ -49,7 +52,7 @@ export type RegistryStateRejected = ProductError<
   "RegistryStateRejected",
   Readonly<{
     targetId: string;
-    reason: "constraint";
+    reason: "constraint" | "fork-location-conflict";
   }>
 >;
 
@@ -279,36 +282,77 @@ export class MachineRegistry {
     try {
       replaceTargetRows(this.#database, state, pendingOperationId);
     } catch (error) {
-      if (error instanceof RegistryPendingOperationConflictError) {
-        return {
-          ok: false,
-          error: productError("RegistryPendingOperationRejected", {
-            targetId: state.targetId,
-            reason: "conflict"
-          })
-        };
-      }
-      if (isConstraintError(error)) {
+      return registryReplaceFailure(state.targetId, error);
+    }
+
+    return this.#readReplacedTargetState(state.targetId);
+  }
+
+  replaceForkedTargetState(
+    state: RegistryTargetStateInput,
+    transfer: RegistryForkLocationTransfer,
+    pendingOperationId?: string
+  ): Result<RegistryTargetState, RegistryReplaceError> {
+    try {
+      replaceForkedTargetRows(
+        this.#database,
+        state,
+        transfer,
+        pendingOperationId
+      );
+    } catch (error) {
+      if (error instanceof RegistryForkLocationConflictError) {
         return {
           ok: false,
           error: productError("RegistryStateRejected", {
             targetId: state.targetId,
-            reason: "constraint"
+            reason: "fork-location-conflict"
           })
         };
       }
-      throw error;
+      return registryReplaceFailure(state.targetId, error);
     }
 
+    return this.#readReplacedTargetState(state.targetId);
+  }
+
+  #readReplacedTargetState(
+    targetId: string
+  ): Result<RegistryTargetState, RegistryReplaceError> {
     const readback = withRegistryReadSnapshot(
       this.#database,
-      () => readTargetRows(this.#database, state.targetId)
+      () => readTargetRows(this.#database, targetId)
     );
     if (readback === undefined) {
       throw new Error("registry target disappeared after committed replacement");
     }
     return { ok: true, value: readback };
   }
+}
+
+function registryReplaceFailure(
+  targetId: string,
+  error: unknown
+): Result<never, RegistryReplaceError> {
+  if (error instanceof RegistryPendingOperationConflictError) {
+    return {
+      ok: false,
+      error: productError("RegistryPendingOperationRejected", {
+        targetId,
+        reason: "conflict"
+      })
+    };
+  }
+  if (isConstraintError(error)) {
+    return {
+      ok: false,
+      error: productError("RegistryStateRejected", {
+        targetId,
+        reason: "constraint"
+      })
+    };
+  }
+  throw error;
 }
 
 export function openMachineRegistry(

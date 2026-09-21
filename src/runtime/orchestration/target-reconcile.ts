@@ -24,6 +24,7 @@ import type {
 import type { SkiloomHomePaths } from "../home.js";
 import type {
   MachineRegistry,
+  RegistryForkLocationTransfer,
   RegistryPendingLockedError,
   RegistryPendingOperationInput,
   RegistryPendingProjectionAction,
@@ -40,6 +41,7 @@ import {
   writeTargetReconciliationRecoveryManifest,
   type InvalidTargetReconciliationRecoveryManifest
 } from "./target-reconcile/recovery.js";
+import { commitReconciliationRegistryState } from "./target-reconcile/commit.js";
 import {
   cleanupPendingTargetStaging,
   validatePendingStagingActions
@@ -104,6 +106,7 @@ export type PrepareTargetReconciliationInput = Readonly<{
   preflight: TargetOwnershipPreflight;
   currentProjections: ReadonlyArray<TargetOwnedProjection>;
   nextState: RegistryTargetStateInput;
+  forkLocationTransfer?: RegistryForkLocationTransfer;
   deferPendingCompletion?: boolean;
   extraPendingActions?: ReadonlyArray<RegistryPendingProjectionAction>;
 }>;
@@ -267,8 +270,10 @@ export async function prepareTargetReconciliation(
           return stillHeld;
         }
 
-        const replaced = input.registry.replaceTargetState(
+        const replaced = commitReconciliationRegistryState(
+          input.registry,
           input.nextState,
+          input.forkLocationTransfer,
           staging.value.hasPending ? input.operationId : undefined
         );
         if (!replaced.ok) {

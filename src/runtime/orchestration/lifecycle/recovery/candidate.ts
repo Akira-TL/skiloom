@@ -296,6 +296,21 @@ export async function executeRecoveryCandidate(
       currentProjections:
         prepared.value.currentProjections,
       nextState: prepared.value.nextState,
+      ...(input.mode === "fork" &&
+      currentRead.value !== undefined &&
+      currentRead.value.locations.some(
+        (location) =>
+          resolve(location.path) === resolve(input.targetRoot)
+      )
+        ? {
+            forkLocationTransfer: {
+              fromTargetId: currentRead.value.targetId,
+              expectedFromGeneration:
+                currentRead.value.generation,
+              path: resolve(input.targetRoot)
+            }
+          }
+        : {}),
       deferPendingCompletion: true
     });
   if (!reconciliation.ok) {
@@ -426,7 +441,10 @@ function selectRecoveryIntent(
     (location) =>
       resolve(location.path) === targetRoot
   );
-  if (registeredHere) {
+  if (
+    registeredHere &&
+    input.marker.generation === current.generation
+  ) {
     return notAllowed(
       input.mode,
       input.marker.targetId,

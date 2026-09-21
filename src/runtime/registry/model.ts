@@ -85,6 +85,12 @@ export type RegistryTargetLocation = Readonly<{
   observedGeneration: number | null;
 }>;
 
+export type RegistryForkLocationTransfer = Readonly<{
+  fromTargetId: string;
+  expectedFromGeneration: number;
+  path: string;
+}>;
+
 export type RegistryTargetState = Readonly<{
   targetId: string;
   generation: number;

@@ -68,7 +68,9 @@ import {
   formatCliCandidatePresentation
 } from "./candidate/presentation.js";
 import {
-  readCliStatus
+  preflightCurrentTargetCopy,
+  readCliStatus,
+  requireCurrentTargetCopy
 } from "./status.js";
 import {
   resolveCliTarget,
@@ -416,6 +418,13 @@ export async function executeCliInstall(
   policy: CliInstallExecutionPolicy = {}
 ): Promise<Result<CliInstallExecution, ProductError>> {
   const userHome = currentUserHome();
+  const current = await preflightCurrentTargetCopy(
+    input.target,
+    userHome
+  );
+  if (!current.ok) {
+    return current;
+  }
   const home = resolveSkiloomHomePaths(userHome);
   try {
     await mkdir(home.homeRoot, { recursive: true });
@@ -484,6 +493,10 @@ async function executeWhileLocked(
         targetId: status.value.marker.targetId
       })
     };
+  }
+  const current = requireCurrentTargetCopy(status.value);
+  if (!current.ok) {
+    return current;
   }
 
   const existingTargetId =

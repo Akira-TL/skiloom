@@ -2,6 +2,7 @@ import { lstat } from "node:fs/promises";
 import { homedir } from "node:os";
 
 import {
+  productError,
   type ProductError,
   type Result
 } from "../domain/errors/index.js";
@@ -56,6 +57,55 @@ export type CliStatusResult = Readonly<{
   marker: TargetRecoveryMarkerFacts | null;
   registry: CliRegistryStatus | null;
 }>;
+
+export type TargetCopyRequiresSyncOrFork = ProductError<
+  "TargetCopyRequiresSyncOrFork",
+  Readonly<{
+    markerGeneration: number;
+    registryGeneration: number;
+    actions: ReadonlyArray<"sync" | "fork">;
+  }>
+>;
+
+export function requireCurrentTargetCopy(
+  status: CliStatusResult
+): Result<void, TargetCopyRequiresSyncOrFork> {
+  if (
+    status.marker !== null &&
+    status.registry !== null &&
+    status.marker.targetId === status.registry.targetId &&
+    status.marker.generation < status.registry.generation
+  ) {
+    return {
+      ok: false,
+      error: productError("TargetCopyRequiresSyncOrFork", {
+        markerGeneration: status.marker.generation,
+        registryGeneration: status.registry.generation,
+        actions: ["sync", "fork"] as const
+      })
+    };
+  }
+  return {
+    ok: true,
+    value: undefined
+  };
+}
+
+export async function preflightCurrentTargetCopy(
+  target: ResolvedCliTarget,
+  userHome: string
+): Promise<
+  Result<
+    void,
+    ReadCliStatusError | TargetCopyRequiresSyncOrFork
+  >
+> {
+  const status = await readCliStatus(target, userHome);
+  if (!status.ok) {
+    return status;
+  }
+  return requireCurrentTargetCopy(status.value);
+}
 
 export function parseCliStatusArguments(
   argv: ReadonlyArray<string>,

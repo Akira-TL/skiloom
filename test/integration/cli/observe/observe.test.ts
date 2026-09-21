@@ -367,11 +367,19 @@ test("observe fails closed for unregistered stale Targets and unknown Packages",
     const staleOutput = parseObserve(stale.stdout);
     assert.equal(
       staleOutput.error?.code,
-      "ObservationTargetUnavailable"
+      "TargetCopyRequiresSyncOrFork"
     );
     assert.equal(
-      staleOutput.error?.facts.reason,
-      "marker-stale"
+      staleOutput.error?.facts.markerGeneration,
+      1
+    );
+    assert.equal(
+      staleOutput.error?.facts.registryGeneration,
+      2
+    );
+    assert.deepEqual(
+      staleOutput.error?.facts.actions,
+      ["sync", "fork"]
     );
   });
 });

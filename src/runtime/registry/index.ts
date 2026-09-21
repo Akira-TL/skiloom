@@ -28,6 +28,7 @@ export type {
   RegistryDependencyEdge,
   RegistryDependencyObservation,
   RegistryDetachedBaseline,
+  RegistryForkLocationTransfer,
   RegistryDirectRequirement,
   RegistryProjection,
   RegistryResolvedPackage,

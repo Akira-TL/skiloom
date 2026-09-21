@@ -6,6 +6,9 @@ import type {
   SkillsMpSearchFailed
 } from "../../runtime/catalog/skillsmp.js";
 import type {
+  TargetCopyRequiresSyncOrFork
+} from "../status.js";
+import type {
   ResolvedCliTarget
 } from "../target-selector.js";
 
@@ -103,6 +106,18 @@ export function formatDiagnosticFailure(
   error: ProductError,
   exitCode: number
 ): string | undefined {
+  if (error.code === "TargetCopyRequiresSyncOrFork") {
+    const facts =
+      error.facts as TargetCopyRequiresSyncOrFork["facts"];
+    return (
+      "skiloom: Target copy generation " +
+      facts.markerGeneration +
+      " is behind Registry generation " +
+      facts.registryGeneration +
+      "; run skiloom sync or skiloom fork for this Target " +
+      "before continuing (exit " + exitCode + ")"
+    );
+  }
   if (error.code !== "SkillsMpSearchFailed") {
     return undefined;
   }
