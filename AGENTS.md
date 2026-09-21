@@ -1,6 +1,6 @@
 # Skiloom 项目规则
 
-Skiloom 是独立的 Agent Skill 包管理器与安装器项目。v0 架构 Wayfinder 主体已收敛，canonical Spec 为 GitHub #31；当前实现已完成 `0.8.14` Product Surface/diagnostics/first-party workflow、dependency-observation、GitHub credential/private-source、child-process secret-isolation、Windows shell-free npm Host Observation、CLI help/version self-description、无锁 Registry snapshot-consistent read、install complete-candidate presentation、update/install/remove/recover/fork detached-content compatibility risk、forget projection-absence exact-state replay、Marker V2 ownership proof 驱动的 copied/lagging Target 安全同步，以及 copied Target adoption 仅允许通过 `sync` 的边界闭环。#125 已无未决设计 frontier；`0.9.x` Release Hardening 仍暂后，当前继续复核 v0 代码与既有规划是否还有遗漏。实现工作必须从已拆分、blocker 已解除的 executable ticket 进入，不在代码阶段重新发明已经接受的产品语义。
+Skiloom 是独立的 Agent Skill 包管理器与安装器项目。v0 架构 Wayfinder 主体已收敛，canonical Spec 为 GitHub #31；当前实现已完成 `0.8.15` Product Surface/diagnostics/first-party workflow、dependency-observation、GitHub credential/private-source、child-process secret-isolation、Windows shell-free npm Host Observation、CLI help/version self-description、无锁 Registry snapshot-consistent read、install complete-candidate presentation、update/install/remove/recover/fork detached-content compatibility risk、forget projection-absence exact-state replay、Marker V2 ownership proof 驱动的 copied/lagging Target 安全同步，以及 copied Target adoption 仅允许通过 `sync` 的边界闭环。#125 已无未决设计 frontier；`0.9.x` Release Hardening 仍暂后，当前继续复核 v0 代码与既有规划是否还有遗漏。实现工作必须从已拆分、blocker 已解除的 executable ticket 进入，不在代码阶段重新发明已经接受的产品语义。
 
 ## 工程流程
 
