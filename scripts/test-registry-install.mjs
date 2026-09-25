@@ -57,13 +57,23 @@ try {
 
   const globalBinDirectory =
     process.platform === "win32" ? prefix : join(prefix, "bin");
-  const globalExecutable =
+  const globalShim =
     process.platform === "win32"
       ? join(prefix, "skiloom.cmd")
       : join(globalBinDirectory, "skiloom");
+  await access(globalShim);
+  const globalEntry = join(
+    prefix,
+    process.platform === "win32" ? "node_modules" : "lib/node_modules",
+    "skiloom",
+    "dist",
+    "cli",
+    "main.js"
+  );
+  await access(globalEntry);
   const globalResult = await runCommand(
-    globalExecutable,
-    ["sync", "--target", globalTarget, "--json"],
+    process.execPath,
+    [globalEntry, "sync", "--target", globalTarget, "--json"],
     runtimeEnvironment(globalHome, globalBinDirectory)
   );
   assertLockedCommandReachedTargetState(globalResult, globalTarget);
