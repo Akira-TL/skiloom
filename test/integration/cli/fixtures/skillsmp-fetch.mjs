@@ -16,7 +16,7 @@ globalThis.fetch = async (input) => {
             skillUrl: "https://skillsmp.com/skills/frontend-design",
             stars: 12345,
             contentLanguage: "en",
-            updatedAt: "2026-09-18T00:00:00Z",
+            updatedAt: 1789890178,
             version: "9.9.9",
             hash: "provider-hash",
             downloadUrl: "https://skillsmp.com/download/provider.zip"

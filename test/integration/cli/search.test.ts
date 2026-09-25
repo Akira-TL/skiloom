@@ -36,7 +36,7 @@ test("search --json normalizes SkillsMP discovery candidates without provider au
             {
               provider: "skillsmp",
               kind: "updated-at",
-              value: "2026-09-18T00:00:00Z"
+              value: 1789890178
             }
           ]
         },

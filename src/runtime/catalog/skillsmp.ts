@@ -145,7 +145,7 @@ type RawSkill = Readonly<{
   skillUrl: string | null;
   stars: number | null;
   contentLanguage: string | null;
-  updatedAt: string | null;
+  updatedAt: string | number | null;
 }>;
 
 function parseSkillsResponse(
@@ -194,7 +194,7 @@ function parseRawSkill(
   const contentLanguage = nullableString(
     value.contentLanguage
   );
-  const updatedAt = nullableString(
+  const updatedAt = nullableTimestamp(
     value.updatedAt
   );
   if (
@@ -385,6 +385,22 @@ function nullableString(
     return null;
   }
   return typeof value === "string"
+    ? value
+    : undefined;
+}
+
+function nullableTimestamp(
+  value: unknown
+): string | number | null | undefined {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  return typeof value === "number" &&
+    Number.isSafeInteger(value) &&
+    value >= 0
     ? value
     : undefined;
 }
