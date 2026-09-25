@@ -74,6 +74,7 @@ import {
 import {
   applyRequestedRenameChange,
   lifecycleCandidateProjections,
+  preserveAcceptedProjectionAbsence,
   projectionRenames,
   requestedRenames,
   type LifecycleCandidateProjection
@@ -251,9 +252,14 @@ export async function applyAcceptedRequirementChange(
   if (!desiredPlan.ok) {
     return desiredPlan;
   }
+  const acceptedDesiredPlan =
+    preserveAcceptedProjectionAbsence(
+      current,
+      desiredPlan.value
+    );
   const candidateProjections = lifecycleCandidateProjections(
     current,
-    desiredPlan.value
+    acceptedDesiredPlan
   );
   const detachedContentRisks = detachedContentChangeRisks(
     current,
@@ -352,14 +358,14 @@ export async function applyAcceptedRequirementChange(
     input.home,
     targetRoot,
     currentOwned.value,
-    desiredPlan.value
+    acceptedDesiredPlan
   );
   if (!observed.ok) {
     return observed;
   }
 
   const preflight = preflightTargetOwnership({
-    desiredPlan: desiredPlan.value,
+    desiredPlan: acceptedDesiredPlan,
     currentProjections: currentOwned.value,
     observedPaths: observed.value
   });
@@ -387,7 +393,7 @@ export async function applyAcceptedRequirementChange(
     current,
     targetRoot,
     candidatePlan,
-    desiredPlan.value
+    acceptedDesiredPlan
   );
   const operationId = (input.createOperationId ?? randomUUID)();
   const prepared = await prepareTargetReconciliation({
@@ -396,7 +402,7 @@ export async function applyAcceptedRequirementChange(
     operationId,
     lock: input.lock,
     registry: input.registry,
-    desiredPlan: desiredPlan.value,
+    desiredPlan: acceptedDesiredPlan,
     preflight: preflight.value,
     currentProjections: currentOwned.value,
     nextState,
@@ -421,7 +427,7 @@ export async function applyAcceptedRequirementChange(
   }
   const marker = buildMarkerFacts(
     reconciled.value,
-    desiredPlan.value
+    acceptedDesiredPlan
   );
   const markerSynced = await syncLifecycleMarker({
     targetRoot,
@@ -461,11 +467,20 @@ function reconstructCurrentTargetPlan(
   state: RegistryTargetState,
   requirements: ReadonlyArray<DirectInstallRequirement>
 ): Result<TargetPlan, TargetPlanError> {
-  return planLifecycleTarget(
+  const plan = planLifecycleTarget(
     requirements,
     registryGraph(state),
     projectionRenames(state.projections)
   );
+  return plan.ok
+    ? {
+        ok: true,
+        value: preserveAcceptedProjectionAbsence(
+          state,
+          plan.value
+        )
+      }
+    : plan;
 }
 
 function registryGraph(

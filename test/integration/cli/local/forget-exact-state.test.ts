@@ -137,6 +137,163 @@ test("sync repair and doctor replay forgotten projection absence without adoptin
   });
 });
 
+test("requirement add preserves forgotten projection absence and user bytes", async () => {
+  await withCliRuntime(async ({ home, cwd, target }) => {
+    assert.equal(
+      (
+        await runCli(
+          ["install", "acme/app/app", "--yes", "--json"],
+          { home, cwd, mode: "base" }
+        )
+      ).code,
+      0
+    );
+    assert.equal(
+      (
+        await runCli(
+          ["detach", "acme/app/app", "--json"],
+          { home, cwd, mode: "forbid-network" }
+        )
+      ).code,
+      0
+    );
+    await writeFile(
+      join(target, "app", "USER-NOTE"),
+      "forgotten bytes survive later add\n",
+      "utf8"
+    );
+    assert.equal(
+      (
+        await runCli(
+          ["forget", "acme/app/app", "--json"],
+          { home, cwd, mode: "forbid-network" }
+        )
+      ).code,
+      0
+    );
+
+    const added = await runCli(
+      [
+        "install",
+        "acme/suite/alpha",
+        "--yes",
+        "--json"
+      ],
+      { home, cwd, mode: "base" }
+    );
+
+    assert.equal(added.code, 0);
+    const output = JSON.parse(added.stdout) as {
+      result: {
+        acceptedState: { generation: number } | null;
+        packages: ReadonlyArray<{
+          packageCoordinate: string;
+        }>;
+        projections: ReadonlyArray<{
+          packageCoordinate: string;
+          ownership: string;
+        }>;
+      };
+    };
+    assert.equal(output.result.acceptedState?.generation, 4);
+    assert.deepEqual(
+      output.result.packages.map(
+        (entry) => entry.packageCoordinate
+      ),
+      ["acme/app/app", "acme/suite/alpha"]
+    );
+    assert.deepEqual(output.result.projections, [
+      {
+        packageCoordinate: "acme/suite/alpha",
+        activationName: "alpha",
+        ownership: "managed"
+      }
+    ]);
+    assert.equal(
+      await readFile(
+        join(target, "app", "USER-NOTE"),
+        "utf8"
+      ),
+      "forgotten bytes survive later add\n"
+    );
+    assert.match(
+      await readFile(
+        join(target, "alpha", "SKILL.md"),
+        "utf8"
+      ),
+      /Alpha package\./u
+    );
+  });
+});
+
+test("remove can drop a forgotten direct requirement without deleting user bytes", async () => {
+  await withCliRuntime(async ({ home, cwd, target }) => {
+    assert.equal(
+      (
+        await runCli(
+          ["install", "acme/app/app", "--yes", "--json"],
+          { home, cwd, mode: "base" }
+        )
+      ).code,
+      0
+    );
+    assert.equal(
+      (
+        await runCli(
+          ["detach", "acme/app/app", "--json"],
+          { home, cwd, mode: "forbid-network" }
+        )
+      ).code,
+      0
+    );
+    await writeFile(
+      join(target, "app", "USER-NOTE"),
+      "forgotten bytes survive logical removal\n",
+      "utf8"
+    );
+    assert.equal(
+      (
+        await runCli(
+          ["forget", "acme/app/app", "--json"],
+          { home, cwd, mode: "forbid-network" }
+        )
+      ).code,
+      0
+    );
+
+    const removed = await runCli(
+      [
+        "remove",
+        "acme/app/app",
+        "--yes",
+        "--json"
+      ],
+      { home, cwd, mode: "base" }
+    );
+
+    assert.equal(removed.code, 0);
+    const output = JSON.parse(removed.stdout) as {
+      result: {
+        acceptedState: { generation: number } | null;
+        directRequirements: ReadonlyArray<unknown>;
+        packages: ReadonlyArray<unknown>;
+        projections: ReadonlyArray<unknown>;
+      };
+    };
+    assert.equal(output.result.acceptedState?.generation, 4);
+    assert.deepEqual(output.result.directRequirements, []);
+    assert.deepEqual(output.result.packages, []);
+    assert.deepEqual(output.result.projections, []);
+    assert.equal(
+      await readFile(
+        join(target, "app", "USER-NOTE"),
+        "utf8"
+      ),
+      "forgotten bytes survive logical removal\n"
+    );
+  });
+});
+
 type LocalOutput = Readonly<{
   result: Readonly<{
     generation: number;

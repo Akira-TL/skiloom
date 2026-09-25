@@ -109,6 +109,38 @@ export function lifecycleCandidateProjections(
   }));
 }
 
+export function preserveAcceptedProjectionAbsence(
+  state: RegistryTargetState,
+  plan: TargetPlan
+): TargetPlan {
+  const acceptedPackages = new Set(
+    state.resolvedPackages.map(
+      (entry) => entry.packageCoordinate
+    )
+  );
+  const projectedPackages = new Set(
+    state.projections.map(
+      (projection) => projection.packageCoordinate
+    )
+  );
+  const forgottenPackages = new Set(
+    [...acceptedPackages].filter(
+      (packageCoordinate) =>
+        !projectedPackages.has(packageCoordinate)
+    )
+  );
+
+  return {
+    ...plan,
+    projections: plan.projections.filter(
+      (projection) =>
+        !forgottenPackages.has(
+          projection.packageCoordinate
+        )
+    )
+  };
+}
+
 function preservedRenames(
   state: RegistryTargetState,
   candidate: ResolverCandidateGraph
