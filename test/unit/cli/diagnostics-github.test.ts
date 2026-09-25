@@ -43,3 +43,19 @@ test("GitHub rate-limit diagnostics preserve a known reset instant", () => {
     "skiloom: GitHub rate limit reached (HTTP 403); retry after 2026-09-25T09:48:20.000Z, or set GH_TOKEN/GITHUB_TOKEN for authenticated GitHub access (exit 1)"
   );
 });
+
+test("GitHub rate-limit diagnostics tolerate an out-of-range reset instant", () => {
+  assert.equal(
+    formatDiagnosticFailure(
+      productError("GitHubRateLimited", {
+        repositoryCoordinate: "akira-tl/skiloom",
+        operation: "read-blob",
+        status: 403 as const,
+        retryAfterSeconds: null,
+        resetAtUnixSeconds: Number.MAX_SAFE_INTEGER
+      }),
+      1
+    ),
+    "skiloom: GitHub rate limit reached (HTTP 403); retry later, or set GH_TOKEN/GITHUB_TOKEN for authenticated GitHub access (exit 1)"
+  );
+});

@@ -105,6 +105,15 @@ export function formatDiagnosticWarning(
   );
 }
 
+function formatUnixInstant(
+  unixSeconds: number
+): string | undefined {
+  const date = new Date(unixSeconds * 1000);
+  return Number.isNaN(date.getTime())
+    ? undefined
+    : date.toISOString();
+}
+
 export function formatDiagnosticFailure(
   error: ProductError,
   exitCode: number
@@ -123,15 +132,16 @@ export function formatDiagnosticFailure(
   }
   if (error.code === "GitHubRateLimited") {
     const facts = error.facts as GitHubRateLimited["facts"];
+    const resetInstant =
+      facts.resetAtUnixSeconds === null
+        ? undefined
+        : formatUnixInstant(facts.resetAtUnixSeconds);
     const retry =
       facts.retryAfterSeconds !== null
         ? "retry after " + facts.retryAfterSeconds + " seconds"
-        : facts.resetAtUnixSeconds !== null
-          ? "retry after " +
-            new Date(
-              facts.resetAtUnixSeconds * 1000
-            ).toISOString()
-          : "retry later";
+        : resetInstant === undefined
+          ? "retry later"
+          : "retry after " + resetInstant;
     return (
       "skiloom: GitHub rate limit reached (HTTP " +
       facts.status +
