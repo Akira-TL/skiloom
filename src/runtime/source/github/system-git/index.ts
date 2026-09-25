@@ -10,6 +10,10 @@ import {
   type Result
 } from "../../../../domain/errors/index.js";
 import type { RepositorySnapshotEntry } from "../../../../domain/snapshot/index.js";
+import {
+  readCachedExactGitHubRepositorySnapshot,
+  writeCachedExactGitHubRepositorySnapshot
+} from "../cache/index.js";
 import type {
   AcquiredGitHubRepositorySnapshot,
   UnsupportedGitTreeEntry
@@ -53,6 +57,7 @@ export type AcquireGitRepositorySnapshotWithSystemGitInput = Readonly<{
   remotes: ReadonlyArray<GitHubSystemGitRemoteCandidate>;
   gitExecutable?: string;
   signal?: AbortSignal;
+  sourceCachePath?: string;
 }>;
 
 export type AcquireGitHubRepositorySnapshotWithSystemGitInput = Readonly<{
@@ -60,7 +65,17 @@ export type AcquireGitHubRepositorySnapshotWithSystemGitInput = Readonly<{
   requestedRef: string;
   gitExecutable?: string;
   signal?: AbortSignal;
+  sourceCachePath?: string;
 }>;
+
+export type GitHubSystemGitSnapshotTransport = (
+  input: AcquireGitHubRepositorySnapshotWithSystemGitInput
+) => Promise<
+  Result<
+    AcquiredGitHubRepositorySnapshot,
+    AcquireGitRepositorySnapshotWithSystemGitError
+  >
+>;
 
 export function gitHubSystemGitRemoteCandidates(
   repository: RepositoryCoordinate
@@ -191,6 +206,17 @@ export async function acquireGitRepositorySnapshotWithSystemGit(
       return unavailable(input, "resolve-ref", "invalid-response");
     }
 
+    if (input.sourceCachePath !== undefined) {
+      const cached = await readCachedExactGitHubRepositorySnapshot({
+        cacheRoot: input.sourceCachePath,
+        repository: input.repository,
+        exactCommit
+      });
+      if (cached !== undefined) {
+        return { ok: true, value: cached };
+      }
+    }
+
     const listed = await runGit({
       executable: gitExecutable,
       args: [
@@ -264,14 +290,18 @@ export async function acquireGitRepositorySnapshotWithSystemGit(
       )
     );
 
-    return {
-      ok: true,
-      value: {
-        repository: input.repository,
-        exactCommit,
-        entries
-      }
+    const snapshot: AcquiredGitHubRepositorySnapshot = {
+      repository: input.repository,
+      exactCommit,
+      entries
     };
+    if (input.sourceCachePath !== undefined) {
+      await writeCachedExactGitHubRepositorySnapshot(
+        input.sourceCachePath,
+        snapshot
+      );
+    }
+    return { ok: true, value: snapshot };
   } finally {
     await rm(root, { recursive: true, force: true }).catch(() => {});
   }

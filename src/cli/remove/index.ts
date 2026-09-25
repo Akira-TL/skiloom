@@ -34,6 +34,7 @@ import type {
   RegistryTargetState
 } from "../../runtime/registry/index.js";
 import {
+  acquireGitHubRepositorySnapshotWithSystemGit,
   createGitHubJsonFetchTransport,
   createGitHubRepositoryFetchTransport
 } from "../../runtime/source/github/index.js";
@@ -259,6 +260,7 @@ async function executeWhileLocked(
         repositoryTransport:
           createGitHubRepositoryFetchTransport(),
         transport: createGitHubJsonFetchTransport(),
+        gitTransport: acquireGitHubRepositorySnapshotWithSystemGit,
         sourceCachePath: home.sourceCachePath,
         ...(credential === undefined
           ? {}

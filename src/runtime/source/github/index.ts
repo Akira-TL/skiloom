@@ -52,8 +52,11 @@ export {
 
 export {
   acquireCachedExactGitHubRepositorySnapshot,
+  readCachedExactGitHubRepositorySnapshot,
   sourceCacheEntryPath,
-  type AcquireCachedExactGitHubRepositorySnapshotInput
+  writeCachedExactGitHubRepositorySnapshot,
+  type AcquireCachedExactGitHubRepositorySnapshotInput,
+  type ExactGitHubRepositorySnapshotCacheInput
 } from "./cache/index.js";
 
 export {
@@ -79,6 +82,7 @@ export {
   type AcquireGitRepositorySnapshotWithSystemGitInput,
   type GitHubSystemGitOperation,
   type GitHubSystemGitRemoteCandidate,
+  type GitHubSystemGitSnapshotTransport,
   type GitHubSystemGitUnavailable
 } from "./system-git/index.js";
 

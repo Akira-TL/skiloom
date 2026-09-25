@@ -38,6 +38,9 @@ export async function addAcceptedTargetRoots(
     registry: input.registry,
     repositoryTransport: input.repositoryTransport,
     transport: input.transport,
+    ...(input.gitTransport === undefined
+      ? {}
+      : { gitTransport: input.gitTransport }),
     mutateRequirements: (current) =>
       upsertDirectRequirements(current, input.additions),
     acceptCandidate: input.acceptCandidate,

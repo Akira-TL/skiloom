@@ -52,6 +52,10 @@ import {
   type AcquireExactGitHubRepositorySnapshotInput
 } from "./snapshot.js";
 import type { GitHubJsonTransport } from "./transport.js";
+import type {
+  GitHubSystemGitSnapshotTransport,
+  GitHubSystemGitUnavailable
+} from "./system-git/index.js";
 
 const TEXT_DECODER = new TextDecoder("utf-8", { fatal: true });
 const PATH_DECODER = new TextDecoder("utf-8");
@@ -87,6 +91,7 @@ export type GitHubSourceRuntimeInput = Readonly<{
   credential?: string;
   signal?: AbortSignal;
   sourceCachePath?: string;
+  gitTransport?: GitHubSystemGitSnapshotTransport;
   repositoryTransport: GitHubRepositoryTransport;
   transport: GitHubJsonTransport;
 }>;
@@ -111,6 +116,7 @@ export type AcquireGitHubGitBindingInput =
     }>;
 
 export type AcquireGitHubGitBindingError =
+  | GitHubSystemGitUnavailable
   | VerifyGitHubRepositoryError
   | ResolveGitHubExactCommitError
   | AcquireExactGitHubRepositorySnapshotError
@@ -186,6 +192,36 @@ export async function acquireGitHubReleaseRepositorySource(
 export async function acquireGitHubGitBinding(
   input: AcquireGitHubGitBindingInput
 ): Promise<Result<ResolverGitBinding, AcquireGitHubGitBindingError>> {
+  if (input.gitTransport !== undefined) {
+    const gitAcquired = await input.gitTransport({
+      repository: input.repository,
+      requestedRef: input.requestedRef,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      ...(input.sourceCachePath === undefined
+        ? {}
+        : { sourceCachePath: input.sourceCachePath })
+    });
+    if (gitAcquired.ok) {
+      const snapshot = buildGitHubResolverRepositorySnapshot(
+        gitAcquired.value
+      );
+      if (!snapshot.ok) {
+        return snapshot;
+      }
+      return {
+        ok: true,
+        value: {
+          repository: input.repository,
+          sourceKind: "git",
+          requestedRef: input.requestedRef,
+          exactCommit: gitAcquired.value.exactCommit,
+          snapshot: snapshot.value
+        }
+      };
+    }
+    return gitAcquired;
+  }
+
   const verified = await verifyGitHubRepository({
     repository: input.repository,
     transport: input.repositoryTransport,

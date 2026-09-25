@@ -43,7 +43,8 @@ import {
 } from "../../target-projection/index.js";
 import type {
   GitHubJsonTransport,
-  GitHubRepositoryTransport
+  GitHubRepositoryTransport,
+  GitHubSystemGitSnapshotTransport
 } from "../../source/github/index.js";
 import {
   computeLifecycleCandidate,
@@ -167,6 +168,7 @@ export type AcceptedRequirementChangeInput = Readonly<{
   credential?: string;
   signal?: AbortSignal;
   sourceCachePath?: string;
+  gitTransport?: GitHubSystemGitSnapshotTransport;
   repositoryTransport: GitHubRepositoryTransport;
   transport: GitHubJsonTransport;
   acceptCandidate: LifecycleCandidateAcceptanceCallback;
@@ -216,6 +218,9 @@ export async function applyAcceptedRequirementChange(
     currentState: current,
     repositoryTransport: input.repositoryTransport,
     transport: input.transport,
+    ...(input.gitTransport === undefined
+      ? {}
+      : { gitTransport: input.gitTransport }),
     ...(input.credential === undefined
       ? {}
       : { credential: input.credential }),

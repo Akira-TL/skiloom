@@ -26,7 +26,8 @@ import type {
 } from "../../../registry/index.js";
 import type {
   GitHubJsonTransport,
-  GitHubRepositoryTransport
+  GitHubRepositoryTransport,
+  GitHubSystemGitSnapshotTransport
 } from "../../../source/github/index.js";
 import {
   computeLifecycleCandidate,
@@ -111,6 +112,7 @@ export type ExecuteRecoveryCandidateInput = Readonly<{
   credential?: string;
   signal?: AbortSignal;
   sourceCachePath?: string;
+  gitTransport?: GitHubSystemGitSnapshotTransport;
   createTargetId?: () => string;
   createOperationId?: () => string;
 }>;
@@ -153,6 +155,9 @@ export async function executeRecoveryCandidate(
       : {}),
     repositoryTransport: input.repositoryTransport,
     transport: input.transport,
+    ...(input.gitTransport === undefined
+      ? {}
+      : { gitTransport: input.gitTransport }),
     ...(input.credential === undefined
       ? {}
       : { credential: input.credential }),

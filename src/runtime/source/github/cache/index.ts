@@ -66,6 +66,12 @@ export type AcquireCachedExactGitHubRepositorySnapshotInput =
       cacheRoot: string;
     }>;
 
+export type ExactGitHubRepositorySnapshotCacheInput = Readonly<{
+  cacheRoot: string;
+  repository: AcquiredGitHubRepositorySnapshot["repository"];
+  exactCommit: string;
+}>;
+
 export async function acquireCachedExactGitHubRepositorySnapshot(
   input: AcquireCachedExactGitHubRepositorySnapshotInput
 ): Promise<
@@ -78,25 +84,13 @@ export async function acquireCachedExactGitHubRepositorySnapshot(
     return acquireExactGitHubRepositorySnapshot(withoutCacheRoot(input));
   }
 
-  const path = sourceCacheEntryPath(
-    input.cacheRoot,
-    input.repository.canonical,
-    input.exactCommit
-  );
-  const cached = await readCachedSnapshot(
-    path,
-    input.repository.canonical,
-    input.exactCommit
-  );
+  const cached = await readCachedExactGitHubRepositorySnapshot({
+    cacheRoot: input.cacheRoot,
+    repository: input.repository,
+    exactCommit: input.exactCommit
+  });
   if (cached !== undefined) {
-    return {
-      ok: true,
-      value: {
-        repository: input.repository,
-        exactCommit: input.exactCommit,
-        entries: cached
-      }
-    };
+    return { ok: true, value: cached };
   }
 
   const acquired = await acquireExactGitHubRepositorySnapshot(
@@ -106,8 +100,53 @@ export async function acquireCachedExactGitHubRepositorySnapshot(
     return acquired;
   }
 
-  await writeCachedSnapshotBestEffort(path, acquired.value);
+  await writeCachedExactGitHubRepositorySnapshot(
+    input.cacheRoot,
+    acquired.value
+  );
   return acquired;
+}
+
+export async function readCachedExactGitHubRepositorySnapshot(
+  input: ExactGitHubRepositorySnapshotCacheInput
+): Promise<AcquiredGitHubRepositorySnapshot | undefined> {
+  if (!EXACT_COMMIT_PATTERN.test(input.exactCommit)) {
+    return undefined;
+  }
+  const path = sourceCacheEntryPath(
+    input.cacheRoot,
+    input.repository.canonical,
+    input.exactCommit
+  );
+  const entries = await readCachedSnapshot(
+    path,
+    input.repository.canonical,
+    input.exactCommit
+  );
+  return entries === undefined
+    ? undefined
+    : {
+        repository: input.repository,
+        exactCommit: input.exactCommit,
+        entries
+      };
+}
+
+export async function writeCachedExactGitHubRepositorySnapshot(
+  cacheRoot: string,
+  snapshot: AcquiredGitHubRepositorySnapshot
+): Promise<void> {
+  if (!EXACT_COMMIT_PATTERN.test(snapshot.exactCommit)) {
+    return;
+  }
+  await writeCachedSnapshotBestEffort(
+    sourceCacheEntryPath(
+      cacheRoot,
+      snapshot.repository.canonical,
+      snapshot.exactCommit
+    ),
+    snapshot
+  );
 }
 
 export function sourceCacheEntryPath(

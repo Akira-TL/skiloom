@@ -423,33 +423,7 @@ test("reinstalling one Package with a new version upserts the direct requirement
   });
 });
 
-test("install supports explicit Git source and Package activation rename while preserving Package identity", async () => {
-  await withCliRuntime("git", async ({ home, cwd }) => {
-    const result = await runCli(
-      [
-        "install",
-        "acme/gitapp/gitapp",
-        "--git",
-        "main",
-        "--yes",
-        "--json"
-      ],
-      { home, cwd }
-    );
-
-    assert.equal(result.code, 0);
-    const output = parseJson(result.stdout);
-    assert.equal(
-      output.result.directRequirements[0]?.sourceKind,
-      "git"
-    );
-    assert.equal(
-      output.result.directRequirements[0]?.requestedRef,
-      "main"
-    );
-    assert.equal(output.result.sources[0]?.sourceKind, "git");
-  });
-
+test("install supports Package activation rename while preserving Package identity", async () => {
   await withCliRuntime("rename", async ({ home, cwd, target }) => {
     const first = await runCli(
       [

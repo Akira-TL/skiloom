@@ -173,6 +173,9 @@ export async function executeFirstAcceptedInstall(
     directRequirements: input.directRequirements,
     repositoryTransport: input.repositoryTransport,
     transport: input.transport,
+    ...(input.gitTransport === undefined
+      ? {}
+      : { gitTransport: input.gitTransport }),
     ...(input.credential === undefined
       ? {}
       : { credential: input.credential }),

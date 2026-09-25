@@ -208,6 +208,47 @@ test("explicit Git source is acquired as an exact snapshot without Release fallb
   }
 });
 
+test("explicit Git transport failure stays structured and never falls back to GitHub REST", async () => {
+  const repository = repositoryCoordinate("Akira-TL/Private-Skill");
+  let restCalls = 0;
+  const binding = await acquireGitHubGitBinding({
+    repository,
+    requestedRef: "main",
+    gitTransport: async () => ({
+      ok: false,
+      error: {
+        code: "GitHubSystemGitUnavailable",
+        facts: {
+          repositoryCoordinate: "akira-tl/private-skill",
+          operation: "fetch",
+          reason: "access-unavailable"
+        }
+      }
+    }),
+    repositoryTransport: async () => {
+      restCalls += 1;
+      throw new Error("GitHub REST must not be used after Git transport failure");
+    },
+    transport: async () => {
+      restCalls += 1;
+      throw new Error("GitHub REST must not be used after Git transport failure");
+    }
+  });
+
+  assert.deepEqual(binding, {
+    ok: false,
+    error: {
+      code: "GitHubSystemGitUnavailable",
+      facts: {
+        repositoryCoordinate: "akira-tl/private-skill",
+        operation: "fetch",
+        reason: "access-unavailable"
+      }
+    }
+  });
+  assert.equal(restCalls, 0);
+});
+
 test("exact-source cache reuses only canonical repository plus exact commit and refetches corruption", async () => {
   const cacheRoot = await mkdtemp(join(tmpdir(), "skiloom-source-cache-"));
   const repository = repositoryCoordinate("Akira-TL/Cached-Skill");

@@ -23,7 +23,7 @@ const LOCK_HELPER =
 const PRIMARY_TOKEN = "skiloom-gh-token-primary-sentinel";
 const FALLBACK_TOKEN = "skiloom-github-token-fallback-sentinel";
 
-test("GitHub CLI credential precedence covers release git anonymous and credential-safe access errors", async () => {
+test("GitHub API credential precedence covers release metadata anonymous access and credential-safe errors", async () => {
   await withCliRuntime(async ({ home, cwd }) => {
     const release = await runCli(
       [
@@ -45,25 +45,6 @@ test("GitHub CLI credential precedence covers release git anonymous and credenti
     assertCredentialSafe(release, PRIMARY_TOKEN);
     assertCredentialSafe(release, FALLBACK_TOKEN);
 
-    const git = await runCli(
-      [
-        "install",
-        "acme/gitapp/gitapp",
-        "--git",
-        "main",
-        "--plan",
-        "--json"
-      ],
-      {
-        home,
-        cwd,
-        mode: "base",
-        githubToken: FALLBACK_TOKEN,
-        expectedBearer: FALLBACK_TOKEN
-      }
-    );
-    assert.equal(git.code, 0);
-    assertCredentialSafe(git, FALLBACK_TOKEN);
 
     const anonymous = await runCli(
       [

@@ -139,12 +139,12 @@ process.env
 
 1. `GH_TOKEN` 优先于 `GITHUB_TOKEN`；
 2. 空/纯空白变量按未设置处理；
-3. 无 credential 时匿名行为保持；
-4. Release source 和 explicit Git source 都收到同一 credential；
-5. install/update/remove/recover/fork/repair 的 network source path 都传播 credential；
-6. bootstrap 通过普通 install 自动继承；
+3. 无 API credential 时匿名 GitHub metadata 行为保持；
+4. Release metadata path 收到选中的 API credential，而 explicit Git source 不依赖该 Bearer credential；
+5. 仍需 GitHub API metadata 的 install/update/remove/recover/fork/bootstrap 路径传播 API credential；
+6. system Git/OpenSSH 使用 ambient Git/SSH authentication 时，Skiloom 不读取、记录或持久化 credential material；
 7. credential 不进入 error/result/JSON、Registry、marker、Store/source-cache payload 或 export；
-8. 401/403/404 仍保持原有 `SourceAccessUnavailable` 语义。
+8. GitHub API 的 401/403/404 仍保持原有 `SourceAccessUnavailable` 语义。
 
 ## 结果
 
