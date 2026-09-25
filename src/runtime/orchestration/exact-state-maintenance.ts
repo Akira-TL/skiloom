@@ -41,10 +41,11 @@ import {
   observePackageCommonSoftware
 } from "../host-observation/index.js";
 import {
-  acquireCachedExactGitHubRepositorySnapshot,
   acquireExactGitHubRepositorySnapshot,
   buildGitHubResolverRepositorySnapshot,
-  type GitHubJsonTransport
+  readCachedExactGitHubRepositorySnapshot,
+  type GitHubJsonTransport,
+  type GitHubSystemGitSnapshotTransport
 } from "../source/github/index.js";
 import {
   repairManagedProjection,
@@ -125,6 +126,7 @@ export type RepairExactAcceptedTargetInput =
   SyncExactAcceptedTargetInput &
   Readonly<{
     transport: GitHubJsonTransport;
+    gitTransport?: GitHubSystemGitSnapshotTransport;
     sourceCachePath?: string;
     credential?: string;
     signal?: AbortSignal;
@@ -437,24 +439,56 @@ async function acquireAcceptedPackageSnapshot(
     );
   }
 
-  const request = {
-    repository: repository.value,
-    exactCommit: source.exactCommit,
-    transport: input.transport,
-    ...(input.credential === undefined
-      ? {}
-      : { credential: input.credential }),
-    ...(input.signal === undefined
-      ? {}
-      : { signal: input.signal })
-  };
-  const acquired =
-    input.sourceCachePath === undefined
-      ? await acquireExactGitHubRepositorySnapshot(request)
-      : await acquireCachedExactGitHubRepositorySnapshot({
-          ...request,
-          cacheRoot: input.sourceCachePath
-        });
+  let acquired;
+  if (input.sourceCachePath !== undefined) {
+    const cached = await readCachedExactGitHubRepositorySnapshot({
+      cacheRoot: input.sourceCachePath,
+      repository: repository.value,
+      exactCommit: source.exactCommit
+    });
+    if (cached !== undefined) {
+      acquired = { ok: true as const, value: cached };
+    }
+  }
+
+  if (acquired === undefined && input.gitTransport !== undefined) {
+    const gitAcquired = await input.gitTransport({
+      repository: repository.value,
+      requestedRef: source.exactCommit,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      ...(input.sourceCachePath === undefined
+        ? {}
+        : { sourceCachePath: input.sourceCachePath })
+    });
+    if (gitAcquired.ok) {
+      if (gitAcquired.value.exactCommit !== source.exactCommit) {
+        return repairMismatch(
+          packageFact.packageCoordinate,
+          "content-digest-mismatch"
+        );
+      }
+      acquired = gitAcquired;
+    } else if (
+      gitAcquired.error.code !== "GitHubSystemGitUnavailable" ||
+      gitAcquired.error.facts.reason === "aborted"
+    ) {
+      return gitAcquired;
+    }
+  }
+
+  if (acquired === undefined) {
+    acquired = await acquireExactGitHubRepositorySnapshot({
+      repository: repository.value,
+      exactCommit: source.exactCommit,
+      transport: input.transport,
+      ...(input.credential === undefined
+        ? {}
+        : { credential: input.credential }),
+      ...(input.signal === undefined
+        ? {}
+        : { signal: input.signal })
+    });
+  }
   if (!acquired.ok) {
     return acquired;
   }

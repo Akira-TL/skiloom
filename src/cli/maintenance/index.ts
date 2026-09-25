@@ -23,6 +23,7 @@ import type {
   MachineRegistry
 } from "../../runtime/registry/index.js";
 import {
+  acquireGitHubRepositorySnapshotWithSystemGit,
   createGitHubJsonFetchTransport
 } from "../../runtime/source/github/index.js";
 import {
@@ -218,6 +219,7 @@ async function executeMaintenanceWhileLocked(
             lock,
             registry,
             transport: createGitHubJsonFetchTransport(),
+            gitTransport: acquireGitHubRepositorySnapshotWithSystemGit,
             sourceCachePath: home.sourceCachePath,
             ...credentialOption()
           });
