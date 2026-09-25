@@ -254,7 +254,18 @@ CI 为支持的平台预编译 `skiloom-lock`。主 npm package 使用 platform-
 - 不现场运行 Cargo/Rust compiler；
 - 不从任意 URL 在 runtime 下载 executable。
 
-具体 npm platform package 名称与最终 CPU/libc matrix 在 release readiness 中固定，不属于产品公开格式。
+v0 release readiness 固定首发支持矩阵如下；这些 package 只是主 `skiloom` package 的发行实现细节，不是新的用户入口：
+
+| Target | npm package | npm platform metadata | executable |
+| --- | --- | --- | --- |
+| Linux x64 glibc | `skiloom-lock-linux-x64-gnu` | `os=linux`, `cpu=x64`, `libc=glibc` | `bin/skiloom-lock` |
+| macOS x64 | `skiloom-lock-darwin-x64` | `os=darwin`, `cpu=x64` | `bin/skiloom-lock` |
+| macOS arm64 | `skiloom-lock-darwin-arm64` | `os=darwin`, `cpu=arm64` | `bin/skiloom-lock` |
+| Windows x64 | `skiloom-lock-win32-x64` | `os=win32`, `cpu=x64` | `bin/skiloom-lock.exe` |
+
+四个 helper package 与主 `skiloom` package 使用同一版本号并由同一 release tag 构建。主 package 通过 `optionalDependencies` 同时声明四个精确版本，让 npm 根据 `os` / `cpu` / `libc` 只安装匹配项；“optional”只描述 npm 的平台选择机制，不改变 `operation.lock` 在产品层的 mandatory 语义。
+
+v0 首发矩阵暂不承诺 Linux arm64、Linux musl、Windows arm64 或其他 OS/CPU/libc 组合。运行在矩阵之外、使用 `--omit=optional`、或安装损坏导致匹配 helper 缺失时，状态型操作继续 fail closed。后续扩大矩阵必须增加对应预编译 package、真实 runner smoke 和 release artifact 验证，不能只放宽运行时判断。
 
 ## 9. 测试要求
 

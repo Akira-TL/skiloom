@@ -320,11 +320,11 @@ src/native/<helper-name>.ts   # Node bridge
 
 ```text
 skiloom
-  optionalDependencies / required platform dependency as explicitly decided
-    ├── platform binary package (darwin-arm64)
-    ├── platform binary package (darwin-x64)
-    ├── platform binary package (linux-x64-gnu/...)
-    └── platform binary package (win32-x64/...)
+  optionalDependencies
+    ├── skiloom-lock-darwin-arm64
+    ├── skiloom-lock-darwin-x64
+    ├── skiloom-lock-linux-x64-gnu
+    └── skiloom-lock-win32-x64
 ```
 
 Compute accelerator 缺失时，如果 TypeScript baseline 存在，必须自动使用 TS path，行为完全相同。Mandatory System Capability Helper 缺失时必须返回明确的 `UnsupportedPlatformCapability` / 安装完整性错误，不能静默退化成不可靠锁。
