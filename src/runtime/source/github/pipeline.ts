@@ -219,7 +219,12 @@ export async function acquireGitHubGitBinding(
         }
       };
     }
-    return gitAcquired;
+    if (
+      gitAcquired.error.code !== "GitHubSystemGitUnavailable" ||
+      gitAcquired.error.facts.reason === "aborted"
+    ) {
+      return gitAcquired;
+    }
   }
 
   const verified = await verifyGitHubRepository({

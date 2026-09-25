@@ -208,9 +208,16 @@ test("explicit Git source is acquired as an exact snapshot without Release fallb
   }
 });
 
-test("explicit Git transport failure stays structured and never falls back to GitHub REST", async () => {
-  const repository = repositoryCoordinate("Akira-TL/Private-Skill");
-  let restCalls = 0;
+test("explicit Git transport failure may fall back to REST without changing source kind", async () => {
+  const repository = repositoryCoordinate("Akira-TL/Git-Skill");
+  const exactCommit = "9".repeat(40);
+  const seenPaths: string[] = [];
+  const fixture = repositoryFixture({
+    exactCommit,
+    files: {
+      "SKILL.md": skill("git-skill", "REST compatibility fallback.")
+    }
+  });
   const binding = await acquireGitHubGitBinding({
     repository,
     requestedRef: "main",
@@ -219,34 +226,29 @@ test("explicit Git transport failure stays structured and never falls back to Gi
       error: {
         code: "GitHubSystemGitUnavailable",
         facts: {
-          repositoryCoordinate: "akira-tl/private-skill",
+          repositoryCoordinate: "akira-tl/git-skill",
           operation: "fetch",
           reason: "access-unavailable"
         }
       }
     }),
-    repositoryTransport: async () => {
-      restCalls += 1;
-      throw new Error("GitHub REST must not be used after Git transport failure");
-    },
-    transport: async () => {
-      restCalls += 1;
-      throw new Error("GitHub REST must not be used after Git transport failure");
-    }
+    repositoryTransport: verifiedRepositoryTransport("Akira-TL/Git-Skill"),
+    transport: gitAndSnapshotTransport({
+      requestedRef: "main",
+      exactCommit,
+      fixture,
+      seenPaths
+    })
   });
 
-  assert.deepEqual(binding, {
-    ok: false,
-    error: {
-      code: "GitHubSystemGitUnavailable",
-      facts: {
-        repositoryCoordinate: "akira-tl/private-skill",
-        operation: "fetch",
-        reason: "access-unavailable"
-      }
-    }
-  });
-  assert.equal(restCalls, 0);
+  assert.equal(binding.ok, true);
+  if (!binding.ok) {
+    return;
+  }
+  assert.equal(binding.value.sourceKind, "git");
+  assert.equal(binding.value.requestedRef, "main");
+  assert.equal(binding.value.exactCommit, exactCommit);
+  assert.equal(seenPaths.some((path) => path.includes("/releases")), false);
 });
 
 test("exact-source cache reuses only canonical repository plus exact commit and refetches corruption", async () => {
