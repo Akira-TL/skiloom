@@ -76,6 +76,13 @@ export type RebindDetachedProjectionInput = Readonly<{
   activationName: string;
 }>;
 
+export type PlanReboundDetachedProjectionStateInput = Readonly<{
+  targetRoot: string;
+  acceptedState: RegistryTargetStateInput;
+  packageCoordinate: string;
+  activationName: string;
+}>;
+
 export async function detachTargetProjection(
   input: DetachTargetProjectionInput
 ): Promise<Result<RegistryTargetState, DetachedLifecycleError>> {
@@ -302,6 +309,22 @@ export async function rebindDetachedProjection(
       "target-location-mismatch"
     );
   }
+
+  const planned = await planReboundDetachedProjectionState({
+    targetRoot: input.targetRoot,
+    acceptedState: input.acceptedState,
+    packageCoordinate: input.packageCoordinate,
+    activationName: input.activationName
+  });
+  if (!planned.ok) {
+    return planned;
+  }
+  return input.registry.replaceTargetState(planned.value);
+}
+
+export async function planReboundDetachedProjectionState(
+  input: PlanReboundDetachedProjectionStateInput
+): Promise<Result<RegistryTargetStateInput, InvalidLocalLifecycleInput>> {
   if (!isValidSkillName(input.activationName)) {
     return invalidLocal(
       input.packageCoordinate,
@@ -377,18 +400,20 @@ export async function rebindDetachedProjection(
     );
   }
 
-  const nextState: RegistryTargetStateInput = {
-    ...input.acceptedState,
-    projections: input.acceptedState.projections.map((candidate) =>
-      candidate.packageCoordinate === input.packageCoordinate
-        ? {
-            ...candidate,
-            activationName: input.activationName
-          }
-        : candidate
-    )
+  return {
+    ok: true,
+    value: {
+      ...input.acceptedState,
+      projections: input.acceptedState.projections.map((candidate) =>
+        candidate.packageCoordinate === input.packageCoordinate
+          ? {
+              ...candidate,
+              activationName: input.activationName
+            }
+          : candidate
+      )
+    }
   };
-  return input.registry.replaceTargetState(nextState);
 }
 
 function managedProjectionMatchesAccepted(

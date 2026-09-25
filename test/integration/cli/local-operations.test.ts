@@ -246,6 +246,92 @@ test("rebind requires a broken detached binding and forget rejects managed owner
   });
 });
 
+test("rebind updates managed reverse-dependent routing without touching detached bytes", async () => {
+  await withCliRuntime(async ({ home, cwd, target }) => {
+    const installed = await runCli(
+      ["install", "acme/app/app", "--yes", "--json"],
+      { home, cwd, mode: "shared-remove" }
+    );
+    assert.equal(installed.code, 0, installed.stderr || installed.stdout);
+
+    const detached = await runCli(
+      ["detach", "acme/shared/shared", "--json"],
+      { home, cwd }
+    );
+    assert.equal(detached.code, 0, detached.stderr || detached.stdout);
+
+    await writeFile(
+      join(target, "shared", "USER-NOTE"),
+      "rebound user bytes\n",
+      "utf8"
+    );
+    await renamePath(
+      join(target, "shared"),
+      join(target, "shared-local")
+    );
+
+    const rebound = await runCli(
+      [
+        "rebind",
+        "acme/shared/shared",
+        "shared-local",
+        "--json"
+      ],
+      { home, cwd }
+    );
+    assert.equal(rebound.code, 0, rebound.stderr || rebound.stdout);
+    const reboundOutput = parseLocalOutput(rebound.stdout);
+    assert.equal(reboundOutput.result.status, "rebound");
+    assert.equal(reboundOutput.result.generation, 3);
+
+    const status = await runCli(
+      ["status", "--json"],
+      { home, cwd }
+    );
+    assert.equal(status.code, 0, status.stderr || status.stdout);
+    const statusOutput = JSON.parse(status.stdout) as {
+      result: {
+        marker: {
+          managed: ReadonlyArray<{
+            packageCoordinate: string;
+            transformJson: string | null;
+          }>;
+        };
+      };
+    };
+    const app = statusOutput.result.marker.managed.find(
+      (entry) => entry.packageCoordinate === "acme/app/app"
+    );
+    assert.notEqual(app, undefined);
+    assert.match(
+      app?.transformJson ?? "",
+      /"toActivationName":"shared-local"/u
+    );
+    assert.match(
+      await readFile(join(target, "app", "SKILL.md"), "utf8"),
+      /SKILOOM-DEPENDENCY-ROUTING-V1/u
+    );
+    assert.equal(
+      await readFile(
+        join(target, "shared-local", "USER-NOTE"),
+        "utf8"
+      ),
+      "rebound user bytes\n"
+    );
+
+    const synced = await runCli(
+      ["sync", "--json"],
+      { home, cwd }
+    );
+    assert.equal(synced.code, 0, synced.stderr || synced.stdout);
+    const syncOutput = JSON.parse(synced.stdout) as {
+      result: { status: string; generation: number };
+    };
+    assert.equal(syncOutput.result.status, "no-op");
+    assert.equal(syncOutput.result.generation, 3);
+  });
+});
+
 test("explicit local operations reject ordinary candidate --yes flags", async () => {
   await withCliRuntime(async ({ home, cwd }) => {
     const cases = [
@@ -423,6 +509,7 @@ function runCli(
   options: Readonly<{
     home: string;
     cwd: string;
+    mode?: string;
   }>
 ): Promise<Readonly<{
   code: number | null;
@@ -440,7 +527,7 @@ function runCli(
           HOME: options.home,
           USERPROFILE: options.home,
           SKILOOM_LOCK_TEST_BINARY: LOCK_HELPER,
-          SKILOOM_TEST_GITHUB_MODE: "base"
+          SKILOOM_TEST_GITHUB_MODE: options.mode ?? "base"
         },
         stdio: ["ignore", "pipe", "pipe"]
       }
