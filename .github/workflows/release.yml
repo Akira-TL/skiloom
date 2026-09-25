@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate release metadata
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run verify:release-version -- "${GITHUB_REF_NAME}"
+
+  ci:
+    name: Release CI
+    needs: validate
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  publish:
+    name: Publish npm packages
+    needs: ci
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm run verify:release-version -- "${GITHUB_REF_NAME}"
+      - run: npm run build
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: skiloom-lock-*
+          path: artifacts
+          merge-multiple: true
+      - name: Pack main package
+        run: npm pack --pack-destination artifacts
+      - name: Verify release artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          for package in skiloom-lock-darwin-arm64 skiloom-lock-darwin-x64 skiloom-lock-linux-x64-gnu skiloom-lock-win32-x64; do
+            test -f "artifacts/${package}-${version}.tgz"
+          done
+          test -f "artifacts/skiloom-${version}.tgz"
+      - name: Publish helpers then main package
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+
+          publish_if_missing() {
+            package_name="$1"
+            tarball="$2"
+            if npm view "${package_name}@${version}" version >/dev/null 2>&1; then
+              echo "${package_name}@${version} already exists; skipping"
+              return
+            fi
+            npm publish "${tarball}" --access public --provenance
+          }
+
+          for package in skiloom-lock-darwin-arm64 skiloom-lock-darwin-x64 skiloom-lock-linux-x64-gnu skiloom-lock-win32-x64; do
+            publish_if_missing "${package}" "artifacts/${package}-${version}.tgz"
+          done
+
+          publish_if_missing "skiloom" "artifacts/skiloom-${version}.tgz"
+
+  registry-smoke:
+    name: Registry install (${{ matrix.target }})
+    needs: publish
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x64-gnu
+            os: ubuntu-24.04
+          - target: darwin-x64
+            os: macos-15-intel
+          - target: darwin-arm64
+            os: macos-15
+          - target: win32-x64
+            os: windows-2025
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: npm run verify:release-version -- "${{ github.ref_name }}"
+      - run: npm run test:registry-install

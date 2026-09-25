@@ -1,0 +1,21 @@
+{
+  "name": "skiloom-lock-darwin-arm64",
+  "version": "0.8.15",
+  "description": "Skiloom operation-lock helper for macOS arm64",
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "files": [
+    "bin/skiloom-lock"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Akira-TL/skiloom.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

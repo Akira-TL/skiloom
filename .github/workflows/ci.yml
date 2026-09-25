@@ -1,8 +1,7 @@
 name: CI
 
 on:
-  push:
-  pull_request:
+  workflow_call:
 
 permissions:
   contents: read
@@ -83,3 +82,45 @@ jobs:
         run: npm run test:machine-state
         env:
           SKILOOM_LOCK_TEST_BINARY: ${{ github.workspace }}/native/skiloom-lock/target/debug/skiloom-lock
+
+  package-install:
+    name: Packed install (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x64-gnu
+            os: ubuntu-24.04
+            binary: native/skiloom-lock/target/release/skiloom-lock
+          - target: darwin-x64
+            os: macos-15-intel
+            binary: native/skiloom-lock/target/release/skiloom-lock
+          - target: darwin-arm64
+            os: macos-15
+            binary: native/skiloom-lock/target/release/skiloom-lock
+          - target: win32-x64
+            os: windows-2025
+            binary: native/skiloom-lock/target/release/skiloom-lock.exe
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Rust 1.89.0
+        run: rustup toolchain install 1.89.0 --profile minimal
+      - name: Build release skiloom-lock
+        run: cargo +1.89.0 build --manifest-path native/skiloom-lock/Cargo.toml --locked --release
+      - name: Pack and install without Rust runtime dependency
+        run: npm run test:package-install
+        env:
+          SKILOOM_LOCK_PACKAGE_BINARY: ${{ github.workspace }}/${{ matrix.binary }}
+      - name: Pack helper artifact
+        run: npm run package:lock-helper -- ${{ matrix.target }} "${{ github.workspace }}/${{ matrix.binary }}" artifacts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: skiloom-lock-${{ matrix.target }}
+          path: artifacts/*.tgz
+          if-no-files-found: error

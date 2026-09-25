@@ -2,10 +2,20 @@
   "name": "skiloom",
   "version": "0.8.15",
   "description": "Agent Skill package manager and installer",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Akira-TL/skiloom.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "bin": {
     "skiloom": "./dist/cli/main.js"
   },
+  "files": [
+    "dist/"
+  ],
   "engines": {
     "node": ">=22"
   },
@@ -38,7 +48,11 @@
     "test:import-merge-locked": "npm run test:compile --silent && node --test .test-dist/test/integration/runtime/import/exact.test.js .test-dist/test/integration/runtime/import/merge.test.js",
     "test:reproduction-locked": "npm run test:compile --silent && node --test .test-dist/test/integration/runtime/export/dependencies.test.js .test-dist/test/integration/runtime/export/full.test.js .test-dist/test/integration/runtime/import/exact.test.js .test-dist/test/integration/runtime/import/merge.test.js .test-dist/test/integration/runtime/reproduction/e2e.test.js",
     "test:import-recovery-locked": "npm run test:compile --silent && node --test .test-dist/test/integration/runtime/export/dependencies.test.js .test-dist/test/integration/runtime/import/exact.test.js .test-dist/test/integration/runtime/import/merge.test.js .test-dist/test/integration/runtime/import/recovery/exact.test.js .test-dist/test/integration/runtime/import/recovery/merge.test.js",
-    "benchmark:exact-export": "npm run build --silent && node --expose-gc benchmarks/exact-export/run.mjs"
+    "benchmark:exact-export": "npm run build --silent && node --expose-gc benchmarks/exact-export/run.mjs",
+    "package:lock-helper": "node scripts/pack-lock-helper.mjs",
+    "test:package-install": "npm run build --silent && node scripts/test-package-install.mjs",
+    "test:registry-install": "node scripts/test-registry-install.mjs",
+    "verify:release-version": "node scripts/verify-release-version.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.20.3",
@@ -48,5 +62,11 @@
     "smol-toml": "^1.8.0",
     "unicode-case-folding": "^1.1.1",
     "yaml": "^2.9.1"
+  },
+  "optionalDependencies": {
+    "skiloom-lock-darwin-arm64": "0.8.15",
+    "skiloom-lock-darwin-x64": "0.8.15",
+    "skiloom-lock-linux-x64-gnu": "0.8.15",
+    "skiloom-lock-win32-x64": "0.8.15"
   }
 }

@@ -1,0 +1,21 @@
+{
+  "name": "skiloom-lock-win32-x64",
+  "version": "0.8.15",
+  "description": "Skiloom operation-lock helper for Windows x64",
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "files": [
+    "bin/skiloom-lock.exe"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Akira-TL/skiloom.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

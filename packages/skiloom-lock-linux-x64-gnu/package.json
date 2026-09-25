@@ -1,0 +1,22 @@
+{
+  "name": "skiloom-lock-linux-x64-gnu",
+  "version": "0.8.15",
+  "description": "Skiloom operation-lock helper for Linux x64 glibc",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "libc": "glibc",
+  "files": [
+    "bin/skiloom-lock"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Akira-TL/skiloom.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
