@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { delimiter, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import process from "node:process";
 
 const packageMetadata = JSON.parse(
@@ -14,6 +14,13 @@ if (typeof version !== "string" || version.length === 0) {
 }
 const packageSpec = `skiloom@${version}`;
 const helperSpec = `${currentHelperPackage()}@${version}`;
+const npmExecPath = process.env.npm_execpath;
+if (npmExecPath === undefined || npmExecPath.length === 0) {
+  throw new Error("registry install smoke must run through npm run");
+}
+const npmCli = resolve(npmExecPath);
+const npxCli = join(dirname(npmCli), "npx-cli.js");
+await Promise.all([access(npmCli), access(npxCli)]);
 
 const root = await mkdtemp(join(tmpdir(), "skiloom-registry-install-"));
 const prefix = join(root, "global");
@@ -35,9 +42,8 @@ try {
     waitForPublishedPackage(helperSpec)
   ]);
 
-  await runCommand(
-    npmCommand(),
-    npmArgs([
+  await runNpm(
+    [
       "install",
       "--global",
       "--prefix",
@@ -45,7 +51,7 @@ try {
       "--no-audit",
       "--no-fund",
       packageSpec
-    ]),
+    ],
     process.env
   );
 
@@ -62,8 +68,7 @@ try {
   );
   assertLockedCommandReachedTargetState(globalResult, globalTarget);
 
-  const npxResult = await runCommand(
-    npxCommand(),
+  const npxResult = await runNpx(
     [
       "--yes",
       packageSpec,
@@ -98,9 +103,8 @@ async function waitForPublishedPackage(packageSpec) {
   let lastError;
   for (let attempt = 0; attempt < 12; attempt += 1) {
     try {
-      await runCommand(
-        npmCommand(),
-        npmArgs(["view", packageSpec, "version"]),
+      await runNpm(
+        ["view", packageSpec, "version"],
         process.env
       );
       return;
@@ -150,16 +154,12 @@ function currentHelperPackage() {
   );
 }
 
-function npmCommand() {
-  return process.platform === "win32" ? "npm.cmd" : "npm";
+function runNpm(args, env) {
+  return runCommand(process.execPath, [npmCli, ...args], env);
 }
 
-function npxCommand() {
-  return process.platform === "win32" ? "npx.cmd" : "npx";
-}
-
-function npmArgs(args) {
-  return args;
+function runNpx(args, env) {
+  return runCommand(process.execPath, [npxCli, ...args], env);
 }
 
 function runCommand(command, args, env) {

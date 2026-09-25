@@ -10,7 +10,10 @@ const PLATFORM_PACKAGES = [
 ];
 
 const tag = process.argv[2] ?? process.env.GITHUB_REF_NAME;
-if (tag === undefined || !/^v\d+\.\d+\.\d+$/.test(tag)) {
+if (
+  tag === undefined ||
+  !/^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/.test(tag)
+) {
   throw new Error(
     "release tag must match vX.Y.Z with numeric stable components"
   );
