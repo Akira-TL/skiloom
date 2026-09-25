@@ -92,7 +92,7 @@ jobs:
         include:
           - target: linux-x64-gnu
             os: ubuntu-24.04
-            binary: native/skiloom-lock/target/release/skiloom-lock
+            binary: native/skiloom-lock/target/manylinux2014/release/skiloom-lock
           - target: darwin-x64
             os: macos-15-intel
             binary: native/skiloom-lock/target/release/skiloom-lock
@@ -111,7 +111,11 @@ jobs:
       - run: npm ci
       - name: Install Rust 1.89.0
         run: rustup toolchain install 1.89.0 --profile minimal
-      - name: Build release skiloom-lock
+      - name: Build release skiloom-lock on glibc 2.17 baseline
+        if: matrix.target == 'linux-x64-gnu'
+        run: npm run build:lock-helper:linux
+      - name: Build release skiloom-lock natively
+        if: matrix.target != 'linux-x64-gnu'
         run: cargo +1.89.0 build --manifest-path native/skiloom-lock/Cargo.toml --locked --release
       - name: Pack and install without Rust runtime dependency
         run: npm run test:package-install

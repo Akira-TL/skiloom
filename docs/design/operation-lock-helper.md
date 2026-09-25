@@ -258,12 +258,14 @@ v0 release readiness 固定首发支持矩阵如下；这些 package 只是主 `
 
 | Target | npm package | npm platform metadata | executable |
 | --- | --- | --- | --- |
-| Linux x64 glibc | `skiloom-lock-linux-x64-gnu` | `os=linux`, `cpu=x64`, `libc=glibc` | `bin/skiloom-lock` |
+| Linux x64 glibc 2.17+ | `skiloom-lock-linux-x64-gnu` | `os=linux`, `cpu=x64`, `libc=glibc` | `bin/skiloom-lock` |
 | macOS x64 | `skiloom-lock-darwin-x64` | `os=darwin`, `cpu=x64` | `bin/skiloom-lock` |
 | macOS arm64 | `skiloom-lock-darwin-arm64` | `os=darwin`, `cpu=arm64` | `bin/skiloom-lock` |
 | Windows x64 | `skiloom-lock-win32-x64` | `os=win32`, `cpu=x64` | `bin/skiloom-lock.exe` |
 
 四个 helper package 与主 `skiloom` package 使用同一版本号并由同一 release tag 构建。主 package 通过 `optionalDependencies` 同时声明四个精确版本，让 npm 根据 `os` / `cpu` / `libc` 只安装匹配项；“optional”只描述 npm 的平台选择机制，不改变 `operation.lock` 在产品层的 mandatory 语义。
+
+Linux x64 GNU ABI 发行物必须按 Rust `x86_64-unknown-linux-gnu` 的 Tier 1 基线保持 glibc 2.17+ 可运行。Release CI 不允许直接在较新的 Ubuntu runner 上链接最终 Linux helper；它使用固定 digest 的 manylinux2014（glibc 2.17）构建环境，并在打包前审计 ELF 导入的 `GLIBC_*` 符号版本，最高版本不得超过 2.17。这样 npm 的 `libc=glibc` 只负责 libc 家族选择，实际 binary compatibility 不依赖 runner 当前安装的更高 glibc。
 
 v0 首发矩阵暂不承诺 Linux arm64、Linux musl、Windows arm64 或其他 OS/CPU/libc 组合。运行在矩阵之外、使用 `--omit=optional`、或安装损坏导致匹配 helper 缺失时，状态型操作继续 fail closed。后续扩大矩阵必须增加对应预编译 package、真实 runner smoke 和 release artifact 验证，不能只放宽运行时判断。
 
