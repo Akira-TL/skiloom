@@ -9,9 +9,60 @@ import {
 } from "../../../../src/domain/resolver/candidates.js";
 import {
   acquirePublishedGitHubReleaseFacts,
+  acquirePublishedGitHubReleaseMetadata,
   createGitHubJsonFetchTransport,
   type GitHubJsonTransport
 } from "../../../../src/runtime/source/github/index.js";
+
+test("published GitHub Release metadata excludes drafts without resolving tags", async () => {
+  const seenPaths: string[] = [];
+  const result = await acquirePublishedGitHubReleaseMetadata({
+    repository: repository("Akira-TL/Skiloom"),
+    transport: async (request) => {
+      seenPaths.push(withQuery(request.path, request.query));
+      if (!request.path.endsWith("/releases")) {
+        throw new Error("metadata-only Release acquisition must not resolve Git refs");
+      }
+      const page = Number(request.query?.page ?? "1");
+      return {
+        status: 200,
+        body:
+          page === 1
+            ? [
+                release("v2.0.0", false),
+                {
+                  tag_name: "v9.0.0",
+                  draft: true,
+                  immutable: false,
+                  target_commitish: "ignored"
+                },
+                release("v1.0.0", true)
+              ]
+            : []
+      };
+    }
+  });
+
+  assert.deepEqual(result, {
+    ok: true,
+    value: [
+      {
+        actualTag: "v1.0.0",
+        draft: false,
+        immutable: true
+      },
+      {
+        actualTag: "v2.0.0",
+        draft: false,
+        immutable: false
+      }
+    ]
+  });
+  assert.equal(
+    seenPaths.every((path) => path.includes("/releases?")),
+    true
+  );
+});
 
 test("published GitHub Releases resolve actual tags to exact commits and ignore target_commitish", async () => {
   const seenPaths: string[] = [];

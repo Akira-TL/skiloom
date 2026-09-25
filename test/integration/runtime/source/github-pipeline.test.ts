@@ -138,6 +138,142 @@ include = ["skills/*"]
   ]);
 });
 
+test("Release source uses REST only for published metadata and system Git for tag plus snapshot", async () => {
+  const repository = repositoryCoordinate("Akira-TL/Release-Skill");
+  const exactCommit = "8".repeat(40);
+  const seenRestPaths: string[] = [];
+  const seenGitRefs: string[] = [];
+  const secret = "release-api-token-must-not-enter-git";
+
+  const source = await acquireGitHubReleaseRepositorySource({
+    repository,
+    credential: secret,
+    repositoryTransport: verifiedRepositoryTransport("Akira-TL/Release-Skill"),
+    transport: async (request) => {
+      seenRestPaths.push(request.path);
+      assert.equal(request.credential, secret);
+      if (!request.path.endsWith("/releases")) {
+        throw new Error("Release REST must stop after metadata selection");
+      }
+      return {
+        status: 200,
+        body:
+          request.query?.page === "1"
+            ? [
+                {
+                  tag_name: "v1.0.0",
+                  draft: false,
+                  immutable: true,
+                  target_commitish: "must-not-be-used"
+                }
+              ]
+            : []
+      };
+    },
+    gitTransport: async (input) => {
+      assert.equal("credential" in input, false);
+      seenGitRefs.push(input.requestedRef);
+      return {
+        ok: true,
+        value: {
+          repository: input.repository,
+          exactCommit,
+          entries: [
+            {
+              pathBytes: new TextEncoder().encode("SKILL.md"),
+              fileType: "regular",
+              gitMode: "100644",
+              content: new TextEncoder().encode(
+                skill("release-skill", "Release via system Git.")
+              )
+            }
+          ]
+        }
+      };
+    }
+  });
+
+  assert.equal(source.ok, true);
+  if (!source.ok) {
+    return;
+  }
+  assert.deepEqual(seenGitRefs, ["v1.0.0"]);
+  assert.equal(
+    seenRestPaths.every((path) => path.endsWith("/releases")),
+    true
+  );
+  assert.deepEqual(
+    source.value.releases.map((release) => ({
+      actualTag: release.actualTag,
+      exactCommit: release.exactCommit,
+      immutable: release.immutable,
+      packages: release.snapshot.packages.map(
+        (entry) => entry.coordinate.canonical
+      )
+    })),
+    [
+      {
+        actualTag: "v1.0.0",
+        exactCommit,
+        immutable: true,
+        packages: ["akira-tl/release-skill/release-skill"]
+      }
+    ]
+  );
+});
+
+test("Release system Git failure may fall back to REST without changing Release provenance", async () => {
+  const repository = repositoryCoordinate("Akira-TL/Skills");
+  const exactCommit = "7".repeat(40);
+  const fixture = repositoryFixture({
+    exactCommit,
+    files: {
+      "SKILL.md": skill("skills", "Release REST compatibility fallback.")
+    }
+  });
+  const source = await acquireGitHubReleaseRepositorySource({
+    repository,
+    repositoryTransport: verifiedRepositoryTransport("Akira-TL/Skills"),
+    transport: releaseAndSnapshotTransport({
+      actualTag: "v1.0.0",
+      exactCommit,
+      fixture
+    }),
+    gitTransport: async () => ({
+      ok: false,
+      error: {
+        code: "GitHubSystemGitUnavailable",
+        facts: {
+          repositoryCoordinate: "akira-tl/skills",
+          operation: "fetch",
+          reason: "access-unavailable"
+        }
+      }
+    })
+  });
+
+  assert.equal(source.ok, true);
+  if (!source.ok) {
+    return;
+  }
+  const resolved = resolveTargetGraph({
+    directRequirements: [
+      {
+        kind: "repository",
+        coordinate: repository,
+        sourceKind: "github-release"
+      }
+    ],
+    releaseSources: [source.value],
+    gitBindings: []
+  });
+  assert.equal(resolved.ok, true);
+  if (resolved.ok) {
+    assert.equal(resolved.value.sourceBindings[0]?.sourceKind, "github-release");
+    assert.equal(resolved.value.sourceBindings[0]?.exactCommit, exactCommit);
+  }
+});
+
 test("explicit Git source is acquired as an exact snapshot without Release fallback", async () => {
   const repository = repositoryCoordinate("Akira-TL/Git-Skill");
   const exactCommit = "2".repeat(40);

@@ -1,10 +1,40 @@
+import {
+  chmodSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { delimiter, join } from "node:path";
+
 const originalFetch = globalThis.fetch;
+
+installFailFastGitFixture();
 
 const mode = process.env.SKILOOM_TEST_GITHUB_MODE ?? "base";
 const expectedBearer =
   process.env.SKILOOM_TEST_EXPECT_GITHUB_BEARER;
 const forbidAuthorization =
   process.env.SKILOOM_TEST_FORBID_GITHUB_AUTH === "1";
+
+function installFailFastGitFixture() {
+  if (process.env.SKILOOM_TEST_USE_REAL_SYSTEM_GIT === "1") {
+    return;
+  }
+
+  const root = mkdtempSync(join(tmpdir(), "skiloom-cli-fake-git-"));
+  if (process.platform === "win32") {
+    writeFileSync(join(root, "git.cmd"), "@exit /b 1\r\n", "utf8");
+  } else {
+    const executable = join(root, "git");
+    writeFileSync(executable, "#!/bin/sh\nexit 1\n", "utf8");
+    chmodSync(executable, 0o755);
+  }
+  process.env.PATH = root + delimiter + (process.env.PATH ?? "");
+  process.once("exit", () => {
+    rmSync(root, { recursive: true, force: true });
+  });
+}
 
 function commit(seed) {
   return seed.repeat(40).slice(0, 40);
@@ -287,6 +317,15 @@ globalThis.fetch = async (input, init) => {
     return json({ message: "missing fixture" }, 404);
   }
   const suffix = match[3] ?? "";
+  if (
+    mode === "release-metadata-only" &&
+    suffix !== "" &&
+    suffix !== "/releases"
+  ) {
+    throw new Error(
+      "Release content/ref REST access forbidden by test fixture"
+    );
+  }
   if (
     mode === "exact-only" &&
     (

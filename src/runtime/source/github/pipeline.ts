@@ -35,7 +35,9 @@ import {
 } from "./git-ref.js";
 import {
   acquirePublishedGitHubReleaseFacts,
-  type AcquirePublishedGitHubReleaseFactsError
+  acquirePublishedGitHubReleaseMetadata,
+  type AcquirePublishedGitHubReleaseFactsError,
+  type AcquirePublishedGitHubReleaseMetadataError
 } from "./release.js";
 import {
   verifyGitHubRepository,
@@ -53,6 +55,7 @@ import {
 } from "./snapshot.js";
 import type { GitHubJsonTransport } from "./transport.js";
 import type {
+  AcquireGitRepositorySnapshotWithSystemGitError,
   GitHubSystemGitSnapshotTransport,
   GitHubSystemGitUnavailable
 } from "./system-git/index.js";
@@ -105,7 +108,9 @@ export type AcquireGitHubReleaseRepositorySourceInput =
 export type AcquireGitHubReleaseRepositorySourceError =
   | VerifyGitHubRepositoryError
   | AcquirePublishedGitHubReleaseFactsError
+  | AcquirePublishedGitHubReleaseMetadataError
   | AcquireExactGitHubRepositorySnapshotError
+  | AcquireGitRepositorySnapshotWithSystemGitError
   | BuildGitHubResolverRepositorySnapshotError;
 
 export type AcquireGitHubGitBindingInput =
@@ -144,40 +149,91 @@ export async function acquireGitHubReleaseRepositorySource(
     return verified;
   }
 
-  const releases = await acquirePublishedGitHubReleaseFacts({
-    repository: verified.value.repository,
-    transport: input.transport,
-    ...(input.credential === undefined
-      ? {}
-      : { credential: input.credential }),
-    ...(input.signal === undefined
-      ? {}
-      : { signal: input.signal })
-  });
-  if (!releases.ok) {
-    return releases;
+  const resolvedReleases: FixedReleaseRepositorySource["releases"][number][] = [];
+  let gitTransportUnavailable = false;
+
+  if (input.gitTransport !== undefined) {
+    const metadata = await acquirePublishedGitHubReleaseMetadata({
+      repository: verified.value.repository,
+      transport: input.transport,
+      ...(input.credential === undefined
+        ? {}
+        : { credential: input.credential }),
+      ...(input.signal === undefined
+        ? {}
+        : { signal: input.signal })
+    });
+    if (!metadata.ok) {
+      return metadata;
+    }
+
+    for (const release of metadata.value) {
+      const acquired = await input.gitTransport({
+        repository: verified.value.repository,
+        requestedRef: release.actualTag,
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
+        ...(input.sourceCachePath === undefined
+          ? {}
+          : { sourceCachePath: input.sourceCachePath })
+      });
+      if (!acquired.ok) {
+        if (
+          acquired.error.code === "GitHubSystemGitUnavailable" &&
+          acquired.error.facts.reason !== "aborted"
+        ) {
+          gitTransportUnavailable = true;
+          resolvedReleases.length = 0;
+          break;
+        }
+        return acquired;
+      }
+      const snapshot = buildGitHubResolverRepositorySnapshot(acquired.value);
+      if (!snapshot.ok) {
+        return snapshot;
+      }
+      resolvedReleases.push({
+        ...release,
+        exactCommit: acquired.value.exactCommit,
+        snapshot: snapshot.value
+      });
+    }
   }
 
-  const resolvedReleases: FixedReleaseRepositorySource["releases"][number][] = [];
-  for (const release of releases.value) {
-    const acquired = await acquireRepositorySnapshot(
-      input,
-      verified.value.repository,
-      release.exactCommit
-    );
-    if (!acquired.ok) {
-      return acquired;
-    }
-
-    const snapshot = buildGitHubResolverRepositorySnapshot(acquired.value);
-    if (!snapshot.ok) {
-      return snapshot;
-    }
-
-    resolvedReleases.push({
-      ...release,
-      snapshot: snapshot.value
+  if (input.gitTransport === undefined || gitTransportUnavailable) {
+    const releases = await acquirePublishedGitHubReleaseFacts({
+      repository: verified.value.repository,
+      transport: input.transport,
+      ...(input.credential === undefined
+        ? {}
+        : { credential: input.credential }),
+      ...(input.signal === undefined
+        ? {}
+        : { signal: input.signal })
     });
+    if (!releases.ok) {
+      return releases;
+    }
+
+    for (const release of releases.value) {
+      const acquired = await acquireRepositorySnapshot(
+        input,
+        verified.value.repository,
+        release.exactCommit
+      );
+      if (!acquired.ok) {
+        return acquired;
+      }
+
+      const snapshot = buildGitHubResolverRepositorySnapshot(acquired.value);
+      if (!snapshot.ok) {
+        return snapshot;
+      }
+
+      resolvedReleases.push({
+        ...release,
+        snapshot: snapshot.value
+      });
+    }
   }
 
   return {

@@ -86,6 +86,37 @@ test("explicit Git package install uses system Git with zero GitHub REST request
   });
 });
 
+test("GitHub Release install uses REST metadata and system Git for tag plus snapshot", async () => {
+  await withReleaseGitCliRuntime(async ({ home, cwd, target }) => {
+    const result = await runCli(
+      [
+        "install",
+        "acme/app/app",
+        "--target",
+        target,
+        "--yes",
+        "--non-interactive",
+        "--json"
+      ],
+      { home, cwd, mode: "release-metadata-only" }
+    );
+
+    assert.equal(result.code, 0, result.stderr || result.stdout);
+    const output = JSON.parse(result.stdout) as InstallEnvelope;
+    assert.equal(output.ok, true);
+    assert.equal(output.result.sources[0]?.sourceKind, "github-release");
+    assert.equal(output.result.sources[0]?.actualTag, "v1.0.0");
+    assert.match(
+      output.result.sources[0]?.exactCommit ?? "",
+      /^[0-9a-f]{40}$/u
+    );
+    assert.match(
+      await readFile(join(target, "app", "SKILL.md"), "utf8"),
+      /Release content from system Git\./u
+    );
+  });
+});
+
 test("explicit Git repository-wide install uses the same exact Git snapshot with zero GitHub REST requests", async () => {
   await withGitCliRuntime(async ({ home, cwd, target }) => {
     const result = await runCli(
@@ -136,6 +167,7 @@ type InstallEnvelope = Readonly<{
       repositoryCoordinate: string;
       sourceKind: string;
       requestedRef?: string;
+      actualTag?: string;
       exactCommit?: string;
     }>>;
     packages: ReadonlyArray<Readonly<{
@@ -182,6 +214,61 @@ async function withGitCliRuntime(
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+}
+
+async function withReleaseGitCliRuntime(
+  run: (input: Readonly<{
+    home: string;
+    cwd: string;
+    target: string;
+  }>) => Promise<void>
+): Promise<void> {
+  const root = await mkdtemp(join(tmpdir(), "skiloom-cli-release-git-"));
+  const home = join(root, "home");
+  const cwd = join(root, "workspace");
+  const repository = join(root, "app");
+  const target = join(cwd, ".agents", "skills");
+  await Promise.all([
+    mkdir(home, { recursive: true }),
+    mkdir(cwd, { recursive: true }),
+    mkdir(repository, { recursive: true })
+  ]);
+
+  try {
+    await createAppReleaseRepository(repository);
+    await writeFile(
+      join(home, ".gitconfig"),
+      [
+        '[url "' + pathToFileURL(repository).href + '"]',
+        "    insteadOf = git@github.com:acme/app.git",
+        ""
+      ].join("\n"),
+      "utf8"
+    );
+    await run({ home, cwd, target });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
+
+async function createAppReleaseRepository(repository: string): Promise<void> {
+  await git(["init", "-b", "main"], repository);
+  await git(["config", "user.name", "Skiloom Test"], repository);
+  await git(["config", "user.email", "skiloom@example.invalid"], repository);
+  await writeFile(
+    join(repository, "SKILL.md"),
+    [
+      "---",
+      "name: app",
+      "description: Release content from system Git.",
+      "---",
+      ""
+    ].join("\n"),
+    "utf8"
+  );
+  await git(["add", "."], repository);
+  await git(["commit", "-m", "release fixture"], repository);
+  await git(["tag", "v1.0.0"], repository);
 }
 
 async function createSuiteRepository(repository: string): Promise<void> {
@@ -240,7 +327,7 @@ async function createSuiteRepository(repository: string): Promise<void> {
 
 function runCli(
   args: ReadonlyArray<string>,
-  options: Readonly<{ home: string; cwd: string }>
+  options: Readonly<{ home: string; cwd: string; mode?: string }>
 ): Promise<Readonly<{
   code: number | null;
   stdout: string;
@@ -257,7 +344,8 @@ function runCli(
           HOME: options.home,
           USERPROFILE: options.home,
           SKILOOM_LOCK_TEST_BINARY: LOCK_HELPER,
-          SKILOOM_TEST_GITHUB_MODE: "forbid-network"
+          SKILOOM_TEST_GITHUB_MODE: options.mode ?? "forbid-network",
+          SKILOOM_TEST_USE_REAL_SYSTEM_GIT: "1"
         },
         stdio: ["ignore", "pipe", "pipe"],
         windowsHide: true

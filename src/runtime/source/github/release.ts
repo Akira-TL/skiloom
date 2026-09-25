@@ -25,6 +25,12 @@ export type GitHubPublishedReleaseFact = Omit<
   "snapshot"
 >;
 
+export type GitHubPublishedReleaseMetadata = Readonly<{
+  actualTag: string;
+  draft: false;
+  immutable: boolean;
+}>;
+
 export type InvalidGitHubReleaseResponse = ProductError<
   "InvalidGitHubReleaseResponse",
   Readonly<{
@@ -49,13 +55,16 @@ export type GitHubReleaseTransportUnavailable = ProductError<
   }>
 >;
 
-export type AcquirePublishedGitHubReleaseFactsError =
+export type AcquirePublishedGitHubReleaseMetadataError =
   | SourceAccessUnavailable
   | InvalidGitHubReleaseResponse
-  | InvalidGitHubCommitResponse
   | GitHubReleaseTransportUnavailable
   | GitHubRateLimited
   | GitHubTransportAborted;
+
+export type AcquirePublishedGitHubReleaseFactsError =
+  | AcquirePublishedGitHubReleaseMetadataError
+  | InvalidGitHubCommitResponse;
 
 export type AcquirePublishedGitHubReleaseFactsInput = Readonly<{
   repository: RepositoryCoordinate;
@@ -63,6 +72,60 @@ export type AcquirePublishedGitHubReleaseFactsInput = Readonly<{
   signal?: AbortSignal;
   transport: GitHubJsonTransport;
 }>;
+
+export async function acquirePublishedGitHubReleaseMetadata(
+  input: AcquirePublishedGitHubReleaseFactsInput
+): Promise<
+  Result<
+    ReadonlyArray<GitHubPublishedReleaseMetadata>,
+    AcquirePublishedGitHubReleaseMetadataError
+  >
+> {
+  const metadata: GitHubPublishedReleaseMetadata[] = [];
+
+  for (let page = 1; page <= MAX_RELEASE_PAGES; page += 1) {
+    const response = await requestJson(
+      input,
+      {
+        path: repositoryPath(input.repository) + "/releases",
+        query: {
+          per_page: RELEASE_PAGE_SIZE,
+          page: String(page)
+        }
+      },
+      "list-releases"
+    );
+    if (!response.ok) {
+      return response;
+    }
+    if (!Array.isArray(response.value.body)) {
+      return invalidReleaseResponse(input.repository);
+    }
+    if (response.value.body.length === 0) {
+      metadata.sort((left, right) =>
+        compareUtf8(left.actualTag, right.actualTag)
+      );
+      return { ok: true, value: metadata };
+    }
+
+    for (const release of response.value.body) {
+      const parsed = parseReleaseRecord(release);
+      if (parsed === undefined) {
+        return invalidReleaseResponse(input.repository);
+      }
+      if (parsed.draft) {
+        continue;
+      }
+      metadata.push({
+        actualTag: parsed.actualTag,
+        draft: false,
+        immutable: parsed.immutable
+      });
+    }
+  }
+
+  return invalidReleaseResponse(input.repository);
+}
 
 export async function acquirePublishedGitHubReleaseFacts(
   input: AcquirePublishedGitHubReleaseFactsInput

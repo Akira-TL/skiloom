@@ -28,9 +28,12 @@ export {
 
 export {
   acquirePublishedGitHubReleaseFacts,
+  acquirePublishedGitHubReleaseMetadata,
   type AcquirePublishedGitHubReleaseFactsError,
   type AcquirePublishedGitHubReleaseFactsInput,
+  type AcquirePublishedGitHubReleaseMetadataError,
   type GitHubPublishedReleaseFact,
+  type GitHubPublishedReleaseMetadata,
   type GitHubReleaseTransportUnavailable,
   type InvalidGitHubCommitResponse,
   type InvalidGitHubReleaseResponse
