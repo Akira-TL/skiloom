@@ -38,6 +38,11 @@ export type ForgetDetachedProjectionInput = Readonly<{
   packageCoordinate: string;
 }>;
 
+export type PlanForgottenDetachedProjectionStateInput = Readonly<{
+  acceptedState: RegistryTargetStateInput;
+  packageCoordinate: string;
+}>;
+
 export type PruneUnreachableDetachedBindingsInput = Readonly<{
   lock: OperationLockSession;
   registry: MachineRegistry;
@@ -48,24 +53,66 @@ export type PruneUnreachableDetachedBindingsInput = Readonly<{
 export async function forgetDetachedProjection(
   input: ForgetDetachedProjectionInput
 ): Promise<Result<RegistryTargetState, DetachedBindingError>> {
-  const validated = validateDetachedBinding(input);
-  if (!validated.ok) {
-    return validated;
+  const accepted = validateAcceptedState(input);
+  if (!accepted.ok) {
+    return accepted;
+  }
+  const planned = planForgottenDetachedProjectionState({
+    acceptedState: input.acceptedState,
+    packageCoordinate: input.packageCoordinate
+  });
+  if (!planned.ok) {
+    return planned;
   }
 
-  const nextState: RegistryTargetStateInput = {
-    ...input.acceptedState,
-    projections: input.acceptedState.projections.filter(
-      (projection) =>
-        projection.packageCoordinate !== input.packageCoordinate
-    ),
-    detachedBaselines: input.acceptedState.detachedBaselines.filter(
-      (baseline) =>
-        baseline.packageCoordinate !== input.packageCoordinate
-    )
-  };
+  return input.registry.replaceTargetState(planned.value);
+}
 
-  return input.registry.replaceTargetState(nextState);
+export function planForgottenDetachedProjectionState(
+  input: PlanForgottenDetachedProjectionStateInput
+): Result<RegistryTargetStateInput, InvalidDetachedBindingInput> {
+  const projection = input.acceptedState.projections.find(
+    (candidate) =>
+      candidate.packageCoordinate === input.packageCoordinate
+  );
+  if (projection === undefined) {
+    return invalidDetached(
+      input.packageCoordinate,
+      "projection-not-found"
+    );
+  }
+  if (projection.ownership !== "detached") {
+    return invalidDetached(
+      input.packageCoordinate,
+      "projection-not-detached"
+    );
+  }
+  if (
+    !input.acceptedState.detachedBaselines.some(
+      (baseline) =>
+        baseline.packageCoordinate === input.packageCoordinate
+    )
+  ) {
+    return invalidDetached(
+      input.packageCoordinate,
+      "detached-baseline-missing"
+    );
+  }
+
+  return {
+    ok: true,
+    value: {
+      ...input.acceptedState,
+      projections: input.acceptedState.projections.filter(
+        (candidate) =>
+          candidate.packageCoordinate !== input.packageCoordinate
+      ),
+      detachedBaselines: input.acceptedState.detachedBaselines.filter(
+        (baseline) =>
+          baseline.packageCoordinate !== input.packageCoordinate
+      )
+    }
+  };
 }
 
 export async function pruneUnreachableDetachedBindings(
@@ -104,45 +151,6 @@ export async function pruneUnreachableDetachedBindings(
   };
 
   return input.registry.replaceTargetState(nextState);
-}
-
-function validateDetachedBinding(
-  input: ForgetDetachedProjectionInput
-): Result<true, InvalidDetachedBindingInput | OperationLockLost> {
-  const accepted = validateAcceptedState(input);
-  if (!accepted.ok) {
-    return accepted;
-  }
-
-  const projection = input.acceptedState.projections.find(
-    (candidate) =>
-      candidate.packageCoordinate === input.packageCoordinate
-  );
-  if (projection === undefined) {
-    return invalidDetached(
-      input.packageCoordinate,
-      "projection-not-found"
-    );
-  }
-  if (projection.ownership !== "detached") {
-    return invalidDetached(
-      input.packageCoordinate,
-      "projection-not-detached"
-    );
-  }
-  if (
-    !input.acceptedState.detachedBaselines.some(
-      (baseline) =>
-        baseline.packageCoordinate === input.packageCoordinate
-    )
-  ) {
-    return invalidDetached(
-      input.packageCoordinate,
-      "detached-baseline-missing"
-    );
-  }
-
-  return { ok: true, value: true };
 }
 
 function validateAcceptedState(input: Readonly<{

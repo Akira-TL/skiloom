@@ -105,8 +105,11 @@ export function acceptedTargetPlan(
       planned === undefined ||
       planned.activationName !==
         projection.activationName ||
-      projectionTransformJson(planned) !==
-        projection.transformJson
+      (
+        projection.ownership === "managed" &&
+        projectionTransformJson(planned) !==
+          projection.transformJson
+      )
     ) {
       return conflict(
         state.targetId,

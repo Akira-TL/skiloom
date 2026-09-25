@@ -137,6 +137,107 @@ test("sync repair and doctor replay forgotten projection absence without adoptin
   });
 });
 
+test("sync accepts a forgotten renamed dependency projection", async () => {
+  await withCliRuntime(async ({ home, cwd, target }) => {
+    for (const args of [
+      ["install", "acme/app/app", "--yes", "--json"],
+      ["rename", "acme/shared/shared", "shared-local", "--json"],
+      ["detach", "acme/shared/shared", "--json"]
+    ]) {
+      const result = await runCli(args, {
+        home,
+        cwd,
+        mode: args[0] === "install"
+          ? "shared-remove"
+          : "forbid-network"
+      });
+      assert.equal(result.code, 0, result.stderr || result.stdout);
+    }
+
+    await writeFile(
+      join(target, "shared-local", "USER-NOTE"),
+      "forgotten renamed dependency bytes\n",
+      "utf8"
+    );
+
+    const forgotten = await runCli(
+      ["forget", "acme/shared/shared", "--json"],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(forgotten.code, 0, forgotten.stderr || forgotten.stdout);
+
+    const status = await runCli(
+      ["status", "--json"],
+      { home, cwd, mode: "forbid-network" }
+    );
+    assert.equal(status.code, 0, status.stderr || status.stdout);
+    const statusOutput = JSON.parse(status.stdout) as {
+      result: {
+        marker: {
+          generation: number;
+          managed: ReadonlyArray<{
+            packageCoordinate: string;
+            transformJson: string | null;
+          }>;
+          detached: ReadonlyArray<unknown>;
+        };
+        registry: {
+          generation: number;
+          projections: number;
+          detached: number;
+        };
+      };
+    };
+    assert.equal(statusOutput.result.marker.generation, 4);
+    assert.equal(statusOutput.result.marker.managed.length, 1);
+    assert.equal(
+      statusOutput.result.marker.managed[0]?.packageCoordinate,
+      "acme/app/app"
+    );
+    assert.equal(
+      statusOutput.result.marker.managed[0]?.transformJson,
+      null
+    );
+    assert.deepEqual(statusOutput.result.marker.detached, []);
+    assert.equal(statusOutput.result.registry.generation, 4);
+    assert.equal(statusOutput.result.registry.projections, 1);
+    assert.equal(statusOutput.result.registry.detached, 0);
+    assert.doesNotMatch(
+      await readFile(join(target, "app", "SKILL.md"), "utf8"),
+      /SKILOOM-DEPENDENCY-ROUTING-V1/u
+    );
+    assert.equal(
+      await readFile(
+        join(target, "shared-local", "USER-NOTE"),
+        "utf8"
+      ),
+      "forgotten renamed dependency bytes\n"
+    );
+
+    for (const command of ["sync", "repair"] as const) {
+      const maintained = await runCli(
+        [command, "--json"],
+        { home, cwd, mode: "forbid-network" }
+      );
+      assert.equal(
+        maintained.code,
+        0,
+        maintained.stderr || maintained.stdout
+      );
+      const output = JSON.parse(maintained.stdout) as {
+        ok: boolean;
+        result: {
+          status: string;
+          generation: number;
+        };
+      };
+      assert.equal(output.ok, true);
+      assert.equal(output.result.status, "no-op");
+      assert.equal(output.result.generation, 4);
+    }
+  });
+});
+
 test("requirement add preserves forgotten projection absence and user bytes", async () => {
   await withCliRuntime(async ({ home, cwd, target }) => {
     assert.equal(

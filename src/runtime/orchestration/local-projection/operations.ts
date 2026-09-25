@@ -31,7 +31,7 @@ import {
   verifyManagedProjection
 } from "../../target-projection/index.js";
 import {
-  forgetDetachedProjection
+  planForgottenDetachedProjectionState
 } from "../detached-binding.js";
 import {
   detachTargetProjection,
@@ -43,6 +43,8 @@ import {
   projectionTransformJson
 } from "../lifecycle/apply.js";
 import {
+  preserveAcceptedProjectionAbsence,
+  projectionRenames,
   requestedRenames
 } from "../lifecycle/projection/plan.js";
 import {
@@ -115,7 +117,10 @@ export type RebindAcceptedProjectionInput =
   }>;
 
 export type ForgetAcceptedProjectionInput =
-  LocalProjectionBaseInput;
+  LocalProjectionBaseInput &
+  Readonly<{
+    createOperationId?: () => string;
+  }>;
 
 export async function renameAcceptedProjection(
   input: RenameAcceptedProjectionInput
@@ -209,7 +214,7 @@ export async function renameAcceptedProjection(
     return preflight;
   }
 
-  const nextState = renamedState(
+  const nextState = projectionStateForPlan(
     accepted.value,
     resolve(input.targetRoot),
     desired.value
@@ -364,27 +369,133 @@ export async function forgetAcceptedProjection(
   if (!accepted.ok) {
     return accepted;
   }
-  const forgotten = await forgetDetachedProjection({
-    lock: input.lock,
-    registry: input.registry,
+
+  const provisional = planForgottenDetachedProjectionState({
     acceptedState: registryStateInput(accepted.value),
     packageCoordinate: input.packageCoordinate
   });
-  if (!forgotten.ok) {
-    return forgotten;
+  if (!provisional.ok) {
+    return provisional;
   }
+  const provisionalState: RegistryTargetState = {
+    ...accepted.value,
+    projections: provisional.value.projections,
+    detachedBaselines: provisional.value.detachedBaselines
+  };
+
+  const requirements = registryRequirementsToDomain(
+    provisionalState.targetId,
+    provisionalState.directRequirements
+  );
+  if (!requirements.ok) {
+    return requirements;
+  }
+  const candidate = registryGraph(provisionalState);
+  const planned = planLifecycleTarget(
+    requirements.value,
+    candidate,
+    projectionRenames(provisionalState.projections)
+  );
+  if (!planned.ok) {
+    return planned;
+  }
+  const desired = preserveAcceptedProjectionAbsence(
+    provisionalState,
+    planned.value
+  );
+
+  const currentPlan = acceptedTargetPlan(accepted.value);
+  if (!currentPlan.ok) {
+    return currentPlan;
+  }
+  const currentOwned = ownedProjections(
+    accepted.value,
+    currentPlan.value
+  );
+  if (!currentOwned.ok) {
+    return currentOwned;
+  }
+  const observed = await observeTarget(
+    input.home,
+    resolve(input.targetRoot),
+    currentOwned.value,
+    desired
+  );
+  if (!observed.ok) {
+    return observed;
+  }
+  const preflight = preflightTargetOwnership({
+    desiredPlan: desired,
+    currentProjections: currentOwned.value,
+    observedPaths: observed.value
+  });
+  if (!preflight.ok) {
+    return preflight;
+  }
+
+  const plannedState = projectionStateForPlan(
+    accepted.value,
+    resolve(input.targetRoot),
+    desired
+  );
+  if (!plannedState.ok) {
+    return plannedState;
+  }
+  const nextState: RegistryTargetStateInput = {
+    ...plannedState.value,
+    detachedBaselines: provisional.value.detachedBaselines
+  };
+
+  const prepared = await prepareTargetReconciliation({
+    home: input.home,
+    targetRoot: resolve(input.targetRoot),
+    operationId: (input.createOperationId ?? randomUUID)(),
+    lock: input.lock,
+    registry: input.registry,
+    desiredPlan: desired,
+    preflight: preflight.value,
+    currentProjections: currentOwned.value,
+    nextState,
+    deferPendingCompletion: true
+  });
+  if (!prepared.ok) {
+    return prepared;
+  }
+
+  const committed =
+    await prepared.value.commitAcceptedState();
+  if (!committed.ok) {
+    return committed;
+  }
+  const reconciled =
+    await committed.value.reconcileLiveTarget();
+  if (!reconciled.ok) {
+    return reconciled;
+  }
+
   const marker = await syncMarkerFromState(
     input.targetRoot,
-    forgotten.value
+    reconciled.value
   );
   if (!marker.ok) {
     return marker;
   }
+
+  const cleaned = await cleanupPendingTargetStaging({
+    targetId: reconciled.value.targetId,
+    targetRoot: resolve(input.targetRoot),
+    lock: input.lock,
+    registry: input.registry
+  });
+  if (!cleaned.ok) {
+    return cleaned;
+  }
+
   return {
     ok: true,
     value: {
       status: "forgotten",
-      state: forgotten.value
+      state: reconciled.value
     }
   };
 }
@@ -571,7 +682,7 @@ async function observeTarget(
   };
 }
 
-function renamedState(
+function projectionStateForPlan(
   current: RegistryTargetState,
   targetRoot: string,
   desired: TargetPlan
