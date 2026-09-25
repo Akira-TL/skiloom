@@ -1,5 +1,5 @@
 import { mkdir } from "node:fs/promises";
-import { basename, isAbsolute, resolve } from "node:path";
+import { basename, isAbsolute } from "node:path";
 import process from "node:process";
 
 import type {
@@ -9,6 +9,7 @@ import {
   type ProductError,
   type Result
 } from "../../domain/errors/index.js";
+import { resolveOperationLockHelperExecutable } from "../../native/operation-lock-helper.js";
 import {
   acquireOperationLock,
   type OperationLockSession
@@ -127,20 +128,13 @@ export async function executeCliExport(
     });
   }
 
-  const helperExecutable =
-    process.env.SKILOOM_LOCK_TEST_BINARY;
-  if (helperExecutable === undefined) {
-    return transferFailure({
-      code: "UnsupportedPlatformCapability",
-      facts: {
-        capability: "operation-lock",
-        reason: "helper-missing"
-      }
-    });
+  const helperExecutable = resolveOperationLockHelperExecutable();
+  if (!helperExecutable.ok) {
+    return transferFailure(helperExecutable.error);
   }
 
   const acquired = await acquireOperationLock({
-    helperExecutable: resolve(helperExecutable),
+    helperExecutable: helperExecutable.value,
     lockPath: home.operationLockPath
   });
   if (!acquired.ok) {

@@ -55,6 +55,26 @@ type ParsedBootstrapOutput = Readonly<{
   }>;
 }>;
 
+test("bootstrap resolves the checkout operation-lock helper without test-only injection", async () => {
+  await withCliRuntime(async ({ home, cwd }) => {
+    const planned = await runCli(
+      ["bootstrap", "--plan", "--json"],
+      {
+        home,
+        cwd,
+        mode: "first-party",
+        injectLockHelper: false
+      }
+    );
+
+    assert.equal(planned.code, 0);
+    assertNoUnexpectedStderr(planned.stderr);
+    const output = parseOutput(planned.stdout);
+    assert.equal(output.ok, true);
+    assert.equal(output.result.status, "planned");
+  });
+});
+
 test("bootstrap --plan computes the complete Router candidate on the default Target without writes", async () => {
   await withCliRuntime(async ({ home, cwd, defaultTarget }) => {
     const planned = await runCli(
@@ -309,6 +329,7 @@ function runCli(
     home: string;
     cwd: string;
     mode: string;
+    injectLockHelper?: boolean;
   }>
 ): Promise<Readonly<{
   code: number | null;
@@ -316,18 +337,24 @@ function runCli(
   stderr: string;
 }>> {
   return new Promise((resolveResult, reject) => {
+    const environment: NodeJS.ProcessEnv = {
+      ...process.env,
+      HOME: options.home,
+      USERPROFILE: options.home,
+      SKILOOM_TEST_GITHUB_MODE: options.mode
+    };
+    if (options.injectLockHelper === false) {
+      delete environment.SKILOOM_LOCK_TEST_BINARY;
+    } else {
+      environment.SKILOOM_LOCK_TEST_BINARY = LOCK_HELPER;
+    }
+
     const child = spawn(
       process.execPath,
       ["--import", FETCH_PRELOAD, CLI_ENTRY, ...args],
       {
         cwd: options.cwd,
-        env: {
-          ...process.env,
-          HOME: options.home,
-          USERPROFILE: options.home,
-          SKILOOM_LOCK_TEST_BINARY: LOCK_HELPER,
-          SKILOOM_TEST_GITHUB_MODE: options.mode
-        },
+        env: environment,
         stdio: ["ignore", "pipe", "pipe"]
       }
     );

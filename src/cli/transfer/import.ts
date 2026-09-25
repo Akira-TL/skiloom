@@ -11,6 +11,7 @@ import {
   type ProductError,
   type Result
 } from "../../domain/errors/index.js";
+import { resolveOperationLockHelperExecutable } from "../../native/operation-lock-helper.js";
 import {
   acquireOperationLock,
   type OperationLockSession
@@ -184,18 +185,12 @@ export async function executeCliImport(
     );
   }
 
-  const helperExecutable =
-    process.env.SKILOOM_LOCK_TEST_BINARY;
-  if (helperExecutable === undefined) {
-    return transferFailure(
-      productError("UnsupportedPlatformCapability", {
-        capability: "operation-lock",
-        reason: "helper-missing"
-      })
-    );
+  const helperExecutable = resolveOperationLockHelperExecutable();
+  if (!helperExecutable.ok) {
+    return transferFailure(helperExecutable.error);
   }
   const acquired = await acquireOperationLock({
-    helperExecutable: resolve(helperExecutable),
+    helperExecutable: helperExecutable.value,
     lockPath: home.operationLockPath
   });
   if (!acquired.ok) {
