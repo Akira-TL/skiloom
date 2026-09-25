@@ -97,7 +97,7 @@ git
 - GitHub `immutable` 只作为 provenance signal，不是安装准入条件；exact commit 与 Package Content Digest 始终必须存在；
 - repository rename/transfer/redirect 到另一个 canonical coordinate 时返回 `RepositoryCoordinateChanged`，不自动改写来源坐标；
 - Catalog 只负责发现与展示，不能在 v0 中改变 source/version/content authority；v0 默认使用 SkillsMP，只有能明确归一成 GitHub `owner/repo` 的条目才能进入安装候选，且必须重新经过 Skiloom 自己的 GitHub 来源验证；
-- GitHub 网络访问可使用 machine/process environment 提供的 credential。v0 对 `github.com` 只按 `GH_TOKEN` > `GITHUB_TOKEN` 选择第一项非空值；两者都不存在时保持匿名访问。Credential 只作为 Node source transport 输入，不进入 accepted source identity、Registry、Store/cache identity、marker、export 或 CLI output，也不建立 `--token`、credential store、`gh auth` 读取或 GitHub Enterprise host discovery。完整边界见 ADR 0029。
+- Git repository facts 与 GitHub platform metadata 使用不同 transport。Git ref/tag、exact commit、tree/blob 优先由 system Git 获取，GitHub remote 顺序为 SSH first、public HTTPS fallback；Git/OpenSSH MAY 使用用户现有 SSH config / ssh-agent，但 Skiloom 不读取或持久化这些 credential。GitHub API metadata 仍只按 `GH_TOKEN` > `GITHUB_TOKEN` 选择第一项非空值，两者都不存在时匿名访问。两类 credential 都不进入 accepted source identity、Registry、Store/cache identity、marker、export 或 CLI output，也不建立 `--token`、credential store 或 `gh auth` secret extraction。完整边界见 ADR 0029 与 ADR 0032。
 
 ## 6. 版本要求与完整依赖解析
 

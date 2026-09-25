@@ -1,8 +1,9 @@
 # ADR 0029：v0 GitHub 凭据只通过环境注入
 
-- 状态：Accepted
+- 状态：Accepted（GitHub API credential boundary；Git repository transport 范围由 ADR 0032 修订）
 - 日期：2026-09-20
 - 对应 Wayfinder：#127 `Decide v0 GitHub credential and private-source boundary`
+- 修订：ADR 0032 `GitHub repository 内容优先使用 system Git transport`
 
 ## 背景
 
@@ -17,9 +18,9 @@ Skiloom v0 的 GitHub source runtime 已经完整区分 `github-release` 与 exp
 
 ## 决定
 
-### 1. github.com credential discovery 只读取环境
+### 1. github.com API credential discovery 只读取环境
 
-Skiloom v0 对 `github.com` 使用第一项非空环境变量：
+Skiloom v0 对 GitHub API metadata transport 使用第一项非空环境变量：
 
 ```text
 GH_TOKEN
@@ -44,26 +45,21 @@ v0 不：
 - 增加 `--token` / `--credential`；
 - 读取 `gh auth` 的持久登录态；
 - 调用 `gh auth token`；
-- 读取 Git credential helper；
-- 访问 OS keychain；
+- 由 Skiloom 主进程主动读取 Git credential helper secret；
+- 由 Skiloom 主进程主动访问 OS keychain；
 - 建立 Skiloom credential file/store/profile；
 - prompt 用户输入 token；
 - 自动写入 shell/environment 配置。
 
 Skiloom 的 GitHub source 目前固定为 `github.com` / `api.github.com`，因此 `GH_ENTERPRISE_TOKEN` / `GITHUB_ENTERPRISE_TOKEN` 与 GitHub Enterprise host discovery 不属于 v0。
 
-### 3. 凭据适用于所有需要 GitHub 网络事实的 source 生命周期
+### 3. 凭据只适用于需要 GitHub API metadata 的 source path
 
-选中的 credential 传入现有 GitHub source pipeline，用于：
+ADR 0032 将 Git repository transport 与 GitHub API metadata transport 分开。选中的 token 只传给仍需要 GitHub API facts 的路径，例如 GitHub Release listing、immutable signal 与明确需要 API repository metadata 的验证。
 
-- install；
-- bootstrap（普通 Router install）；
-- whole-Target update；
-- remove 中需要重新解析剩余 roots 的 GitHub source；
-- recover / fork candidate；
-- repair 在 Store/source cache 缺失时按 accepted exact commit 重新获取内容。
+Git ref/tag、exact commit、tree/blob 等 Git facts迁移到 system Git 后，不要求把 `GH_TOKEN` / `GITHUB_TOKEN` 传给 Git subprocess。system Git / OpenSSH MAY 使用用户已有的 SSH config / ssh-agent，但 Skiloom 不读取这些 credential。
 
-`github-release` 和 explicit `git` 使用同一 credential input；credential 不允许一种 source kind 失败后静默 fallback 到另一种。
+`github-release` 和 explicit `git` 仍是不同 source kind；任何 transport fallback 都不得把一种 source kind 静默改成另一种。
 
 `sync` 只 replay accepted exact state，不重新 source resolve，因此没有 GitHub credential requirement。
 
@@ -71,7 +67,7 @@ Exact import 继续允许完全离线。它接受的是 export 中记录的 exac
 
 ### 4. 私有仓库支持是权限结果，不是新的 source kind
 
-当 `GH_TOKEN` / `GITHUB_TOKEN` 对目标 repository 具有足够 GitHub 权限时，同一 `github-release` / `git` source pipeline 可以访问 private repository。
+Private repository 可以通过用户现有 Git/SSH access 提供 Git repository facts；需要 GitHub API metadata 的路径仍可使用 `GH_TOKEN` / `GITHUB_TOKEN`。两种 credential transport 都不形成新的 source kind。
 
 Skiloom 不把：
 
@@ -128,7 +124,7 @@ process.env
   -> credential | undefined
 ```
 
-随后只把结果传给已经存在的 lifecycle/source `credential` 参数。
+随后只把结果传给 GitHub API metadata transport。Git repository transport 的 ambient SSH/Git authentication 由 system Git/OpenSSH 自己处理；Skiloom 不把这些 credential material 转换成该 `credential` 参数。
 
 不要为此创建：
 

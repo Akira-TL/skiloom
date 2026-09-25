@@ -266,17 +266,21 @@ Native helper 不应在用户执行 `npm install` 时现场编译。
 
 ## 10. GitHub source implementation
 
-v0 GitHub source adapter优先使用 Node built-in HTTP capabilities和 GitHub API/source transport，不要求用户机器安装 system `git` executable。
+v0 将 Git repository transport 与 GitHub platform metadata transport 分开（ADR 0032）。Git repository 的 ref/tag、exact commit、tree/blob facts 优先由 system `git` 获取；GitHub REST 只保留 GitHub-specific metadata，例如 published Release visibility、immutable signal 与仍明确需要 API 的 repository metadata。
+
+默认 GitHub repository remote 顺序为 SSH first、public HTTPS fallback。system Git/OpenSSH 可以使用用户已有的 `~/.ssh/config`、ssh-agent 与 SSH key；Skiloom 不读取、复制或持久化这些 credential。Git subprocess 必须 direct-spawn、non-interactive，不 checkout 或执行 repository code。
+
+GitHub API credential discovery 继续按 ADR 0029：`GH_TOKEN > GITHUB_TOKEN > anonymous`，但该 token 只进入 API metadata transport，不代表 Git/SSH credential。
 
 GitHub source 的产品语义仍是：
 
 ```text
-GitHub metadata/ref/tag
+GitHub-specific metadata (when required) + Git ref/tag facts
   -> exact commit
   -> exact repository snapshot facts
 ```
 
-是否未来用 native Git object helper 优化 acquisition 属于实现细节；不能改变官方产品规范已经固定的 coordinate/redirect/tag/commit/discovery/digest 语义。
+transport kind 不进入 accepted source identity。无论 snapshot bytes 经 source cache、system Git 或过渡期 REST acquisition 获得，都必须重新经过 repository discovery、Package snapshot 与 digest 验证；不能改变官方产品规范已经固定的 source-kind、coordinate、commit、discovery/digest 语义。
 
 ## 11. Testing architecture
 

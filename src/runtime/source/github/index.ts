@@ -71,6 +71,18 @@ export {
 } from "./pipeline.js";
 
 export {
+  acquireGitHubRepositorySnapshotWithSystemGit,
+  acquireGitRepositorySnapshotWithSystemGit,
+  gitHubSystemGitRemoteCandidates,
+  type AcquireGitHubRepositorySnapshotWithSystemGitInput,
+  type AcquireGitRepositorySnapshotWithSystemGitError,
+  type AcquireGitRepositorySnapshotWithSystemGitInput,
+  type GitHubSystemGitOperation,
+  type GitHubSystemGitRemoteCandidate,
+  type GitHubSystemGitUnavailable
+} from "./system-git/index.js";
+
+export {
   createGitHubJsonFetchTransport,
   createGitHubRepositoryFetchTransport,
   type GitHubFetchTransportOptions,
