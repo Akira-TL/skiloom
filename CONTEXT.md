@@ -22,7 +22,7 @@ Skiloom 对 GitHub Release repository version 使用的约束语言。v0 使用 
 
 ## Git Source
 
-没有合适 Release 或明确需要源码版本时显式使用的 source。用户 ref 最终解析为 exact commit；Package path 在该 commit 的 tracked tree 中通过 `SKILL.md` discovery 获得。GitHub Release 与 Git source 共用同一可选 authenticated transport：v0 对 `github.com` 只读取 `GH_TOKEN`，其次 `GITHUB_TOKEN`；没有时匿名访问。Credential 不进入 source identity、Registry、Store/cache identity、marker、export 或 CLI output，也不提供 `--token`/credential store。
+没有合适 Release 或明确需要源码版本时显式使用的 source。用户 ref 最终解析为 exact commit；Package path 在该 commit 的 tracked tree 中通过 `SKILL.md` discovery 获得。Git repository facts 与 GitHub platform metadata 使用不同 transport：ref/tag、exact commit、tree/blob 优先由 system Git 获取，GitHub remote 使用 SSH first、public HTTPS fallback；system Git/OpenSSH 可以使用用户既有 SSH config / ssh-agent，但 Skiloom 不读取这些 credential。GitHub API metadata 仍只按 `GH_TOKEN`，其次 `GITHUB_TOKEN`，没有时匿名访问。两类 credential 都不进入 source identity、Registry、Store/cache identity、marker、export 或 CLI output，也不提供 `--token`/credential store。
 
 ## Git Source Cache
 
