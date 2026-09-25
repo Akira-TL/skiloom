@@ -84,35 +84,18 @@ export async function acquirePublishedGitHubReleaseMetadata(
   const metadata: GitHubPublishedReleaseMetadata[] = [];
 
   for (let page = 1; page <= MAX_RELEASE_PAGES; page += 1) {
-    const response = await requestJson(
-      input,
-      {
-        path: repositoryPath(input.repository) + "/releases",
-        query: {
-          per_page: RELEASE_PAGE_SIZE,
-          page: String(page)
-        }
-      },
-      "list-releases"
-    );
-    if (!response.ok) {
-      return response;
+    const releasePage = await readPublishedReleasePage(input, page);
+    if (!releasePage.ok) {
+      return releasePage;
     }
-    if (!Array.isArray(response.value.body)) {
-      return invalidReleaseResponse(input.repository);
-    }
-    if (response.value.body.length === 0) {
+    if (releasePage.value.length === 0) {
       metadata.sort((left, right) =>
         compareUtf8(left.actualTag, right.actualTag)
       );
       return { ok: true, value: metadata };
     }
 
-    for (const release of response.value.body) {
-      const parsed = parseReleaseRecord(release);
-      if (parsed === undefined) {
-        return invalidReleaseResponse(input.repository);
-      }
+    for (const parsed of releasePage.value) {
       if (parsed.draft) {
         continue;
       }
@@ -138,33 +121,16 @@ export async function acquirePublishedGitHubReleaseFacts(
   const facts: GitHubPublishedReleaseFact[] = [];
 
   for (let page = 1; page <= MAX_RELEASE_PAGES; page += 1) {
-    const response = await requestJson(
-      input,
-      {
-        path: repositoryPath(input.repository) + "/releases",
-        query: {
-          per_page: RELEASE_PAGE_SIZE,
-          page: String(page)
-        }
-      },
-      "list-releases"
-    );
-    if (!response.ok) {
-      return response;
+    const releasePage = await readPublishedReleasePage(input, page);
+    if (!releasePage.ok) {
+      return releasePage;
     }
-    if (!Array.isArray(response.value.body)) {
-      return invalidReleaseResponse(input.repository);
-    }
-    if (response.value.body.length === 0) {
+    if (releasePage.value.length === 0) {
       facts.sort(compareReleaseFacts);
       return { ok: true, value: facts };
     }
 
-    for (const release of response.value.body) {
-      const parsed = parseReleaseRecord(release);
-      if (parsed === undefined) {
-        return invalidReleaseResponse(input.repository);
-      }
+    for (const parsed of releasePage.value) {
       if (parsed.draft) {
         continue;
       }
@@ -194,6 +160,44 @@ type ParsedReleaseRecord = Readonly<{
   draft: boolean;
   immutable: boolean;
 }>;
+
+async function readPublishedReleasePage(
+  input: AcquirePublishedGitHubReleaseFactsInput,
+  page: number
+): Promise<
+  Result<
+    ReadonlyArray<ParsedReleaseRecord>,
+    AcquirePublishedGitHubReleaseMetadataError
+  >
+> {
+  const response = await requestJson(
+    input,
+    {
+      path: repositoryPath(input.repository) + "/releases",
+      query: {
+        per_page: RELEASE_PAGE_SIZE,
+        page: String(page)
+      }
+    },
+    "list-releases"
+  );
+  if (!response.ok) {
+    return response;
+  }
+  if (!Array.isArray(response.value.body)) {
+    return invalidReleaseResponse(input.repository);
+  }
+
+  const releases: ParsedReleaseRecord[] = [];
+  for (const release of response.value.body) {
+    const parsed = parseReleaseRecord(release);
+    if (parsed === undefined) {
+      return invalidReleaseResponse(input.repository);
+    }
+    releases.push(parsed);
+  }
+  return { ok: true, value: releases };
+}
 
 function parseReleaseRecord(
   value: unknown
