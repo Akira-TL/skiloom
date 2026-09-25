@@ -74,6 +74,36 @@ for (const example of [
   });
 }
 
+test("explicit Git ref rate-limit response stays distinct from source access denial", async () => {
+  const result = await resolveExplicitGitHubGitSource({
+    repository: repository("akira-tl/skiloom"),
+    requestedRef: "main",
+    transport: async () => ({
+      status: 403,
+      body: { message: "rate-limit provider detail" },
+      rateLimit: {
+        remaining: 0,
+        retryAfterSeconds: null,
+        resetAtUnixSeconds: 1790329700
+      }
+    })
+  });
+
+  assert.deepEqual(result, {
+    ok: false,
+    error: {
+      code: "GitHubRateLimited",
+      facts: {
+        repositoryCoordinate: "akira-tl/skiloom",
+        operation: "resolve-ref",
+        status: 403,
+        retryAfterSeconds: null,
+        resetAtUnixSeconds: 1790329700
+      }
+    }
+  });
+});
+
 for (const status of [401, 403, 404] as const) {
   test(`explicit Git ref access status ${status} remains SourceAccessUnavailable`, async () => {
     const result = await resolveExplicitGitHubGitSource({

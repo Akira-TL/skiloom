@@ -297,6 +297,36 @@ test("malformed Git blob responses fail with the affected repository path", asyn
   });
 });
 
+test("exact snapshot rate-limit response stays distinct from source access denial", async () => {
+  const result = await acquireExactGitHubRepositorySnapshot({
+    repository: repository("akira-tl/skiloom"),
+    exactCommit: "1".repeat(40),
+    transport: async () => ({
+      status: 403,
+      body: { message: "rate-limit provider detail" },
+      rateLimit: {
+        remaining: 0,
+        retryAfterSeconds: null,
+        resetAtUnixSeconds: 1790329700
+      }
+    })
+  });
+
+  assert.deepEqual(result, {
+    ok: false,
+    error: {
+      code: "GitHubRateLimited",
+      facts: {
+        repositoryCoordinate: "akira-tl/skiloom",
+        operation: "read-commit",
+        status: 403,
+        retryAfterSeconds: null,
+        resetAtUnixSeconds: 1790329700
+      }
+    }
+  });
+});
+
 for (const status of [401, 403, 404] as const) {
   test(`exact snapshot access status ${status} remains SourceAccessUnavailable`, async () => {
     const result = await acquireExactGitHubRepositorySnapshot({

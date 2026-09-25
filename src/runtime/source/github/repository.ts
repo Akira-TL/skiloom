@@ -8,7 +8,10 @@ import {
   type Result
 } from "../../../domain/errors/index.js";
 import {
+  gitHubRateLimitError,
   gitHubTransportAbortResult,
+  type GitHubRateLimited,
+  type GitHubRateLimitMetadata,
   type GitHubTransportAborted
 } from "./transport.js";
 
@@ -21,6 +24,7 @@ export type GitHubRepositoryTransportRequest = Readonly<{
 export type GitHubRepositoryTransportResponse = Readonly<{
   status: number;
   body: unknown;
+  rateLimit?: GitHubRateLimitMetadata;
 }>;
 
 export type GitHubRepositoryTransport = (
@@ -67,6 +71,7 @@ export type VerifyGitHubRepositoryError =
   | SourceAccessUnavailable
   | InvalidGitHubRepositoryResponse
   | GitHubRepositoryTransportUnavailable
+  | GitHubRateLimited
   | GitHubTransportAborted;
 
 export type VerifyGitHubRepositoryInput = Readonly<{
@@ -106,6 +111,15 @@ export async function verifyGitHubRepository(
         status: null
       })
     };
+  }
+
+  const rateLimited = gitHubRateLimitError(
+    response,
+    input.repository.canonical,
+    "verify-repository"
+  );
+  if (rateLimited !== undefined) {
+    return { ok: false, error: rateLimited };
   }
 
   if (

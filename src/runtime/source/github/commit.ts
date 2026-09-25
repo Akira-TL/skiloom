@@ -6,8 +6,10 @@ import {
 } from "../../../domain/errors/index.js";
 import type { SourceAccessUnavailable } from "./repository.js";
 import {
+  gitHubRateLimitError,
   gitHubTransportAbortResult,
   type GitHubJsonTransport,
+  type GitHubRateLimited,
   type GitHubTransportAborted
 } from "./transport.js";
 
@@ -34,6 +36,7 @@ export type ResolveGitHubExactCommitError =
   | SourceAccessUnavailable
   | InvalidGitHubExactCommitResponse
   | GitHubExactCommitTransportUnavailable
+  | GitHubRateLimited
   | GitHubTransportAborted;
 
 export type ResolveGitHubExactCommitInput = Readonly<{
@@ -72,6 +75,15 @@ export async function resolveGitHubExactCommit(
       return { ok: false, error: aborted };
     }
     return transportUnavailable(input, null);
+  }
+
+  const rateLimited = gitHubRateLimitError(
+    response,
+    input.repository.canonical,
+    input.operation ?? "resolve-ref"
+  );
+  if (rateLimited !== undefined) {
+    return { ok: false, error: rateLimited };
   }
 
   if (

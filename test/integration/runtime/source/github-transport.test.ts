@@ -129,6 +129,76 @@ test("stable source-access status is not retried", async () => {
   });
 });
 
+test("primary GitHub rate-limit 403 is distinct from source access denial", async () => {
+  const result = await verifyGitHubRepository({
+    repository: repository("akira-tl/skiloom"),
+    transport: createGitHubRepositoryFetchTransport({
+      maxAttempts: 1,
+      fetchImpl: async () =>
+        jsonResponse(
+          403,
+          { message: "sensitive provider text must not escape" },
+          {
+            "x-ratelimit-remaining": "0",
+            "x-ratelimit-reset": "1790329700",
+            "x-sensitive-header": "credential-sentinel"
+          }
+        )
+    })
+  });
+
+  assert.equal(JSON.stringify(result).includes("credential-sentinel"), false);
+  assert.equal(
+    JSON.stringify(result).includes("sensitive provider text"),
+    false
+  );
+  assert.deepEqual(result, {
+    ok: false,
+    error: {
+      code: "GitHubRateLimited",
+      facts: {
+        repositoryCoordinate: "akira-tl/skiloom",
+        operation: "verify-repository",
+        status: 403,
+        retryAfterSeconds: null,
+        resetAtUnixSeconds: 1790329700
+      }
+    }
+  });
+});
+
+test("secondary GitHub rate-limit 403 preserves only normalized retry guidance", async () => {
+  const result = await verifyGitHubRepository({
+    repository: repository("akira-tl/skiloom"),
+    transport: createGitHubRepositoryFetchTransport({
+      maxAttempts: 1,
+      fetchImpl: async () =>
+        jsonResponse(
+          403,
+          { message: "secondary rate limit detail" },
+          {
+            "retry-after": "60",
+            "x-ratelimit-remaining": "42"
+          }
+        )
+    })
+  });
+
+  assert.deepEqual(result, {
+    ok: false,
+    error: {
+      code: "GitHubRateLimited",
+      facts: {
+        repositoryCoordinate: "akira-tl/skiloom",
+        operation: "verify-repository",
+        status: 403,
+        retryAfterSeconds: 60,
+        resetAtUnixSeconds: null
+      }
+    }
+  });
+});
+
 test("caller cancellation aborts in-flight GitHub work without hidden retries", async () => {
   const controller = new AbortController();
   let attempts = 0;
@@ -323,10 +393,17 @@ test("transient network retry is bounded and secret-safe when exhausted", async 
   });
 });
 
-function jsonResponse(status: number, body: unknown): Response {
+function jsonResponse(
+  status: number,
+  body: unknown,
+  headers: Readonly<Record<string, string>> = {}
+): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json" }
+    headers: {
+      "content-type": "application/json",
+      ...headers
+    }
   });
 }
 

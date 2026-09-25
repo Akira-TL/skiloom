@@ -9,8 +9,10 @@ import type {
 } from "../../../domain/snapshot/index.js";
 import type { SourceAccessUnavailable } from "./repository.js";
 import {
+  gitHubRateLimitError,
   gitHubTransportAbortResult,
   type GitHubJsonTransport,
+  type GitHubRateLimited,
   type GitHubTransportAborted
 } from "./transport.js";
 
@@ -90,6 +92,7 @@ export type AcquireExactGitHubRepositorySnapshotError =
   | UnsupportedGitTreeEntry
   | InvalidGitHubBlobResponse
   | GitHubSnapshotTransportUnavailable
+  | GitHubRateLimited
   | GitHubTransportAborted;
 
 export type AcquireExactGitHubRepositorySnapshotInput = Readonly<{
@@ -381,6 +384,7 @@ async function requestJson(
     Readonly<{ body: unknown }>,
     | SourceAccessUnavailable
     | GitHubSnapshotTransportUnavailable
+    | GitHubRateLimited
     | GitHubTransportAborted
   >
 > {
@@ -405,6 +409,15 @@ async function requestJson(
       return { ok: false, error: aborted };
     }
     return transportUnavailable(input.repository, operation, null);
+  }
+
+  const rateLimited = gitHubRateLimitError(
+    response,
+    input.repository.canonical,
+    operation
+  );
+  if (rateLimited !== undefined) {
+    return { ok: false, error: rateLimited };
   }
 
   if (

@@ -172,6 +172,35 @@ test("Release API ordering does not change normalized exact facts", async () => 
   assert.deepEqual(reversed, forward);
 });
 
+test("Release listing rate-limit response stays distinct from source access denial", async () => {
+  const result = await acquirePublishedGitHubReleaseFacts({
+    repository: repository("akira-tl/skiloom"),
+    transport: async () => ({
+      status: 403,
+      body: { message: "rate-limit provider detail" },
+      rateLimit: {
+        remaining: 0,
+        retryAfterSeconds: null,
+        resetAtUnixSeconds: 1790329700
+      }
+    })
+  });
+
+  assert.deepEqual(result, {
+    ok: false,
+    error: {
+      code: "GitHubRateLimited",
+      facts: {
+        repositoryCoordinate: "akira-tl/skiloom",
+        operation: "list-releases",
+        status: 403,
+        retryAfterSeconds: null,
+        resetAtUnixSeconds: 1790329700
+      }
+    }
+  });
+});
+
 for (const status of [401, 403, 404] as const) {
   test(`Release listing access status ${status} maps to SourceAccessUnavailable`, async () => {
     const result = await acquirePublishedGitHubReleaseFacts({

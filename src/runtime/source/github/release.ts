@@ -10,8 +10,10 @@ import {
 } from "./commit.js";
 import type { SourceAccessUnavailable } from "./repository.js";
 import {
+  gitHubRateLimitError,
   gitHubTransportAbortResult,
   type GitHubJsonTransport,
+  type GitHubRateLimited,
   type GitHubTransportAborted
 } from "./transport.js";
 
@@ -52,6 +54,7 @@ export type AcquirePublishedGitHubReleaseFactsError =
   | InvalidGitHubReleaseResponse
   | InvalidGitHubCommitResponse
   | GitHubReleaseTransportUnavailable
+  | GitHubRateLimited
   | GitHubTransportAborted;
 
 export type AcquirePublishedGitHubReleaseFactsInput = Readonly<{
@@ -183,6 +186,7 @@ async function resolveActualTagCommit(
 
   switch (resolved.error.code) {
     case "SourceAccessUnavailable":
+    case "GitHubRateLimited":
       return {
         ok: false,
         error: resolved.error
@@ -217,6 +221,7 @@ async function requestJson(
     Readonly<{ body: unknown }>,
     | SourceAccessUnavailable
     | GitHubReleaseTransportUnavailable
+    | GitHubRateLimited
     | GitHubTransportAborted
   >
 > {
@@ -245,6 +250,15 @@ async function requestJson(
       operation,
       null
     );
+  }
+
+  const rateLimited = gitHubRateLimitError(
+    response,
+    input.repository.canonical,
+    operation
+  );
+  if (rateLimited !== undefined) {
+    return { ok: false, error: rateLimited };
   }
 
   if (

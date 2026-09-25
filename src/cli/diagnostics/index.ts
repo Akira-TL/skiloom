@@ -6,6 +6,9 @@ import type {
   SkillsMpSearchFailed
 } from "../../runtime/catalog/skillsmp.js";
 import type {
+  GitHubRateLimited
+} from "../../runtime/source/github/index.js";
+import type {
   TargetCopyRequiresSyncOrFork
 } from "../status.js";
 import type {
@@ -118,6 +121,27 @@ export function formatDiagnosticFailure(
       "before continuing (exit " + exitCode + ")"
     );
   }
+  if (error.code === "GitHubRateLimited") {
+    const facts = error.facts as GitHubRateLimited["facts"];
+    const retry =
+      facts.retryAfterSeconds !== null
+        ? "retry after " + facts.retryAfterSeconds + " seconds"
+        : facts.resetAtUnixSeconds !== null
+          ? "retry after " +
+            new Date(
+              facts.resetAtUnixSeconds * 1000
+            ).toISOString()
+          : "retry later";
+    return (
+      "skiloom: GitHub rate limit reached (HTTP " +
+      facts.status +
+      "); " +
+      retry +
+      ", or set GH_TOKEN/GITHUB_TOKEN for authenticated " +
+      "GitHub access (exit " + exitCode + ")"
+    );
+  }
+
   if (error.code !== "SkillsMpSearchFailed") {
     return undefined;
   }

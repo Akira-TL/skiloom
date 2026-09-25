@@ -77,6 +77,8 @@ export {
   type GitHubJsonTransport,
   type GitHubJsonTransportRequest,
   type GitHubJsonTransportResponse,
+  type GitHubRateLimited,
+  type GitHubRateLimitMetadata,
   type GitHubTransportAborted,
   type GitHubTransportAbortReason,
   type GitHubTransportOperation

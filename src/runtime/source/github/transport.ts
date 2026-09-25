@@ -33,6 +33,17 @@ export type GitHubTransportOperation =
   | "read-tree"
   | "read-blob";
 
+export type GitHubRateLimited = ProductError<
+  "GitHubRateLimited",
+  Readonly<{
+    repositoryCoordinate: string;
+    operation: GitHubTransportOperation;
+    status: 403 | 429;
+    retryAfterSeconds: number | null;
+    resetAtUnixSeconds: number | null;
+  }>
+>;
+
 export type GitHubTransportAborted = ProductError<
   "GitHubTransportAborted",
   Readonly<{
@@ -58,9 +69,16 @@ export type GitHubJsonTransportRequest = Readonly<{
   signal?: AbortSignal;
 }>;
 
+export type GitHubRateLimitMetadata = Readonly<{
+  remaining: number | null;
+  retryAfterSeconds: number | null;
+  resetAtUnixSeconds: number | null;
+}>;
+
 export type GitHubJsonTransportResponse = Readonly<{
   status: number;
   body: unknown;
+  rateLimit?: GitHubRateLimitMetadata;
 }>;
 
 export type GitHubJsonTransport = (
@@ -161,9 +179,11 @@ export function createGitHubJsonFetchTransport(
           continue;
         }
 
+        const rateLimit = readRateLimitMetadata(response.headers);
         return {
           status: response.status,
-          body: await readJsonBody(response, abortState)
+          body: await readJsonBody(response, abortState),
+          ...(rateLimit === undefined ? {} : { rateLimit })
         };
       } catch (error) {
         const abortReason = abortState.reason();
@@ -225,6 +245,31 @@ export function createGitHubRepositoryFetchTransport(
         ? {}
         : { signal: request.signal })
     });
+}
+
+export function gitHubRateLimitError(
+  response: GitHubJsonTransportResponse,
+  repositoryCoordinate: string,
+  operation: GitHubTransportOperation
+): GitHubRateLimited | undefined {
+  const metadata = response.rateLimit;
+  const rateLimited =
+    response.status === 429 ||
+    (response.status === 403 &&
+      (metadata?.remaining === 0 ||
+        metadata?.retryAfterSeconds !== null &&
+          metadata?.retryAfterSeconds !== undefined));
+  if (!rateLimited) {
+    return undefined;
+  }
+
+  return productError("GitHubRateLimited", {
+    repositoryCoordinate,
+    operation,
+    status: response.status as 403 | 429,
+    retryAfterSeconds: metadata?.retryAfterSeconds ?? null,
+    resetAtUnixSeconds: metadata?.resetAtUnixSeconds ?? null
+  });
 }
 
 export function gitHubTransportAbortResult(
@@ -314,6 +359,40 @@ async function waitBeforeRetry(
     };
     signal?.addEventListener("abort", onAbort, { once: true });
   });
+}
+
+function readRateLimitMetadata(
+  headers: Headers
+): GitHubRateLimitMetadata | undefined {
+  const remaining = parseNonnegativeInteger(
+    headers.get("x-ratelimit-remaining")
+  );
+  const retryAfterSeconds = parseNonnegativeInteger(
+    headers.get("retry-after")
+  );
+  const resetAtUnixSeconds = parseNonnegativeInteger(
+    headers.get("x-ratelimit-reset")
+  );
+  if (
+    remaining === null &&
+    retryAfterSeconds === null &&
+    resetAtUnixSeconds === null
+  ) {
+    return undefined;
+  }
+  return {
+    remaining,
+    retryAfterSeconds,
+    resetAtUnixSeconds
+  };
+}
+
+function parseNonnegativeInteger(value: string | null): number | null {
+  if (value === null || !/^(?:0|[1-9]\d*)$/u.test(value)) {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
 function isRetryableFetchError(error: unknown): boolean {
