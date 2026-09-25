@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawn } from "node:child_process";
@@ -62,6 +62,55 @@ test("validate --json reports admitted local package facts through the executabl
       },
       warnings: []
     });
+  } finally {
+    await rm(temp, { recursive: true, force: true });
+  }
+});
+
+test("validate accepts a directory symlink used as a managed Target projection", async () => {
+  const temp = await mkdtemp(join(tmpdir(), "skiloom-cli-validate-symlink-"));
+  const payloadRoot = join(temp, "payload");
+  const projectionRoot = join(temp, "managed-skill");
+  await mkdir(payloadRoot);
+  await writeFile(
+    join(payloadRoot, "SKILL.md"),
+    "---\nname: managed-skill\ndescription: Managed symlink projection.\n---\n",
+    "utf8"
+  );
+  await symlink(
+    payloadRoot,
+    projectionRoot,
+    process.platform === "win32" ? "junction" : "dir"
+  );
+
+  try {
+    const result = await runCli([
+      "validate",
+      projectionRoot,
+      "--json"
+    ]);
+
+    assert.equal(result.code, 0);
+    assert.equal(result.stderr, "");
+    const output = JSON.parse(result.stdout) as {
+      ok: boolean;
+      result: {
+        path: string;
+        packages: Array<{
+          name: string;
+          packageRoot: string;
+        }>;
+      };
+    };
+    assert.equal(output.ok, true);
+    assert.equal(output.result.path, projectionRoot);
+    assert.deepEqual(
+      output.result.packages.map((entry) => ({
+        name: entry.name,
+        packageRoot: entry.packageRoot
+      })),
+      [{ name: "managed-skill", packageRoot: "." }]
+    );
   } finally {
     await rm(temp, { recursive: true, force: true });
   }

@@ -1,7 +1,7 @@
 import {
-  lstat,
   readFile,
-  readdir
+  readdir,
+  stat as fsStat
 } from "node:fs/promises";
 import {
   basename,
@@ -180,7 +180,7 @@ async function validateDirectory(
 ): Promise<Result<void, ValidateLocalPathUnavailable>> {
   let stat;
   try {
-    stat = await lstat(path);
+    stat = await fsStat(path);
   } catch (error) {
     return unavailable(
       path,
@@ -189,7 +189,7 @@ async function validateDirectory(
         : "io"
     );
   }
-  if (!stat.isDirectory() || stat.isSymbolicLink()) {
+  if (!stat.isDirectory()) {
     return unavailable(path, "not-directory");
   }
   return { ok: true, value: undefined };
