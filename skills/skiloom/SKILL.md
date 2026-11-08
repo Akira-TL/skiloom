@@ -14,6 +14,7 @@ Use this Skill as the Agent-facing router for Skiloom tasks. Do not implement re
 - Inspecting Registry, Store, Target, marker, ownership drift, or dependency observations: use `skiloom-doctor`.
 - Creating or validating Agent Skill package files: use `skiloom-author`.
 - 修改已安装技能、调整技能内脚本或按项目规范定制：先使用 `skiloom-manage` 的“定制已安装技能”流程，取得可编辑的本地副本，再交给 `skiloom-author`。上游源码开发只有在用户要求修改上游时才进入。
+- 撤销误操作的 `detach`、恢复原版本受管状态：使用 `skiloom-manage` 的公开 `restore` 流程，保留用户指定作用范围及其他依赖版本。
 
 ## Routing examples
 

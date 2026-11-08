@@ -36,9 +36,17 @@ Use only the public Skiloom CLI/runtime for state-changing or maintenance operat
 
 ## 解除管理后的恢复请求
 
-用户要求撤销误操作的 `detach`、恢复原版本受管状态时，先核对当前 CLI 是否提供直接支持该状态转换的公开操作，以及它能否保持其他包的精确版本和其他目标目录不变。`rebind` 只修复已解除管理副本的位置绑定；`forget` 只释放关联；`sync/repair` 保持已接受的所有权状态。它们都不代表把本地副本重新交给 Skiloom 管理。
+用户要求撤销误操作的 `detach`、恢复原版本受管状态时，使用 Skiloom 0.8.16 起提供的公开 `restore`。先通过 `status` 核对指定包与目标目录；恢复用户级包时显式使用 `--scope user`，恢复项目级包时在对应项目工作目录使用 `--scope workspace`，用户选择其他目标目录时沿用其 `--target`。例如恢复用户级安装：
 
-当前版本缺少直接恢复操作时，明确报告产品能力缺口并保留现场，将恢复需求交回 Skiloom 项目设计与实现流程。即使用户已授权恢复，也不得自行组合导出、搬移或删除本地副本、清除关联、修改导出清单和重新导入来模拟该转换；每一步使用公开命令，也不能代替产品对完整恢复操作的支持。恢复能力应由 Skiloom 负责精确版本选择、用户内容保护、所有权转换与中断后的状态协调，技能不维护另一套恢复流程。
+```text
+skiloom restore <package> --scope user --json
+```
+
+该命令核对解除时的来源与内容基线，将未修改的普通本地副本恢复为原精确版本受管投影，不重新解析依赖，不升级其他包，不改其他目标目录。投影名称与确定性变换保持不变；已经正确受管时返回 `no-op`。命令本身就是对这次局部操作的授权，不增加 `--plan`、`--yes` 或重复确认。
+
+内容已修改、路径缺失或被替换、包存储损坏、解除时基线与当前精确图不一致时，保留现场并报告结构化错误，由用户决定后续处理；不能为了让恢复成功而丢弃修改、改用 `main` 或升级依赖。中断后重试同一命令，由 Skiloom 核验并协调对应包的已记录操作。
+
+`rebind` 只修复已解除管理副本的位置绑定；`forget` 只释放关联；`sync/repair` 保持已接受的所有权状态；数据库丢失后的 `recover` 会重新解析候选。这些命令都不代替 `restore`。若本机旧版 CLI 尚无此命令，报告需要升级到支持版本；不要自行升级，也不要组合导出、搬移、清除关联、修改导出清单和重新导入来模拟恢复。
 
 ## Candidate operations
 
@@ -98,6 +106,7 @@ Use:
 ```text
 skiloom rename <package> <activation-name> --json
 skiloom detach <package> --json
+skiloom restore <package> --json
 skiloom rebind <package> <activation-name> --json
 skiloom forget <package> --json
 skiloom observe <package> <name> --status <status> --json
