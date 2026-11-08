@@ -1,6 +1,6 @@
 {
   "name": "skiloom-lock-darwin-arm64",
-  "version": "0.8.15",
+  "version": "0.8.16",
   "description": "Skiloom operation-lock helper for macOS arm64",
   "os": [
     "darwin"

@@ -1,6 +1,6 @@
 {
   "name": "skiloom",
-  "version": "0.8.15",
+  "version": "0.8.16",
   "description": "Agent Skill package manager and installer",
   "repository": {
     "type": "git",
@@ -66,9 +66,9 @@
     "yaml": "^2.9.1"
   },
   "optionalDependencies": {
-    "skiloom-lock-darwin-arm64": "0.8.15",
-    "skiloom-lock-darwin-x64": "0.8.15",
-    "skiloom-lock-linux-x64-gnu": "0.8.15",
-    "skiloom-lock-win32-x64": "0.8.15"
+    "skiloom-lock-darwin-arm64": "0.8.16",
+    "skiloom-lock-darwin-x64": "0.8.16",
+    "skiloom-lock-linux-x64-gnu": "0.8.16",
+    "skiloom-lock-win32-x64": "0.8.16"
   }
 }
