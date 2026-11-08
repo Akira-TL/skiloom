@@ -35,6 +35,7 @@ skiloom sync
 skiloom repair
 
 skiloom detach <package>
+skiloom restore <package>
 skiloom rebind <package> <activation-name>
 skiloom forget <package>
 skiloom observe <package> <name> --status <status>
@@ -215,6 +216,7 @@ Machine Registry 当前已接受 exact state
 ```text
 rename
 detach
+restore
 rebind
 forget
 ```
@@ -222,6 +224,14 @@ forget
 v0 不再机械增加第二次普通确认。
 
 它们仍必须取得 `operation.lock`、做 ownership preflight、通过 Machine Registry transaction 更新状态、按 DB-first materialize/reconcile Target，并更新 Target Generation / `.skiloom-state`。任何 foreign path、ownership 或状态异常继续 fail closed。
+
+### 恢复原版本受管投影（#158）
+
+`restore <package>` 只把所选目标目录中未修改的已解除管理副本恢复为原精确版本受管投影。解除时的来源种类、精确提交、包根和摘要必须与当前已接受图一致，投影名称和确定性变换保持不变；不重新解析版本，不升级其他依赖，不修改其他目标目录。它不是数据库丢失后的 `recover`，也不是修复位置绑定的 `rebind`。
+
+恢复前核验本地普通副本和包存储；内容修改、缺失路径、外来链接、解除基线变化或存储损坏时失败并保留现场。已经处于正确受管状态时返回 `no-op`。命令遵守统一目标选择、操作锁与数据库先行协调协议，使用 `--json`，不接受 `--plan`、`--yes` 或 `--force`。中断后重试同一恢复命令，只协调对应包的已记录操作；无法证明的本地内容继续阻止自动替换。
+
+恢复输入错误使用 `InvalidProjectionRestore`，`facts` 包含 `packageCoordinate` 与 `reason`；解除基线缺失或不一致、包不存在及无关未完成操作分别给出明确原因。内容、物化方式和包存储核验继续使用现有结构化错误。
 
 ### 8.1 Machine-local dependency observation
 

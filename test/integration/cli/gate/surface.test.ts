@@ -33,6 +33,7 @@ const EXPECTED_CANONICAL_COMMANDS = [
   "sync",
   "repair",
   "detach",
+  "restore",
   "rebind",
   "forget",
   "observe",

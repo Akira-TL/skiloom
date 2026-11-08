@@ -213,6 +213,7 @@ async function main(): Promise<number> {
       return runExport(parsed.value);
     case "rename":
     case "detach":
+    case "restore":
     case "rebind":
     case "forget":
       return runLocal(parsed.value);
@@ -511,6 +512,7 @@ function parseArguments(
       );
     case "rename":
     case "detach":
+    case "restore":
     case "rebind":
     case "forget":
       return parseLocal(

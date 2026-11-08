@@ -24,11 +24,13 @@ import {
   forgetAcceptedProjection,
   rebindAcceptedProjection,
   renameAcceptedProjection,
+  restoreAcceptedProjection,
   type LocalProjectionOperationResult
 } from "../../runtime/orchestration/local-projection/operations.js";
 import type {
   MachineRegistry
 } from "../../runtime/registry/index.js";
+import { recoverPendingProjectionRestore } from "../../runtime/orchestration/local-projection/restore.js";
 import {
   currentUserHome
 } from "../candidate-acceptance.js";
@@ -45,6 +47,7 @@ import type {
 export type CliLocalOperation =
   | "rename"
   | "detach"
+  | "restore"
   | "rebind"
   | "forget";
 
@@ -148,12 +151,9 @@ export async function executeCliLocalOperation(
   input: CliLocalInvocation
 ): Promise<Result<CliLocalResult, ProductError>> {
   const userHome = currentUserHome();
-  const current = await preflightCurrentTargetCopy(
-    input.target,
-    userHome
-  );
-  if (!current.ok) {
-    return current;
+  if (input.operation !== "restore") {
+    const current = await preflightCurrentTargetCopy(input.target, userHome);
+    if (!current.ok) return current;
   }
   const home = resolveSkiloomHomePaths(userHome);
   try {
@@ -218,11 +218,6 @@ async function executeWhileLocked(
       })
     };
   }
-  const current = requireCurrentTargetCopy(status.value);
-  if (!current.ok) {
-    return current;
-  }
-
   let registry: MachineRegistry | undefined;
   try {
     const { openMachineRegistry } =
@@ -241,6 +236,15 @@ async function executeWhileLocked(
       registry,
       packageCoordinate: input.packageCoordinate
     };
+    if (input.operation === "restore") {
+      const recovered = await recoverPendingProjectionRestore(base);
+      if (!recovered.ok) return recovered;
+    }
+    const refreshed = input.operation === "restore"
+      ? await readCliStatus(input.target, userHome) : status;
+    if (!refreshed.ok) return refreshed;
+    const current = requireCurrentTargetCopy(refreshed.value);
+    if (!current.ok) return current;
     const operated =
       input.operation === "rename"
         ? await renameAcceptedProjection({
@@ -249,12 +253,14 @@ async function executeWhileLocked(
           })
         : input.operation === "detach"
           ? await detachAcceptedProjection(base)
-          : input.operation === "rebind"
-            ? await rebindAcceptedProjection({
-                ...base,
-                activationName: input.activationName!
-              })
-            : await forgetAcceptedProjection(base);
+          : input.operation === "restore"
+            ? await restoreAcceptedProjection(base)
+            : input.operation === "rebind"
+              ? await rebindAcceptedProjection({
+                  ...base,
+                  activationName: input.activationName!
+                })
+              : await forgetAcceptedProjection(base);
     if (!operated.ok) {
       return operated;
     }

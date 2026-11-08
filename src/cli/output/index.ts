@@ -173,6 +173,7 @@ export function renderSuccess(
   }
   if (
     command === "rename" ||
+    command === "restore" ||
     command === "detach" ||
     command === "rebind" ||
     command === "forget"

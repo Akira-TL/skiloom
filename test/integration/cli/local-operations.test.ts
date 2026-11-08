@@ -26,6 +26,50 @@ const LOCK_HELPER =
   process.env.SKILOOM_LOCK_TEST_BINARY ??
   resolve("native/skiloom-lock/target/debug/skiloom-lock");
 
+test("restore returns a detached package to its exact managed version without touching another scope", async () => {
+  await withCliRuntime(async ({ home, cwd, target }) => {
+    for (const scope of ["user", "workspace"]) {
+      const installed = await runCli(
+        ["install", "acme/app/app", "--scope", scope, "--yes", "--json"],
+        { home, cwd }
+      );
+      assert.equal(installed.code, 0, installed.stdout);
+    }
+    const projectDetached = await runCli(
+      ["detach", "acme/app/app", "--scope", "workspace", "--json"], { home, cwd }
+    );
+    assert.equal(projectDetached.code, 0, projectDetached.stdout);
+    await writeFile(join(target, "app", "LOCAL"), "Project customization.\n");
+    const projectMarker = await readFile(join(target, ".skiloom-state"));
+    const projectSkill = await readFile(join(target, "app", "SKILL.md"));
+    const userTarget = join(home, ".agents", "skills");
+    const original = await readFile(join(userTarget, "app", "SKILL.md"));
+    const detached = await runCli(
+      ["detach", "acme/app/app", "--scope", "user", "--json"], { home, cwd }
+    );
+    assert.equal(detached.code, 0, detached.stdout);
+    const restored = await runCli(
+      ["restore", "acme/app/app", "--scope", "user", "--json"], { home, cwd }
+    );
+    assert.equal(restored.code, 0, restored.stdout);
+    assert.notEqual(restored.stdout, "", restored.stderr);
+    const output = parseLocalOutput(restored.stdout);
+    assert.equal(output.result.status, "restored");
+    assert.equal(output.result.projections[0]?.ownership, "managed");
+    assert.deepEqual(output.result.detached, []);
+    assert.deepEqual(await readFile(join(userTarget, "app", "SKILL.md")), original);
+    assert.deepEqual(await readFile(join(target, ".skiloom-state")), projectMarker);
+    assert.deepEqual(await readFile(join(target, "app", "SKILL.md")), projectSkill);
+    assert.equal(await readFile(join(target, "app", "LOCAL"), "utf8"), "Project customization.\n");
+    const again = await runCli(
+      ["restore", "acme/app/app", "--scope", "user", "--json"], { home, cwd }
+    );
+    assert.equal(again.code, 0, again.stdout);
+    assert.equal(parseLocalOutput(again.stdout).result.status, "no-op");
+    assert.equal(parseLocalOutput(again.stdout).result.generation, output.result.generation);
+  });
+});
+
 type ParsedLocalOutput = Readonly<{
   ok: boolean;
   error?: Readonly<{
@@ -337,6 +381,8 @@ test("explicit local operations reject ordinary candidate --yes flags", async ()
     const cases = [
       ["rename", "acme/app/app", "app-local", "--yes", "--json"],
       ["detach", "acme/app/app", "--yes", "--json"],
+      ["restore", "acme/app/app", "--yes", "--json"],
+      ["restore", "acme/app/app", "--plan", "--json"],
       ["rebind", "acme/app/app", "app-local", "--yes", "--json"],
       ["forget", "acme/app/app", "--yes", "--json"]
     ];

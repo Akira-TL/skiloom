@@ -89,6 +89,11 @@ export const CLI_HELP_SPECS = {
     summary: "Transfer one managed projection to user ownership.",
     options: [...TARGET_OPTIONS, "--json"]
   },
+  restore: {
+    usage: "skiloom restore <package> [target-options] [--json]",
+    summary: "Restore an unchanged detached projection to exact managed ownership.",
+    options: [...TARGET_OPTIONS, "--json"]
+  },
   rebind: {
     usage: "skiloom rebind <package> <activation-name> [target-options] [--json]",
     summary: "Rebind a broken detached projection.",

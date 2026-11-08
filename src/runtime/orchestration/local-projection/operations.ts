@@ -53,6 +53,7 @@ import {
 } from "./reconcile.js";
 
 export type { InvalidLocalProjectionOperation } from "./reconcile.js";
+export { restoreAcceptedProjection } from "./restore.js";
 import {
   targetStateMarkerFactsFromRegistryState
 } from "../../target-state-recovery.js";
@@ -62,6 +63,7 @@ export type LocalProjectionOperationResult = Readonly<{
     | "no-op"
     | "renamed"
     | "detached"
+    | "restored"
     | "rebound"
     | "forgotten";
   state: RegistryTargetState;

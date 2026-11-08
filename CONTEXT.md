@@ -112,6 +112,8 @@ Skiloom 为 rename 或 dependency routing 等确定性变换生成并继续全�
 
 用户显式把一个 managed projection 原地转换成普通本地 copy 后形成的 user-owned dependency override。它继续占据原 Package coordinate 在该 Target 的 dependency slot 并可被宿主发现，但其 bytes 退出 Skiloom content ownership；Skiloom只保留 detach 时的 baseline provenance 用于诊断与提醒，后续相关 update 必须提示用户自行适配，不能自动覆盖、合并或宣称本地内容满足新的版本约束。
 
+`restore` 可以把未修改的已解除管理副本恢复为原精确版本受管投影。解除时来源与内容基线须与当前已接受精确图一致，投影名称与变换保持不变；只变更选定包和目标目录的所有权及必要物化状态，不重新解析依赖或升级其他包。内容修改、基线变化或无法证明所有权时失败并保留现场。此操作不同于重新绑定位置的 `rebind` 与数据库丢失后的 `recover`。
+
 ## Activation Rename
 
 对 resolved Package 的 projected Skill identity 改名。Rename 不改变 Package coordinate、source resolution 或 Package Store `content-digest`；Skiloom 用 Managed Transformed Projection 同步修改目录名与顶层 `SKILL.md.name`，并继续自动更新该 projection。为灾难恢复，非默认 rename 作为稀疏 projection override 写入 Target Recovery Marker。
@@ -162,7 +164,7 @@ Skiloom 官方实现使用 Node.js + TypeScript + npm 作为主控制面与发�
 
 ## CLI Surface
 
-Skiloom v0 的 canonical CLI commands 为 `search/status/doctor/validate/install/update/remove/rename/sync/repair/detach/rebind/forget/observe/recover/fork/export/import/bootstrap`。完整 Candidate 命令统一支持 `--plan`；non-interactive 真正提交新状态需要 `--yes`，Release retarget 额外要求 `--allow-release-retarget`，merge import 额外要求 `--merge`。`--json` 自动禁止 prompt，但不自动批准 candidate，并通过 `SKILOOM-CLI-V1` envelope 返回 `schema/ok/command/result|error/warnings`。CLI 自描述是独立的人类 meta surface：bare `skiloom`、top-level `--help/-h`、`--version/-V` 和每个 canonical command 的 `--help/-h` 在产品 parser/副作用前短路；help/version 不进入 JSON envelope，也不新增 `help` command。v0 不提供 `--force`、永久 source whitelist、policy DSL、同义 alias 或 TUI。
+Skiloom v0 的 canonical CLI commands 为 `search/status/doctor/validate/install/update/remove/rename/sync/repair/detach/restore/rebind/forget/observe/recover/fork/export/import/bootstrap`。完整 Candidate 命令统一支持 `--plan`；non-interactive 真正提交新状态需要 `--yes`，Release retarget 额外要求 `--allow-release-retarget`，merge import 额外要求 `--merge`。`--json` 自动禁止 prompt，但不自动批准 candidate，并通过 `SKILOOM-CLI-V1` envelope 返回 `schema/ok/command/result|error/warnings`。CLI 自描述是独立的人类 meta surface：bare `skiloom`、top-level `--help/-h`、`--version/-V` 和每个 canonical command 的 `--help/-h` 在产品 parser/副作用前短路；help/version 不进入 JSON envelope，也不新增 `help` command。v0 不提供 `--force`、永久 source whitelist、policy DSL、同义 alias 或 TUI。
 
 ## Machine Registry
 
