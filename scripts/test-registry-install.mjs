@@ -81,7 +81,10 @@ try {
   const npxResult = await runNpx(
     [
       "--yes",
+      "--package",
       packageSpec,
+      "--",
+      "skiloom",
       "sync",
       "--target",
       npxTarget,
