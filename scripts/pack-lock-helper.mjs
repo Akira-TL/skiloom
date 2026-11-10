@@ -56,6 +56,15 @@ const TARGETS = new Map([
   ]
 ]);
 
+export function packTargetForLockHelperPackage(packageName) {
+  for (const [target, metadata] of TARGETS) {
+    if (metadata.packageName === packageName) {
+      return target;
+    }
+  }
+  return undefined;
+}
+
 export async function packLockHelper(target, binaryPath, outputDirectory) {
   const metadata = TARGETS.get(target);
   if (metadata === undefined) {

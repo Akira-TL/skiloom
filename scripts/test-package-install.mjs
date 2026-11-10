@@ -5,7 +5,11 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import process from "node:process";
 
-import { packLockHelper, runNpm } from "./pack-lock-helper.mjs";
+import {
+  packLockHelper,
+  packTargetForLockHelperPackage,
+  runNpm
+} from "./pack-lock-helper.mjs";
 
 const { operationLockPlatformPackage } = await import(
   "../dist/native/operation-lock-helper.js"
@@ -30,7 +34,12 @@ if (selected === undefined) {
   );
 }
 
-const target = selected.packageName.replace("skiloom-lock-", "");
+const target = packTargetForLockHelperPackage(selected.packageName);
+if (target === undefined) {
+  throw new Error(
+    `no pack target is registered for helper package: ${selected.packageName}`
+  );
+}
 const binary = await resolveBuiltHelper(selected.executablePath.endsWith(".exe"));
 const root = await mkdtemp(join(tmpdir(), "skiloom-package-install-"));
 const packDirectory = join(root, "pack");
