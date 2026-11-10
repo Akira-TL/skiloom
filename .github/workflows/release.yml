@@ -79,7 +79,7 @@ jobs:
               echo "${package_name}@${version} already exists with matching tarball; skipping"
               return
             fi
-            npm publish "${tarball}" --access public --provenance
+            npm publish "./${tarball}" --access public --provenance
           }
 
           for package in skiloom-lock-darwin-arm64 skiloom-lock-darwin-x64 skiloom-lock-linux-x64-gnu skiloom-lock-win32-x64; do
