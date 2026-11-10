@@ -90,7 +90,8 @@ try {
       npxTarget,
       "--json"
     ],
-    runtimeEnvironment(npxHome)
+    runtimeEnvironment(npxHome),
+    npxHome
   );
   assertLockedCommandReachedTargetState(npxResult, npxTarget);
 
@@ -171,14 +172,14 @@ function runNpm(args, env) {
   return runCommand(process.execPath, [npmCli, ...args], env);
 }
 
-function runNpx(args, env) {
-  return runCommand(process.execPath, [npxCli, ...args], env);
+function runNpx(args, env, cwd) {
+  return runCommand(process.execPath, [npxCli, ...args], env, cwd);
 }
 
-function runCommand(command, args, env) {
+function runCommand(command, args, env, cwd = process.cwd()) {
   return new Promise((resolveResult, reject) => {
     const child = spawn(command, args, {
-      cwd: process.cwd(),
+      cwd,
       env,
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true
