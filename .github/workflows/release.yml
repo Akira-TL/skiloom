@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Published release tag to verify from the npm registry"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -11,6 +17,7 @@ permissions:
 jobs:
   validate:
     name: Validate release metadata
+    if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -22,13 +29,15 @@ jobs:
 
   ci:
     name: Release CI
+    if: github.event_name == 'push'
     needs: validate
     uses: ./.github/workflows/ci.yml
     permissions:
       contents: read
 
-  publish:
-    name: Publish npm packages
+  stage:
+    name: Stage npm packages
+    if: github.event_name == 'push'
     needs: ci
     runs-on: ubuntu-24.04
     permissions:
@@ -41,6 +50,8 @@ jobs:
           node-version: 24
           registry-url: https://registry.npmjs.org
       - run: npm ci
+      - name: Install npm with staged publishing support
+        run: npm install --global npm@11.21.2
       - run: npm run verify:release-version -- "${GITHUB_REF_NAME}"
       - run: npm run build
       - uses: actions/download-artifact@v4
@@ -59,7 +70,7 @@ jobs:
             test -f "artifacts/${package}-${version}.tgz"
           done
           test -f "artifacts/skiloom-${version}.tgz"
-      - name: Publish helpers then main package
+      - name: Stage helpers then main package
         shell: bash
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -67,11 +78,12 @@ jobs:
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
 
-          publish_if_missing() {
+          stage_if_missing() {
             package_name="$1"
             tarball="$2"
+            local_sha="$(node -e "const fs=require('node:fs'); const crypto=require('node:crypto'); const bytes=fs.readFileSync(process.argv[1]); process.stdout.write(crypto.createHash('sha1').update(bytes).digest('hex'));" "${tarball}")"
+
             if existing_sha="$(npm view "${package_name}@${version}" dist.shasum 2>/dev/null)"; then
-              local_sha="$(node -e "const fs=require('node:fs'); const crypto=require('node:crypto'); const bytes=fs.readFileSync(process.argv[1]); process.stdout.write(crypto.createHash('sha1').update(bytes).digest('hex'));" "${tarball}")"
               if [ -z "${existing_sha}" ] || [ "${existing_sha}" != "${local_sha}" ]; then
                 echo "::error::${package_name}@${version} already exists with different tarball content"
                 exit 1
@@ -79,18 +91,44 @@ jobs:
               echo "${package_name}@${version} already exists with matching tarball; skipping"
               return
             fi
-            npm publish "./${tarball}" --access public --provenance
+
+            staged_json="$(npm stage list "${package_name}" --json)"
+            staged_sha="$(node -e "const items=JSON.parse(process.argv[1]); const version=process.argv[2]; const item=items.find((entry) => entry.version === version); if (item?.shasum) process.stdout.write(item.shasum);" "${staged_json}" "${version}")"
+            if [ -n "${staged_sha}" ]; then
+              if [ "${staged_sha}" != "${local_sha}" ]; then
+                echo "::error::${package_name}@${version} is already staged with different tarball content"
+                exit 1
+              fi
+              echo "${package_name}@${version} is already staged with matching tarball; skipping"
+              return
+            fi
+
+            npm stage publish "./${tarball}" --access public --provenance
           }
 
           for package in skiloom-lock-darwin-arm64 skiloom-lock-darwin-x64 skiloom-lock-linux-x64-gnu skiloom-lock-win32-x64; do
-            publish_if_missing "${package}" "artifacts/${package}-${version}.tgz"
+            stage_if_missing "${package}" "artifacts/${package}-${version}.tgz"
           done
 
-          publish_if_missing "skiloom" "artifacts/skiloom-${version}.tgz"
+          stage_if_missing "skiloom" "artifacts/skiloom-${version}.tgz"
+
+      - name: Record staged packages
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          {
+            echo "## npm staged packages"
+            for package in skiloom-lock-darwin-arm64 skiloom-lock-darwin-x64 skiloom-lock-linux-x64-gnu skiloom-lock-win32-x64 skiloom; do
+              echo
+              echo "### ${package}"
+              npm stage list "${package}"
+            done
+          } >> "${GITHUB_STEP_SUMMARY}"
 
   registry-smoke:
     name: Registry install (${{ matrix.target }})
-    needs: publish
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -106,9 +144,11 @@ jobs:
             os: windows-2025
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.release_tag }}
       - uses: actions/setup-node@v7
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
-      - run: npm run verify:release-version -- "${{ github.ref_name }}"
+      - run: npm run verify:release-version -- "${{ inputs.release_tag }}"
       - run: npm run test:registry-install
