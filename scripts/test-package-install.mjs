@@ -83,6 +83,7 @@ try {
   const omittedMain = join(
     omittedInstallDirectory,
     "node_modules",
+    "@akira-tl",
     "skiloom",
     "dist",
     "cli",
@@ -126,6 +127,7 @@ try {
   const installedMain = join(
     installDirectory,
     "node_modules",
+    "@akira-tl",
     "skiloom",
     "dist",
     "cli",

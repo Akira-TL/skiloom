@@ -24,25 +24,25 @@ export function operationLockPlatformPackage(
 ): OperationLockPlatformPackage | undefined {
   if (platform === "linux" && arch === "x64" && libc === "glibc") {
     return {
-      packageName: "skiloom-lock-linux-x64-gnu",
+      packageName: "@akira-tl/skiloom-lock-linux-x64-gnu",
       executablePath: "bin/skiloom-lock"
     };
   }
   if (platform === "darwin" && arch === "x64") {
     return {
-      packageName: "skiloom-lock-darwin-x64",
+      packageName: "@akira-tl/skiloom-lock-darwin-x64",
       executablePath: "bin/skiloom-lock"
     };
   }
   if (platform === "darwin" && arch === "arm64") {
     return {
-      packageName: "skiloom-lock-darwin-arm64",
+      packageName: "@akira-tl/skiloom-lock-darwin-arm64",
       executablePath: "bin/skiloom-lock"
     };
   }
   if (platform === "win32" && arch === "x64") {
     return {
-      packageName: "skiloom-lock-win32-x64-msvc",
+      packageName: "@akira-tl/skiloom-lock-win32-x64-msvc",
       executablePath: "bin/skiloom-lock.exe"
     };
   }

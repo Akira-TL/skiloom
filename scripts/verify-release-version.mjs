@@ -3,10 +3,22 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const PLATFORM_PACKAGES = [
-  "skiloom-lock-darwin-arm64",
-  "skiloom-lock-darwin-x64",
-  "skiloom-lock-linux-x64-gnu",
-  "skiloom-lock-win32-x64-msvc"
+  {
+    name: "@akira-tl/skiloom-lock-darwin-arm64",
+    directory: "skiloom-lock-darwin-arm64"
+  },
+  {
+    name: "@akira-tl/skiloom-lock-darwin-x64",
+    directory: "skiloom-lock-darwin-x64"
+  },
+  {
+    name: "@akira-tl/skiloom-lock-linux-x64-gnu",
+    directory: "skiloom-lock-linux-x64-gnu"
+  },
+  {
+    name: "@akira-tl/skiloom-lock-win32-x64-msvc",
+    directory: "skiloom-lock-win32-x64-msvc"
+  }
 ];
 
 const tag = process.argv[2] ?? process.env.GITHUB_REF_NAME;
@@ -21,16 +33,17 @@ if (
 const version = tag.slice(1);
 
 const root = await readJson("package.json");
-assert.equal(root.name, "skiloom");
+assert.equal(root.name, "@akira-tl/skiloom");
 assert.equal(
   root.version,
   version,
   `package.json version must match ${tag}`
 );
 
-for (const packageName of PLATFORM_PACKAGES) {
+for (const platformPackage of PLATFORM_PACKAGES) {
+  const packageName = platformPackage.name;
   const helper = await readJson(
-    resolve("packages", packageName, "package.json")
+    resolve("packages", platformPackage.directory, "package.json")
   );
   assert.equal(helper.name, packageName);
   assert.equal(

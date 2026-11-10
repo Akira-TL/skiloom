@@ -15,7 +15,7 @@ test("installed version discovery follows nearest Skiloom package metadata inste
     await mkdir(nested, { recursive: true });
     await writeFile(
       join(root, "package.json"),
-      JSON.stringify({ name: "skiloom", version: "9.8.7-test" }),
+      JSON.stringify({ name: "@akira-tl/skiloom", version: "9.8.7-test" }),
       "utf8"
     );
     await writeFile(

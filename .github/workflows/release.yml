@@ -66,10 +66,14 @@ jobs:
         run: |
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
-          for package in skiloom-lock-darwin-arm64 skiloom-lock-darwin-x64 skiloom-lock-linux-x64-gnu skiloom-lock-win32-x64-msvc; do
-            test -f "artifacts/${package}-${version}.tgz"
+          package_tarball() {
+            package_basename="${1#@akira-tl/}"
+            printf 'artifacts/akira-tl-%s-%s.tgz' "${package_basename}" "${version}"
+          }
+          for package in @akira-tl/skiloom-lock-darwin-arm64 @akira-tl/skiloom-lock-darwin-x64 @akira-tl/skiloom-lock-linux-x64-gnu @akira-tl/skiloom-lock-win32-x64-msvc; do
+            test -f "$(package_tarball "${package}")"
           done
-          test -f "artifacts/skiloom-${version}.tgz"
+          test -f "$(package_tarball "@akira-tl/skiloom")"
       - name: Stage helpers then main package with OIDC
         shell: bash
         run: |
@@ -93,11 +97,16 @@ jobs:
             npm stage publish "./${tarball}" --access public
           }
 
-          for package in skiloom-lock-darwin-arm64 skiloom-lock-darwin-x64 skiloom-lock-linux-x64-gnu skiloom-lock-win32-x64-msvc; do
-            stage_if_unpublished "${package}" "artifacts/${package}-${version}.tgz"
+          package_tarball() {
+            package_basename="${1#@akira-tl/}"
+            printf 'artifacts/akira-tl-%s-%s.tgz' "${package_basename}" "${version}"
+          }
+
+          for package in @akira-tl/skiloom-lock-darwin-arm64 @akira-tl/skiloom-lock-darwin-x64 @akira-tl/skiloom-lock-linux-x64-gnu @akira-tl/skiloom-lock-win32-x64-msvc; do
+            stage_if_unpublished "${package}" "$(package_tarball "${package}")"
           done
 
-          stage_if_unpublished "skiloom" "artifacts/skiloom-${version}.tgz"
+          stage_if_unpublished "@akira-tl/skiloom" "$(package_tarball "@akira-tl/skiloom")"
 
   registry-smoke:
     name: Registry install (${{ matrix.target }})

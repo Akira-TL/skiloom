@@ -1,5 +1,5 @@
 {
-  "name": "skiloom",
+  "name": "@akira-tl/skiloom",
   "version": "0.8.16",
   "description": "Agent Skill package manager and installer",
   "repository": {
@@ -66,9 +66,9 @@
     "yaml": "^2.9.1"
   },
   "optionalDependencies": {
-    "skiloom-lock-darwin-arm64": "0.8.16",
-    "skiloom-lock-darwin-x64": "0.8.16",
-    "skiloom-lock-linux-x64-gnu": "0.8.16",
-    "skiloom-lock-win32-x64-msvc": "0.8.16"
+    "@akira-tl/skiloom-lock-darwin-arm64": "0.8.16",
+    "@akira-tl/skiloom-lock-darwin-x64": "0.8.16",
+    "@akira-tl/skiloom-lock-linux-x64-gnu": "0.8.16",
+    "@akira-tl/skiloom-lock-win32-x64-msvc": "0.8.16"
   }
 }

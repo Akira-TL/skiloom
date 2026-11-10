@@ -9,28 +9,28 @@ test("operation-lock platform package selection matches the v0 release matrix", 
   assert.deepEqual(
     operationLockPlatformPackage("linux", "x64", "glibc"),
     {
-      packageName: "skiloom-lock-linux-x64-gnu",
+      packageName: "@akira-tl/skiloom-lock-linux-x64-gnu",
       executablePath: "bin/skiloom-lock"
     }
   );
   assert.deepEqual(
     operationLockPlatformPackage("darwin", "x64", null),
     {
-      packageName: "skiloom-lock-darwin-x64",
+      packageName: "@akira-tl/skiloom-lock-darwin-x64",
       executablePath: "bin/skiloom-lock"
     }
   );
   assert.deepEqual(
     operationLockPlatformPackage("darwin", "arm64", null),
     {
-      packageName: "skiloom-lock-darwin-arm64",
+      packageName: "@akira-tl/skiloom-lock-darwin-arm64",
       executablePath: "bin/skiloom-lock"
     }
   );
   assert.deepEqual(
     operationLockPlatformPackage("win32", "x64", null),
     {
-      packageName: "skiloom-lock-win32-x64-msvc",
+      packageName: "@akira-tl/skiloom-lock-win32-x64-msvc",
       executablePath: "bin/skiloom-lock.exe"
     }
   );

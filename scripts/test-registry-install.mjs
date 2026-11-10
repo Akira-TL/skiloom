@@ -12,7 +12,7 @@ const version = packageMetadata.version;
 if (typeof version !== "string" || version.length === 0) {
   throw new Error("package.json version is unavailable");
 }
-const packageSpec = `skiloom@${version}`;
+const packageSpec = `${packageMetadata.name}@${version}`;
 const helperSpec = `${currentHelperPackage()}@${version}`;
 const npmExecPath = process.env.npm_execpath;
 if (npmExecPath === undefined || npmExecPath.length === 0) {
@@ -65,7 +65,7 @@ try {
   const globalEntry = join(
     prefix,
     process.platform === "win32" ? "node_modules" : "lib/node_modules",
-    "skiloom",
+    ...packageMetadata.name.split("/"),
     "dist",
     "cli",
     "main.js"
@@ -151,17 +151,17 @@ function currentHelperPackage() {
   if (process.platform === "linux" && process.arch === "x64") {
     const report = process.report.getReport();
     if (typeof report.header?.glibcVersionRuntime === "string") {
-      return "skiloom-lock-linux-x64-gnu";
+      return "@akira-tl/skiloom-lock-linux-x64-gnu";
     }
   }
   if (process.platform === "darwin" && process.arch === "x64") {
-    return "skiloom-lock-darwin-x64";
+    return "@akira-tl/skiloom-lock-darwin-x64";
   }
   if (process.platform === "darwin" && process.arch === "arm64") {
-    return "skiloom-lock-darwin-arm64";
+    return "@akira-tl/skiloom-lock-darwin-arm64";
   }
   if (process.platform === "win32" && process.arch === "x64") {
-    return "skiloom-lock-win32-x64-msvc";
+    return "@akira-tl/skiloom-lock-win32-x64-msvc";
   }
   throw new Error(
     `registry smoke platform is outside the v0 matrix: ${process.platform}/${process.arch}`

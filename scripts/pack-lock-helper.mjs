@@ -17,7 +17,8 @@ const TARGETS = new Map([
   [
     "linux-x64-gnu",
     {
-      packageName: "skiloom-lock-linux-x64-gnu",
+      packageName: "@akira-tl/skiloom-lock-linux-x64-gnu",
+      packageDirectory: "skiloom-lock-linux-x64-gnu",
       executable: "skiloom-lock",
       os: ["linux"],
       cpu: ["x64"],
@@ -27,7 +28,8 @@ const TARGETS = new Map([
   [
     "darwin-x64",
     {
-      packageName: "skiloom-lock-darwin-x64",
+      packageName: "@akira-tl/skiloom-lock-darwin-x64",
+      packageDirectory: "skiloom-lock-darwin-x64",
       executable: "skiloom-lock",
       os: ["darwin"],
       cpu: ["x64"],
@@ -37,7 +39,8 @@ const TARGETS = new Map([
   [
     "darwin-arm64",
     {
-      packageName: "skiloom-lock-darwin-arm64",
+      packageName: "@akira-tl/skiloom-lock-darwin-arm64",
+      packageDirectory: "skiloom-lock-darwin-arm64",
       executable: "skiloom-lock",
       os: ["darwin"],
       cpu: ["arm64"],
@@ -47,7 +50,8 @@ const TARGETS = new Map([
   [
     "win32-x64",
     {
-      packageName: "skiloom-lock-win32-x64-msvc",
+      packageName: "@akira-tl/skiloom-lock-win32-x64-msvc",
+      packageDirectory: "skiloom-lock-win32-x64-msvc",
       executable: "skiloom-lock.exe",
       os: ["win32"],
       cpu: ["x64"],
@@ -71,7 +75,7 @@ export async function packLockHelper(target, binaryPath, outputDirectory) {
     throw new Error(`unsupported lock helper package target: ${target}`);
   }
 
-  const sourceDirectory = resolve("packages", metadata.packageName);
+  const sourceDirectory = resolve("packages", metadata.packageDirectory);
   const binary = resolve(binaryPath);
   const output = resolve(outputDirectory);
   await stat(binary);
@@ -105,7 +109,7 @@ export async function packLockHelper(target, binaryPath, outputDirectory) {
 
   await mkdir(output, { recursive: true });
   const temporaryRoot = await mkdtemp(join(tmpdir(), "skiloom-lock-package-"));
-  const stagingDirectory = join(temporaryRoot, metadata.packageName);
+  const stagingDirectory = join(temporaryRoot, metadata.packageDirectory);
 
   try {
     await cp(sourceDirectory, stagingDirectory, { recursive: true });

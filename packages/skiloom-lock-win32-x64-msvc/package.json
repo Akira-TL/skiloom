@@ -1,5 +1,5 @@
 {
-  "name": "skiloom-lock-win32-x64-msvc",
+  "name": "@akira-tl/skiloom-lock-win32-x64-msvc",
   "version": "0.8.16",
   "description": "Skiloom operation-lock helper for Windows x64",
   "os": [

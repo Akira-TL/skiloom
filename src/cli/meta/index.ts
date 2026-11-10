@@ -265,7 +265,7 @@ export async function readSkiloomPackageVersion(
       const parsed = JSON.parse(source) as unknown;
       if (
         isRecord(parsed) &&
-        parsed.name === "skiloom" &&
+        parsed.name === "@akira-tl/skiloom" &&
         typeof parsed.version === "string" &&
         parsed.version.length > 0
       ) {
