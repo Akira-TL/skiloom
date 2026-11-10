@@ -150,5 +150,7 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
+      - name: Install npm used by registry smoke
+        run: npm install --global npm@11.21.2
       - run: npm run verify:release-version -- "${{ inputs.release_tag }}"
       - run: npm run test:registry-install
