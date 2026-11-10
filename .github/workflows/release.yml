@@ -74,10 +74,8 @@ jobs:
             test -f "$(package_tarball "${package}")"
           done
           test -f "$(package_tarball "@akira-tl/skiloom")"
-      - name: Stage scoped packages with bootstrap token
+      - name: Stage scoped packages with OIDC
         shell: bash
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
@@ -96,7 +94,7 @@ jobs:
               return
             fi
 
-            npm stage publish "./${tarball}" --access public --provenance
+            npm stage publish "./${tarball}" --access public
           }
 
           package_tarball() {
