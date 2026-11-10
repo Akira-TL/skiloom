@@ -152,7 +152,7 @@ Skiloom v0 不执行 destructive automatic Package Store GC。移除某个 proje
 
 ## Skiloom Public Namespace
 
-Skiloom v0 的公开 token 是 `skiloom`：CLI 为 `skiloom`，Package/Repository optional metadata 为 `skiloom-package.toml` / `skiloom-repo.toml`，公开 Package Snapshot format identifier 为 `SKILOOM-PACKAGE-V1`。普通安装不要求项目级 `skiloom.toml` / `skiloom.lock`；目标目录用 `.skiloom-state` 保留轻量恢复锚点，完整机器安装状态由 Skiloom Home 的 Machine Registry 管理。`.agents/skills` 等宿主目录只是 Target。旧 `AKM / akm` 只属于 pre-standard working draft，不形成 v0 compatibility alias。
+Skiloom v0 的产品、CLI 与协议公开 token 是 `skiloom`：CLI 为 `skiloom`，Package/Repository optional metadata 为 `skiloom-package.toml` / `skiloom-repo.toml`，公开 Package Snapshot format identifier 为 `SKILOOM-PACKAGE-V1`。官方 npm distribution identity 单独使用 `@akira-tl` scope：主包为 `@akira-tl/skiloom`，平台 helper 为 `@akira-tl/skiloom-lock-*`；npm scope 不进入 GitHub Package Coordinate、Machine Registry、Target、marker 或 export 格式。普通安装不要求项目级 `skiloom.toml` / `skiloom.lock`；目标目录用 `.skiloom-state` 保留轻量恢复锚点，完整机器安装状态由 Skiloom Home 的 Machine Registry 管理。`.agents/skills` 等宿主目录只是 Target。旧 `AKM / akm` 只属于 pre-standard working draft，不形成 v0 compatibility alias。
 
 ## Official Product Contract
 
@@ -160,7 +160,7 @@ Skiloom 当前最高产品权威，定义官方产品必须遵守的安装、解
 
 ## Official Implementation Architecture
 
-Skiloom 官方实现使用 Node.js + TypeScript + npm 作为主控制面与发行方式：Node.js >=22，开发/release 主线为 Node 24 LTS，公开 npm package / executable 均为 `skiloom`。v0 的 `operation.lock` 由预编译 mandatory Rust standalone helper `skiloom-lock` 提供 OS 级跨平台文件锁能力；resolver/Git/snapshot/export 等复杂计算热点仍只在 benchmark 证明值得时使用可选 native compute helper。所有 helper 都位于窄内部 seam 后，不能独立拥有网络、凭据、用户授权、Machine Registry 写入或 Target destructive mutation；产品行为权威是 Skiloom 官方产品规范与官方行为测试数据。
+Skiloom 官方实现使用 Node.js + TypeScript + npm 作为主控制面与发行方式：Node.js >=22，开发/release 主线为 Node 24 LTS，官方 npm 主包为 `@akira-tl/skiloom`，CLI executable 仍为 `skiloom`。v0 的 `operation.lock` 由预编译 mandatory Rust standalone helper `skiloom-lock` 提供 OS 级跨平台文件锁能力，其 npm 平台包统一使用 `@akira-tl/skiloom-lock-*`。resolver/Git/snapshot/export 等复杂计算热点仍只在 benchmark 证明值得时使用可选 native compute helper。所有 helper 都位于窄内部 seam 后，不能独立拥有网络、凭据、用户授权、Machine Registry 写入或 Target destructive mutation；产品行为权威是 Skiloom 官方产品规范与官方行为测试数据。
 
 ## CLI Surface
 

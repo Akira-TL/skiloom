@@ -239,9 +239,9 @@ Target 本身是否位于其他文件系统是另一个 materialization/prefligh
 最终用户入口不变：
 
 ```text
-npm install -g skiloom
+npm install -g @akira-tl/skiloom
 # 或
-npx skiloom ...
+npx --package @akira-tl/skiloom -- skiloom ...
 ```
 
 CI 为支持的平台预编译 `skiloom-lock`。主 npm package 使用 platform-filtered helper package 作为发行实现细节；允许通过 `optionalDependencies` 表达多平台 package 选择，但 **产品能力并非 optional**。
@@ -258,12 +258,12 @@ v0 release readiness 固定首发支持矩阵如下；这些 package 只是主 `
 
 | Target | npm package | npm platform metadata | executable |
 | --- | --- | --- | --- |
-| Linux x64 glibc 2.17+ | `skiloom-lock-linux-x64-gnu` | `os=linux`, `cpu=x64`, `libc=glibc` | `bin/skiloom-lock` |
-| macOS x64 | `skiloom-lock-darwin-x64` | `os=darwin`, `cpu=x64` | `bin/skiloom-lock` |
-| macOS arm64 | `skiloom-lock-darwin-arm64` | `os=darwin`, `cpu=arm64` | `bin/skiloom-lock` |
-| Windows x64 | `skiloom-lock-win32-x64-msvc` | `os=win32`, `cpu=x64` | `bin/skiloom-lock.exe` |
+| Linux x64 glibc 2.17+ | `@akira-tl/skiloom-lock-linux-x64-gnu` | `os=linux`, `cpu=x64`, `libc=glibc` | `bin/skiloom-lock` |
+| macOS x64 | `@akira-tl/skiloom-lock-darwin-x64` | `os=darwin`, `cpu=x64` | `bin/skiloom-lock` |
+| macOS arm64 | `@akira-tl/skiloom-lock-darwin-arm64` | `os=darwin`, `cpu=arm64` | `bin/skiloom-lock` |
+| Windows x64 | `@akira-tl/skiloom-lock-win32-x64-msvc` | `os=win32`, `cpu=x64` | `bin/skiloom-lock.exe` |
 
-四个 helper package 与主 `skiloom` package 使用同一版本号并由同一 release tag 构建。主 package 通过 `optionalDependencies` 同时声明四个精确版本，让 npm 根据 `os` / `cpu` / `libc` 只安装匹配项；“optional”只描述 npm 的平台选择机制，不改变 `operation.lock` 在产品层的 mandatory 语义。
+四个 helper package 与主 `@akira-tl/skiloom` package 使用同一版本号并由同一 release tag 构建。主 package 通过 `optionalDependencies` 同时声明四个精确版本，让 npm 根据 `os` / `cpu` / `libc` 只安装匹配项；“optional”只描述 npm 的平台选择机制，不改变 `operation.lock` 在产品层的 mandatory 语义。
 
 Linux x64 GNU ABI 发行物必须按 Rust `x86_64-unknown-linux-gnu` 的 Tier 1 基线保持 glibc 2.17+ 可运行。Release CI 不允许直接在较新的 Ubuntu runner 上链接最终 Linux helper；它使用固定 digest 的 manylinux2014（glibc 2.17）构建环境，并在打包前审计 ELF 导入的 `GLIBC_*` 符号版本，最高版本不得超过 2.17。这样 npm 的 `libc=glibc` 只负责 libc 家族选择，实际 binary compatibility 不依赖 runner 当前安装的更高 glibc。
 

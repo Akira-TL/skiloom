@@ -1,9 +1,9 @@
 # ADR 0017：Node.js 官方实现 + Optional Native Helpers
 
-- 状态：Accepted
+- 状态：Partially Superseded by ADR 0033
 - 日期：2026-09-15
 
-当前补充：ADR 0025 已把 `operation.lock` 固定为 mandatory Rust System Capability Helper。本文中“optional native helper”的原始表述继续适用于 compute helper；`skiloom-lock` 是已经显式批准的系统能力例外。
+当前补充：ADR 0025 已把 `operation.lock` 固定为 mandatory Rust System Capability Helper。本文中“optional native helper”的原始表述继续适用于 compute helper；`skiloom-lock` 是已经显式批准的系统能力例外。ADR 0033 已把官方 npm 发行坐标从 unscoped `skiloom` / `skiloom-lock-*` 改为 `@akira-tl/skiloom` / `@akira-tl/skiloom-lock-*`；CLI executable 仍为 `skiloom`。
 
 ## 背景
 

@@ -359,7 +359,7 @@ Skiloom v0 提供五个第一方标准 Skill Package：`skiloom`、`skiloom-disc
 
 Bootstrap 本质是一次用户显式发起的普通 Router direct install，一次只处理一个用户选择的 Target，并继续使用“显式 Target > 显式 Host preset + scope > 默认 `.agents/skills`”的 Target 选择规则。默认 bootstrap 不使用 repository-wide install，因此官方 repository 后来新增其他 Skill 时，不会仅因 discovery 到新 Package 就自动进入现有 Suite；Suite 扩展必须通过 Router dependency 变化进入普通 update candidate 和 acceptance。
 
-`npm install -g skiloom` / `npx skiloom` 本身不得修改任何 Skill Target，也不得通过 postinstall 或首次运行副作用静默 bootstrap。第一方 Skill 不能直接写 Machine Registry、修改 Store、绕过 `operation.lock`、自动接受来源/Release retarget 或取得普通 Package 之外的隐藏 Target 写权限。
+`npm install -g @akira-tl/skiloom` / `npx --package @akira-tl/skiloom -- skiloom` 本身不得修改任何 Skill Target，也不得通过 postinstall 或首次运行副作用静默 bootstrap。第一方 Skill 不能直接写 Machine Registry、修改 Store、绕过 `operation.lock`、自动接受来源/Release retarget 或取得普通 Package 之外的隐藏 Target 写权限。
 
 Suite 启用后的 update/remove/sync/repair/detach/rename 等生命周期全部沿用普通 Target 规则。详细契约见 [`first-party-skill-suite-bootstrap.md`](first-party-skill-suite-bootstrap.md)。
 
@@ -369,7 +369,7 @@ Skiloom 官方实现继续采用：
 
 - Node.js >= 22；开发/release 主线 Node.js 24 LTS；
 - TypeScript strict + ESM；
-- npm package / executable `skiloom`；
+- npm package `@akira-tl/skiloom` / executable `skiloom`；
 - Node 层拥有 CLI、GitHub access、credentials、状态接受、Store/Target side effects 与用户交互；
 - `operation.lock` 使用一个预编译 mandatory Rust standalone helper `skiloom-lock` 提供跨平台 OS file lock capability；
 - 真实计算热点仍可按 benchmark 使用可选预编译 Rust/C/C++ standalone helper；

@@ -2,7 +2,7 @@
 
 - 状态：Partially Superseded by ADR 0018
 - 日期：2026-09-14
-- 当前说明：`Skiloom / skiloom` 品牌、CLI/package token、`skiloom-package.toml`、`skiloom-repo.toml` 与 `SKILOOM-PACKAGE-V1` 继续有效；旧 `.agents/.skiloom/skiloom.toml`、`skiloom.lock`、`activation.lock` 等项目状态 namespace 已退役。现行规则见 `docs/design/skiloom-v0-product-contract.md`。
+- 当前说明：`Skiloom / skiloom` 品牌、CLI/protocol token、`skiloom-package.toml`、`skiloom-repo.toml` 与 `SKILOOM-PACKAGE-V1` 继续有效；旧 `.agents/.skiloom/skiloom.toml`、`skiloom.lock`、`activation.lock` 等项目状态 namespace 已退役。ADR 0033 进一步把官方 npm distribution identity 改为 `@akira-tl/skiloom` / `@akira-tl/skiloom-lock-*`，但不改变 CLI 或协议 token。现行规则见 `docs/design/skiloom-v0-product-contract.md`。
 
 ## 背景
 
@@ -50,7 +50,7 @@ SKILOOM-PACKAGE-V1\0
 
 Snapshot framing和其他已接受算法不改变。因为旧 identifier 从未成为公开 release，本次是 pre-standard namespace correction，不定义 `akm` compatibility alias、dual-reader 或 dual-digest；正式 v0 只认 Skiloom namespace。
 
-Reference implementation未来首选 distribution/package token也是 `skiloom`，但具体 language registry不是 Core protocol的一部分，实际发布前重新核查/取得对应 namespace。
+Reference implementation 的 distribution/package identity 后续由 ADR 0033 固定为 npm scope `@akira-tl` 下的 `@akira-tl/skiloom`；具体 language registry identity 仍不是 Core protocol 的一部分，CLI/protocol token 保持 `skiloom`。
 
 GitHub repository在 active source-of-truth docs完成 namespace migration后，从 `Akira-TL/akira-skill-manager` rename到 `Akira-TL/skiloom`，并更新本地 `origin`。GitHub旧 URL redirect只作为迁移便利，不成为 protocol alias。
 

@@ -13,7 +13,7 @@
 官方实现优先优化：
 
 1. 用户通过 npm 低摩擦安装和试用；
-2. `npm install -g skiloom` / `npx skiloom` 可以直接进入产品；
+2. `npm install -g @akira-tl/skiloom` / `npx --package @akira-tl/skiloom -- skiloom` 可以直接进入产品；
 3. 协议语义与 CLI/runtime side effects 分离；
 4. 普通开发不要求 Rust/C/C++ toolchain；
 5. 对确实需要高性能或底层能力的热点，允许使用预编译 native helper；
@@ -256,7 +256,7 @@ Native helper 不应在用户执行 `npm install` 时现场编译。
 2. platform package 使用 npm `os` / `cpu`，Linux 必要时使用 `libc` metadata；
 3. 主 `skiloom` package 可以通过 `optionalDependencies` 表达 mutually-exclusive 的 platform helper packages；这个 npm 字段只解决平台选择，不代表 mandatory system capability 在产品上可选；
 4. Node runtime 检测已安装的匹配 helper；mandatory helper 缺失时明确失败，optional compute helper 缺失时在有 TS baseline 的情况下回退；
-5. `npm install -g skiloom` / `npx skiloom` 仍是用户唯一需要理解的入口。
+5. `npm install -g @akira-tl/skiloom` / `npx --package @akira-tl/skiloom -- skiloom` 仍是用户唯一需要理解的 npm 入口；CLI 命令名保持 `skiloom`。
 
 具体 platform package 名称是 release engineering 名称，不属于公开产品格式。在正式创建 npm scope/package 前必须重新验证 registry availability。
 
@@ -309,9 +309,9 @@ Native helper 自身 MAY 使用其语言生态的 unit/property tests，但这�
 目标用户体验：
 
 ```text
-npm install -g skiloom
+npm install -g @akira-tl/skiloom
 # 或
-npx skiloom ...
+npx --package @akira-tl/skiloom -- skiloom ...
 ```
 
 预编译 native helper只是 npm dependency graph内部的实现细节。`skiloom-lock` 是状态型操作所需的 mandatory helper；其他 compute helper 仍按真实性能证据选择。用户不应该为了使用 Skiloom而安装 Rust、C/C++ compiler、CMake 或 platform SDK。

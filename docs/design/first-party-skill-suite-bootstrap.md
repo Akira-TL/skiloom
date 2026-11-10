@@ -113,8 +113,8 @@ Bootstrap 是用户显式发起的首次启用动作，本质是一次普通 dir
 以下动作只安装 Skiloom 程序，不修改任何 Skill Target：
 
 ```text
-npm install -g skiloom
-npx skiloom ...
+npm install -g @akira-tl/skiloom
+npx --package @akira-tl/skiloom -- skiloom ...
 ```
 
 不能使用 npm postinstall 或首次运行副作用偷偷写入 `.agents/skills`、`.claude/skills` 或其他 Host Target。

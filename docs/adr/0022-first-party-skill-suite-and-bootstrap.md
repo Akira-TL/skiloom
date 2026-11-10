@@ -20,7 +20,7 @@ Skiloom v0 计划提供 `skiloom`、`skiloom-discover`、`skiloom-manage`、`ski
 7. `skiloom-doctor` 默认只读诊断。任何修复都重新进入普通 sync/repair/recovery/manage 路径，不能通过 doctor Skill 获得隐藏写权限。
 8. `skiloom-author` 负责标准 Skill 与 Skiloom metadata 的创建/检查，不拥有特殊发布、安装或 hook 能力。
 9. Bootstrap 是用户显式发起的一次普通 Router direct install，一次只针对一个用户选择的 Target。Target 选择继续遵守“显式 Target > 显式 Host preset + scope > 默认 `.agents/skills`”。
-10. `npm install -g skiloom` / `npx skiloom` 本身不得修改任何 Skill Target，也不得通过 postinstall 或首次运行副作用静默 bootstrap。
+10. `npm install -g @akira-tl/skiloom` / `npx --package @akira-tl/skiloom -- skiloom` 本身不得修改任何 Skill Target，也不得通过 postinstall 或首次运行副作用静默 bootstrap。npm distribution identity 后续由 ADR 0033 固定到 `@akira-tl` scope。
 11. 第一方身份不授予直接写 `registry.sqlite3`、修改 Store、绕过 `operation.lock`、自动接受来源、自动允许 Release retarget、删除/覆盖 Target 或其他隐藏宿主写权限。
 12. CLI/runtime 在没有安装第一方 Skill Suite 时也必须保持完整正确性。第一方 Skill 只提供 Agent UX 和 workflow guidance。
 13. Suite 已启用后的 update/remove/sync/repair/detach/rename 等生命周期全部复用普通 Target 规则；bootstrap 不形成第二套升级或维护语义。

@@ -26,7 +26,7 @@ Skiloom 是面向 Agent Skill 的独立包管理器与安装器。它把标准 A
 
 - Node.js >= 22，Node 24 LTS 为主要开发/release 线；
 - TypeScript strict + ESM；
-- npm package / executable 名称均为 `skiloom`；
+- npm 主包为 `@akira-tl/skiloom`，CLI executable 仍为 `skiloom`；
 - 普通产品控制面由 Node/TypeScript 实现；
 - `operation.lock` 使用预编译 mandatory Rust helper `skiloom-lock`；
 - 其他 native compute helper 只有通过 benchmark gate 后才引入；

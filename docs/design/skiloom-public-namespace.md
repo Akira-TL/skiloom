@@ -138,14 +138,14 @@ activation/dependency local lock generations = existing reference generations
 Reference implementation未来发布时：
 
 ```text
-preferred distribution/package name = skiloom
-preferred executable                = skiloom
+official npm distribution package  = @akira-tl/skiloom
+official executable                = skiloom
 preferred source/module token       = skiloom
 ```
 
-Core protocol 仍不绑定任何实现语言或 package ecosystem；但 reference implementation 已由 ADR 0017 选择 Node.js + TypeScript，并以 npm package `skiloom` 作为主要发行入口。此前核查 exact `skiloom` npm 名称时未发现已存在 package；真正首次发布前仍必须再次核查并取得对应 namespace。
+Core protocol 仍不绑定任何实现语言或 package ecosystem；reference implementation 由 ADR 0017 选择 Node.js + TypeScript，并由 ADR 0033 把 npm distribution identity 固定为 `@akira-tl/skiloom`，CLI executable 仍为 `skiloom`。npm scope 只属于官方发行坐标，不进入协议或产品 namespace。
 
-其他独立实现或未来额外 ecosystem distribution 可以使用 ecosystem-specific scoped/qualified package name，但 canonical executable 与 protocol/config namespace仍保持 `skiloom`，除非另有正式 namespace ADR。
+其他独立实现或未来额外 ecosystem distribution 可以使用各自 ecosystem-specific scoped/qualified package name；官方 npm 发行使用 `@akira-tl` scope，但 canonical executable 与 protocol/config namespace 继续保持 `skiloom`。
 
 ## 7. GitHub repository rename policy
 
