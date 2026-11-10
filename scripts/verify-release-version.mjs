@@ -6,7 +6,7 @@ const PLATFORM_PACKAGES = [
   "skiloom-lock-darwin-arm64",
   "skiloom-lock-darwin-x64",
   "skiloom-lock-linux-x64-gnu",
-  "skiloom-lock-win32-x64"
+  "skiloom-lock-win32-x64-msvc"
 ];
 
 const tag = process.argv[2] ?? process.env.GITHUB_REF_NAME;

@@ -324,7 +324,7 @@ skiloom
     ├── skiloom-lock-darwin-arm64
     ├── skiloom-lock-darwin-x64
     ├── skiloom-lock-linux-x64-gnu
-    └── skiloom-lock-win32-x64
+    └── skiloom-lock-win32-x64-msvc
 ```
 
 Compute accelerator 缺失时，如果 TypeScript baseline 存在，必须自动使用 TS path，行为完全相同。Mandatory System Capability Helper 缺失时必须返回明确的 `UnsupportedPlatformCapability` / 安装完整性错误，不能静默退化成不可靠锁。

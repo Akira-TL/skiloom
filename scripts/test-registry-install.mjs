@@ -157,7 +157,7 @@ function currentHelperPackage() {
     return "skiloom-lock-darwin-arm64";
   }
   if (process.platform === "win32" && process.arch === "x64") {
-    return "skiloom-lock-win32-x64";
+    return "skiloom-lock-win32-x64-msvc";
   }
   throw new Error(
     `registry smoke platform is outside the v0 matrix: ${process.platform}/${process.arch}`

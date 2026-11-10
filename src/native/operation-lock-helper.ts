@@ -42,7 +42,7 @@ export function operationLockPlatformPackage(
   }
   if (platform === "win32" && arch === "x64") {
     return {
-      packageName: "skiloom-lock-win32-x64",
+      packageName: "skiloom-lock-win32-x64-msvc",
       executablePath: "bin/skiloom-lock.exe"
     };
   }

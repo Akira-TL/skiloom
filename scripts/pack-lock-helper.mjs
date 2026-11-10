@@ -47,7 +47,7 @@ const TARGETS = new Map([
   [
     "win32-x64",
     {
-      packageName: "skiloom-lock-win32-x64",
+      packageName: "skiloom-lock-win32-x64-msvc",
       executable: "skiloom-lock.exe",
       os: ["win32"],
       cpu: ["x64"],

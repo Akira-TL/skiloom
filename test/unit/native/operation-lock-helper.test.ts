@@ -30,7 +30,7 @@ test("operation-lock platform package selection matches the v0 release matrix", 
   assert.deepEqual(
     operationLockPlatformPackage("win32", "x64", null),
     {
-      packageName: "skiloom-lock-win32-x64",
+      packageName: "skiloom-lock-win32-x64-msvc",
       executablePath: "bin/skiloom-lock.exe"
     }
   );

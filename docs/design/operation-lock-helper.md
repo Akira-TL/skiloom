@@ -261,7 +261,7 @@ v0 release readiness 固定首发支持矩阵如下；这些 package 只是主 `
 | Linux x64 glibc 2.17+ | `skiloom-lock-linux-x64-gnu` | `os=linux`, `cpu=x64`, `libc=glibc` | `bin/skiloom-lock` |
 | macOS x64 | `skiloom-lock-darwin-x64` | `os=darwin`, `cpu=x64` | `bin/skiloom-lock` |
 | macOS arm64 | `skiloom-lock-darwin-arm64` | `os=darwin`, `cpu=arm64` | `bin/skiloom-lock` |
-| Windows x64 | `skiloom-lock-win32-x64` | `os=win32`, `cpu=x64` | `bin/skiloom-lock.exe` |
+| Windows x64 | `skiloom-lock-win32-x64-msvc` | `os=win32`, `cpu=x64` | `bin/skiloom-lock.exe` |
 
 四个 helper package 与主 `skiloom` package 使用同一版本号并由同一 release tag 构建。主 package 通过 `optionalDependencies` 同时声明四个精确版本，让 npm 根据 `os` / `cpu` / `libc` 只安装匹配项；“optional”只描述 npm 的平台选择机制，不改变 `operation.lock` 在产品层的 mandatory 语义。
 
